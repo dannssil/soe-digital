@@ -4,12 +4,13 @@ import {
   LayoutDashboard, Users, FileText, LogOut, 
   Search, Plus, Save, X, ChevronDown, CheckSquare, 
   AlertTriangle, Heart, BookOpen, Calendar, Folder, Camera,
-  Phone, MapPin, User, Pencil, Printer
+  Phone, MapPin, User, Pencil, Printer, Lock
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
 const SYSTEM_USER_NAME = "Daniel Alves"; 
 const SYSTEM_ROLE = "SOE - CED 4 Guará";
+const ACCESS_PASSWORD = "123"; // <--- SUA SENHA AQUI
 
 // --- LISTAS ---
 const MOTIVOS_COMPORTAMENTO = [
@@ -86,6 +87,11 @@ function Avatar({ name, src, size = "md" }: { name: string, src?: string | null,
 
 // --- APP ---
 export default function App() {
+  // --- ESTADO DE LOGIN ---
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState(false);
+
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -124,8 +130,13 @@ export default function App() {
   const DEFAULT_OBS = "Relatório de Atendimento:\n\n- Relato do estudante:\n\n- Mediação realizada:\n\n- Combinados:";
   const [obsLivre, setObsLivre] = useState(DEFAULT_OBS);
 
+  // --- VERIFICAR LOGIN AO CARREGAR ---
   useEffect(() => {
-    fetchStudents();
+    const savedAuth = localStorage.getItem('soe_auth');
+    if (savedAuth === 'true') {
+      setIsAuthenticated(true);
+      fetchStudents();
+    }
   }, []);
 
   async function fetchStudents() {
@@ -143,6 +154,25 @@ export default function App() {
     }
     setLoading(false);
   }
+
+  // --- FUNÇÃO DE LOGIN ---
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === ACCESS_PASSWORD) {
+      setIsAuthenticated(true);
+      localStorage.setItem('soe_auth', 'true');
+      fetchStudents();
+    } else {
+      setLoginError(true);
+    }
+  };
+
+  const handleLogout = () => { 
+    if(confirm("Deseja realmente sair?")) {
+      localStorage.removeItem('soe_auth');
+      window.location.reload(); 
+    }
+  };
 
   // --- FUNÇÕES DE EDIÇÃO ---
   function startEditing() {
@@ -252,8 +282,6 @@ export default function App() {
     else setList([...list, item]);
   };
 
-  const handleLogout = () => { if(confirm("Deseja realmente sair?")) window.location.reload(); };
-
   const studentsByClass = students.reduce((acc, student) => {
     const turma = student.class_id || 'Sem Turma';
     if (turma.trim().startsWith('1')) return acc;
@@ -263,6 +291,36 @@ export default function App() {
   }, {} as Record<string, Student[]>);
 
   const filteredTurmas = Object.keys(studentsByClass).sort();
+
+  // --- RENDERIZAÇÃO CONDICIONAL (LOGIN vs APP) ---
+  if (!isAuthenticated) {
+    return (
+      <div className="h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
+          <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Lock className="text-indigo-600" size={32} />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso Restrito</h1>
+          <p className="text-slate-500 mb-6 text-sm">SOE Digital - CED 4 Guará</p>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input 
+              type="password" 
+              className={`w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-center text-lg ${loginError ? 'border-red-500 bg-red-50' : 'border-slate-300'}`}
+              placeholder="Digite a Senha de Acesso"
+              value={passwordInput}
+              onChange={e => { setPasswordInput(e.target.value); setLoginError(false); }}
+            />
+            {loginError && <p className="text-red-500 text-xs font-bold">Senha incorreta.</p>}
+            <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-all">
+              Entrar no Sistema
+            </button>
+          </form>
+          <p className="mt-8 text-[10px] text-slate-400">Sistema Seguro • Versão 2026</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
