@@ -10,7 +10,7 @@ import {
 // --- CONFIGURAÇÕES ---
 const SYSTEM_USER_NAME = "Daniel Alves"; 
 const SYSTEM_ROLE = "SOE - CED 4 Guará";
-const ACCESS_PASSWORD = "123"; // <--- SUA SENHA AQUI
+const ACCESS_PASSWORD = "Ced@1rf1"; // <--- SUA SENHA AQUI
 
 // --- LISTAS ---
 const MOTIVOS_COMPORTAMENTO = [
