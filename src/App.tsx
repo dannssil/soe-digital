@@ -36,8 +36,8 @@ const ENCAMINHAMENTOS = [
 // --- INTERFACES ---
 interface Student {
   id: any; 
-  name: string;  // CORRIGIDO: mudamos de nome_do_aluno para name
-  class: string; // CORRIGIDO: mudamos de turma para class
+  name: string;      
+  class_id: string;  // CORRIGIDO: O nome no seu banco é class_id
   turno?: string;
   responsavel?: string;
   logs?: Log[];
@@ -101,7 +101,7 @@ export default function App() {
     setLoading(true);
     setErrorMsg('');
     
-    // CORREÇÃO: Buscando na tabela 'students' ordenando por 'name'
+    // Busca na tabela 'students'
     const { data, error } = await supabase
       .from('students') 
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date)`)
@@ -120,12 +120,12 @@ export default function App() {
     e.preventDefault();
     if (!newName || !newClass) return;
 
-    // CORREÇÃO: Inserindo nas colunas 'name' e 'class'
+    // CORREÇÃO: Usando 'class_id' para salvar a turma
     const { error } = await supabase
       .from('students')
       .insert([{ 
         name: newName, 
-        class: newClass,
+        class_id: newClass, // AQUI MUDOU
         turno: newTurno,
         responsavel: newResponsavel
       }]);
@@ -175,8 +175,8 @@ export default function App() {
   };
 
   const studentsByClass = students.reduce((acc, student) => {
-    // CORREÇÃO: Usando student.class para agrupar
-    const turma = student.class || 'Sem Turma';
+    // CORREÇÃO CRÍTICA: Usando student.class_id para agrupar as pastas
+    const turma = student.class_id || 'Sem Turma';
     if (!acc[turma]) acc[turma] = [];
     acc[turma].push(student);
     return acc;
@@ -278,7 +278,6 @@ export default function App() {
                  <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
                    <Users size={48} className="mx-auto text-slate-300 mb-4"/>
                    <p className="text-slate-500">Nenhum aluno encontrado.</p>
-                   {!errorMsg && <p className="text-xs text-slate-400 mt-1">Conectado com sucesso à tabela 'students', mas ela parece vazia.</p>}
                  </div>
                ) :
                filteredTurmas.map(turma => {
@@ -304,7 +303,8 @@ export default function App() {
                             <div>
                               <p className="font-bold text-slate-800 group-hover:text-indigo-700">{student.name}</p>
                               <div className="flex items-center gap-2 text-xs text-slate-500">
-                                {student.turno && <span>{student.turno}</span>}
+                                <span className="bg-slate-100 px-2 rounded font-bold text-slate-600">{student.class_id}</span>
+                                {student.turno && <span>• {student.turno}</span>}
                                 {student.responsavel && <span>• Resp: {student.responsavel}</span>}
                               </div>
                             </div>
@@ -330,7 +330,7 @@ export default function App() {
             <form onSubmit={handleAddStudent} className="space-y-4">
               <input className="w-full p-3 border rounded-xl" placeholder="Nome Completo" value={newName} onChange={e => setNewName(e.target.value)} />
               <div className="grid grid-cols-2 gap-4">
-                <input className="w-full p-3 border rounded-xl" placeholder="Turma" value={newClass} onChange={e => setNewClass(e.target.value)} />
+                <input className="w-full p-3 border rounded-xl" placeholder="Turma (ex: 6A)" value={newClass} onChange={e => setNewClass(e.target.value)} />
                 <select className="w-full p-3 border rounded-xl bg-white" value={newTurno} onChange={e => setNewTurno(e.target.value)}>
                    <option>Matutino</option><option>Vespertino</option><option>Integral</option>
                 </select>
@@ -354,7 +354,7 @@ export default function App() {
                 <Avatar name={selectedStudent.name} size="lg" />
                 <div>
                   <h2 className="text-2xl font-bold text-slate-800">{selectedStudent.name}</h2>
-                  <p className="text-slate-500">Turma {selectedStudent.class}</p>
+                  <p className="text-slate-500">Turma {selectedStudent.class_id}</p>
                 </div>
               </div>
               <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 hover:text-red-500" size={28}/></button>
