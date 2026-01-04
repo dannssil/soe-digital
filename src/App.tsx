@@ -36,8 +36,8 @@ const ENCAMINHAMENTOS = [
 // --- INTERFACES ---
 interface Student {
   id: any; 
-  nome_do_aluno: string; // Se não aparecer o nome, trocaremos para 'name'
-  turma: string;         
+  name: string;  // CORRIGIDO: mudamos de nome_do_aluno para name
+  class: string; // CORRIGIDO: mudamos de turma para class
   turno?: string;
   responsavel?: string;
   logs?: Log[];
@@ -101,11 +101,11 @@ export default function App() {
     setLoading(true);
     setErrorMsg('');
     
-    // CORREÇÃO: Buscando na tabela 'students' (conforme seu print)
+    // CORREÇÃO: Buscando na tabela 'students' ordenando por 'name'
     const { data, error } = await supabase
       .from('students') 
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date)`)
-      .order('nome_do_aluno'); // Se der erro de coluna, troque para 'name'
+      .order('name'); 
 
     if (error) {
       console.error("Erro Supabase:", error);
@@ -120,12 +120,12 @@ export default function App() {
     e.preventDefault();
     if (!newName || !newClass) return;
 
-    // CORREÇÃO: Inserindo na tabela 'students'
+    // CORREÇÃO: Inserindo nas colunas 'name' e 'class'
     const { error } = await supabase
       .from('students')
       .insert([{ 
-        nome_do_aluno: newName, 
-        turma: newClass,
+        name: newName, 
+        class: newClass,
         turno: newTurno,
         responsavel: newResponsavel
       }]);
@@ -175,7 +175,8 @@ export default function App() {
   };
 
   const studentsByClass = students.reduce((acc, student) => {
-    const turma = student.turma || 'Sem Turma';
+    // CORREÇÃO: Usando student.class para agrupar
+    const turma = student.class || 'Sem Turma';
     if (!acc[turma]) acc[turma] = [];
     acc[turma].push(student);
     return acc;
@@ -277,11 +278,11 @@ export default function App() {
                  <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
                    <Users size={48} className="mx-auto text-slate-300 mb-4"/>
                    <p className="text-slate-500">Nenhum aluno encontrado.</p>
-                   {!errorMsg && <p className="text-xs text-slate-400 mt-1">A conexão parece OK, mas a tabela 'students' pode estar vazia.</p>}
+                   {!errorMsg && <p className="text-xs text-slate-400 mt-1">Conectado com sucesso à tabela 'students', mas ela parece vazia.</p>}
                  </div>
                ) :
                filteredTurmas.map(turma => {
-                 const turmaAlunos = studentsByClass[turma].filter(s => s.nome_do_aluno.toLowerCase().includes(searchTerm.toLowerCase()));
+                 const turmaAlunos = studentsByClass[turma].filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
                  if (turmaAlunos.length === 0) return null;
 
                  return (
@@ -299,9 +300,9 @@ export default function App() {
                           onClick={() => { setSelectedStudent(student); setIsModalOpen(true); }}
                         >
                           <div className="flex items-center gap-4">
-                            <Avatar name={student.nome_do_aluno} />
+                            <Avatar name={student.name} />
                             <div>
-                              <p className="font-bold text-slate-800 group-hover:text-indigo-700">{student.nome_do_aluno}</p>
+                              <p className="font-bold text-slate-800 group-hover:text-indigo-700">{student.name}</p>
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 {student.turno && <span>{student.turno}</span>}
                                 {student.responsavel && <span>• Resp: {student.responsavel}</span>}
@@ -350,10 +351,10 @@ export default function App() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
             <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50">
               <div className="flex items-center gap-4">
-                <Avatar name={selectedStudent.nome_do_aluno} size="lg" />
+                <Avatar name={selectedStudent.name} size="lg" />
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-800">{selectedStudent.nome_do_aluno}</h2>
-                  <p className="text-slate-500">Turma {selectedStudent.turma}</p>
+                  <h2 className="text-2xl font-bold text-slate-800">{selectedStudent.name}</h2>
+                  <p className="text-slate-500">Turma {selectedStudent.class}</p>
                 </div>
               </div>
               <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 hover:text-red-500" size={28}/></button>
