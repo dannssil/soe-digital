@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, FileText, LogOut, 
   Search, Plus, Save, X, ChevronDown, CheckSquare, 
   AlertTriangle, Heart, BookOpen, Calendar, Folder, Camera,
-  Phone, MapPin, User, Pencil
+  Phone, MapPin, User, Pencil, Printer
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -43,7 +43,6 @@ interface Student {
   id: any; 
   name: string;      
   class_id: string;  
-  // turno removido do banco, será fixo no código
   guardian_name?: string;  
   guardian_phone?: string; 
   address?: string;        
@@ -73,13 +72,13 @@ function Avatar({ name, src, size = "md" }: { name: string, src?: string | null,
       <img 
         src={src} 
         alt={name} 
-        className={`${sizeClasses[size]} rounded-full object-cover shadow-sm ring-2 ring-white bg-gray-100`}
+        className={`${sizeClasses[size]} rounded-full object-cover shadow-sm ring-2 ring-white bg-gray-100 print:border-0`}
         style={{ width: pxSize[size], height: pxSize[size] }}
       />
     );
   }
   return (
-    <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-white`} style={{ width: pxSize[size], height: pxSize[size] }}>
+    <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-white print:border print:border-black print:text-black print:bg-white`} style={{ width: pxSize[size], height: pxSize[size] }}>
       {initials}
     </div>
   );
@@ -110,7 +109,6 @@ export default function App() {
   // Form Novo Aluno
   const [newName, setNewName] = useState('');
   const [newClass, setNewClass] = useState('');
-  // const [newTurno, setNewTurno] = useState('Vespertino'); // Removido
   const [newResponsavel, setNewResponsavel] = useState('');
   const [newPhone, setNewPhone] = useState('');   
   const [newAddress, setNewAddress] = useState(''); 
@@ -159,8 +157,6 @@ export default function App() {
 
   async function saveEdits() {
     if (!selectedStudent) return;
-    
-    // ATUALIZADO: Não envia mais o campo 'turno'
     const { error } = await supabase
       .from('students')
       .update({
@@ -186,6 +182,11 @@ export default function App() {
       fetchStudents();
     }
   }
+
+  // --- FUNÇÃO DE IMPRESSÃO ---
+  const handlePrint = () => {
+    window.print();
+  };
 
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return;
@@ -221,16 +222,7 @@ export default function App() {
   async function handleAddStudent(e: React.FormEvent) {
     e.preventDefault();
     if (!newName || !newClass) return;
-    
-    // ATUALIZADO: Não envia 'turno', pois não existe a coluna e todos são Vespertino
-    const { error } = await supabase.from('students').insert([{ 
-      name: newName, 
-      class_id: newClass, 
-      guardian_name: newResponsavel, 
-      guardian_phone: newPhone, 
-      address: newAddress 
-    }]);
-
+    const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, guardian_name: newResponsavel, guardian_phone: newPhone, address: newAddress }]);
     if (error) alert('Erro ao cadastrar: ' + error.message);
     else {
       alert('Aluno cadastrado!');
@@ -262,13 +254,9 @@ export default function App() {
 
   const handleLogout = () => { if(confirm("Deseja realmente sair?")) window.location.reload(); };
 
-  // --- FILTRO DE TURMAS ---
   const studentsByClass = students.reduce((acc, student) => {
     const turma = student.class_id || 'Sem Turma';
-    
-    // FILTRO: Se a turma começar com "1", ignora este aluno
     if (turma.trim().startsWith('1')) return acc;
-
     if (!acc[turma]) acc[turma] = [];
     acc[turma].push(student);
     return acc;
@@ -279,6 +267,32 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
       
+      {/* CSS PARA IMPRESSÃO */}
+      <style>{`
+        @media print {
+          aside, header, .no-print { display: none !important; }
+          body { background: white; }
+          .modal-content { 
+            box-shadow: none !important; 
+            width: 100% !important; 
+            max-width: 100% !important;
+            height: auto !important;
+            position: relative !important;
+            overflow: visible !important;
+          }
+          .modal-overlay { 
+            position: static !important; 
+            background: white !important; 
+            padding: 0 !important; 
+          }
+          /* Esconder área de novo atendimento na impressão */
+          .new-log-area { display: none !important; }
+          /* Mostrar cabeçalho oficial */
+          .print-header { display: block !important; }
+        }
+        .print-header { display: none; }
+      `}</style>
+
       {/* SIDEBAR */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shadow-2xl z-20">
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
@@ -373,7 +387,6 @@ export default function App() {
                               <p className="font-bold text-slate-800 group-hover:text-indigo-700">{student.name}</p>
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <span className="bg-slate-100 px-2 rounded font-bold text-slate-600">{student.class_id}</span>
-                                {/* TURNO FIXO AGORA */}
                                 <span>• Vespertino</span>
                               </div>
                             </div>
@@ -400,7 +413,6 @@ export default function App() {
               <input className="w-full p-3 border rounded-xl" placeholder="Nome Completo" value={newName} onChange={e => setNewName(e.target.value)} />
               <div className="grid grid-cols-2 gap-4">
                 <input className="w-full p-3 border rounded-xl" placeholder="Turma (ex: 6A)" value={newClass} onChange={e => setNewClass(e.target.value)} />
-                {/* CAMPO TURNO REMOVIDO DA TELA - É AUTOMÁTICO */}
                 <div className="w-full p-3 border rounded-xl bg-slate-100 text-slate-500 flex items-center">Vespertino (Automático)</div>
               </div>
               <input className="w-full p-3 border rounded-xl" placeholder="Responsável (Mãe/Pai)" value={newResponsavel} onChange={e => setNewResponsavel(e.target.value)} />
@@ -417,11 +429,20 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL ATENDIMENTO (COM EDIÇÃO) */}
+      {/* MODAL ATENDIMENTO (COM IMPRESSÃO E EDIÇÃO) */}
       {isModalOpen && selectedStudent && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
-            <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50">
+        <div className="modal-overlay fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+            
+            {/* CABEÇALHO PARA IMPRESSÃO (Escondido na tela) */}
+            <div className="print-header p-8 border-b-2 border-black mb-4 text-center">
+               <h1 className="font-bold text-xl uppercase">Governo do Distrito Federal</h1>
+               <h2 className="font-bold text-lg uppercase">Secretaria de Estado de Educação</h2>
+               <h3 className="font-bold text-lg uppercase mt-2">Centro Educacional 04 do Guará</h3>
+               <p className="font-bold text-sm mt-4 uppercase border p-2 inline-block">Serviço de Orientação Educacional - SOE</p>
+            </div>
+
+            <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50 no-print">
               <div className="flex items-center gap-4">
                 <div className="relative group">
                   <Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="lg" />
@@ -440,22 +461,21 @@ export default function App() {
                      <div className="flex items-center gap-3">
                        <div>
                           <h2 className="text-2xl font-bold text-slate-800">{selectedStudent.name}</h2>
-                          {/* TURNO FIXO */}
                           <p className="text-slate-500">Turma {selectedStudent.class_id} • Vespertino</p>
                        </div>
                        <button onClick={startEditing} className="p-2 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 transition-colors" title="Editar Dados">
                           <Pencil size={18} />
+                       </button>
+                       {/* BOTAO IMPRIMIR */}
+                       <button onClick={handlePrint} className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200 transition-colors" title="Imprimir Ficha">
+                          <Printer size={18} />
                        </button>
                      </div>
                    )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {isEditing && (
-                  <button onClick={saveEdits} className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700">
-                    Salvar
-                  </button>
-                )}
+                {isEditing && <button onClick={saveEdits} className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold">Salvar</button>}
                 <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 hover:text-red-500" size={28}/></button>
               </div>
             </div>
@@ -463,44 +483,31 @@ export default function App() {
             <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-8 space-y-6">
                 
-                {/* DADOS CADASTRAIS (COM EDIÇÃO) */}
-                <div className={`p-5 rounded-xl border border-slate-200 shadow-sm ${isEditing ? 'bg-amber-50 border-amber-200' : 'bg-white'}`}>
-                  <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2">
+                {/* DADOS CADASTRAIS */}
+                <div className={`p-5 rounded-xl border border-slate-200 shadow-sm ${isEditing ? 'bg-amber-50 border-amber-200' : 'bg-white'} print:border-black print:shadow-none`}>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2 print:text-black">
                     <User size={14}/> {isEditing ? 'Editando Dados...' : 'Dados Cadastrais'}
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
                     <div>
-                      <span className="block text-xs font-bold text-slate-500 mb-1">Responsável</span>
-                      {isEditing ? 
-                        <input className="w-full p-1 border rounded" value={editGuardian} onChange={e => setEditGuardian(e.target.value)} /> : 
-                        <p className="font-medium text-slate-800">{selectedStudent.guardian_name || "—"}</p>
-                      }
+                      <span className="block text-xs font-bold text-slate-500 mb-1 print:text-black">Responsável</span>
+                      {isEditing ? <input className="w-full p-1 border rounded" value={editGuardian} onChange={e => setEditGuardian(e.target.value)} /> : <p className="font-medium text-slate-800">{selectedStudent.guardian_name || "—"}</p>}
                     </div>
                     <div>
-                      <span className="block text-xs font-bold text-slate-500 mb-1">Telefone</span>
-                      {isEditing ? 
-                        <input className="w-full p-1 border rounded" value={editPhone} onChange={e => setEditPhone(e.target.value)} /> :
-                        <p className="font-medium text-slate-800 flex items-center gap-2">
-                          {selectedStudent.guardian_phone ? <><Phone size={14} className="text-green-600"/> {selectedStudent.guardian_phone}</> : "—"}
-                        </p>
-                      }
+                      <span className="block text-xs font-bold text-slate-500 mb-1 print:text-black">Telefone</span>
+                      {isEditing ? <input className="w-full p-1 border rounded" value={editPhone} onChange={e => setEditPhone(e.target.value)} /> : <p className="font-medium text-slate-800">{selectedStudent.guardian_phone || "—"}</p>}
                     </div>
                     <div>
-                      <span className="block text-xs font-bold text-slate-500 mb-1">Endereço</span>
-                      {isEditing ?
-                         <input className="w-full p-1 border rounded" value={editAddress} onChange={e => setEditAddress(e.target.value)} /> :
-                         <p className="font-medium text-slate-800 flex items-center gap-2">
-                            {selectedStudent.address ? <><MapPin size={14} className="text-red-500"/> {selectedStudent.address}</> : "—"}
-                         </p>
-                      }
+                      <span className="block text-xs font-bold text-slate-500 mb-1 print:text-black">Endereço</span>
+                      {isEditing ? <input className="w-full p-1 border rounded" value={editAddress} onChange={e => setEditAddress(e.target.value)} /> : <p className="font-medium text-slate-800">{selectedStudent.address || "—"}</p>}
                     </div>
                   </div>
                 </div>
 
-                {/* ATENDIMENTO (Fica oculto durante edição para focar nos dados) */}
+                {/* AREA DE REGISTRO (SOME NA IMPRESSÃO) */}
                 {!isEditing && (
                   <>
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 new-log-area">
                       <h3 className="text-xs font-bold text-indigo-800 uppercase mb-3">2. Novo Atendimento</h3>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -517,7 +524,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div>
+                    <div className="new-log-area">
                       <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">Motivos e Ações</h3>
                       <div className="grid grid-cols-2 gap-6">
                         <div>
@@ -539,7 +546,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div>
+                    <div className="new-log-area">
                       <h3 className="font-bold text-slate-800 mb-3">Encaminhamentos</h3>
                       <div className="grid grid-cols-2 gap-6">
                         <select className="w-full p-2 border rounded" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}>
@@ -554,7 +561,7 @@ export default function App() {
                     </div>
                     
                     <textarea 
-                      className="w-full p-4 border rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all text-base leading-relaxed" 
+                      className="w-full p-4 border rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all text-base leading-relaxed new-log-area" 
                       rows={15} 
                       value={obsLivre} 
                       onChange={e => setObsLivre(e.target.value)} 
@@ -563,20 +570,21 @@ export default function App() {
                 )}
               </div>
 
-              <div className="lg:col-span-4 bg-slate-50 rounded-xl p-4 overflow-y-auto max-h-[700px]">
-                <h3 className="text-xs font-bold text-slate-400 uppercase mb-4">Histórico do Aluno</h3>
+              {/* HISTÓRICO - VISÍVEL NA IMPRESSÃO */}
+              <div className="lg:col-span-4 bg-slate-50 rounded-xl p-4 overflow-y-auto max-h-[700px] print:col-span-12 print:max-h-none print:bg-white print:border print:border-black">
+                <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 print:text-black print:text-lg">Histórico do Aluno</h3>
                 {!selectedStudent.logs?.length && <p className="text-slate-400 text-center">Nenhum registro.</p>}
                 {selectedStudent.logs?.map(log => {
                   let parsed = { motivos: [], obs: log.description };
                   try { parsed = JSON.parse(log.description) } catch(e) {}
                   return (
-                    <div key={log.id} className="bg-white p-3 rounded-lg border shadow-sm mb-3 text-sm">
+                    <div key={log.id} className="bg-white p-3 rounded-lg border shadow-sm mb-3 text-sm print:border-black print:shadow-none print:mb-4">
                       <div className="flex justify-between mb-2">
-                        <span className="font-bold text-indigo-600">{new Date(log.created_at).toLocaleDateString()}</span>
-                        {log.resolved && <span className="text-[10px] bg-green-100 text-green-700 px-2 rounded">OK</span>}
+                        <span className="font-bold text-indigo-600 print:text-black">{new Date(log.created_at).toLocaleDateString()}</span>
+                        {log.resolved && <span className="text-[10px] bg-green-100 text-green-700 px-2 rounded print:border print:border-black print:text-black print:bg-white">RESOLVIDO</span>}
                       </div>
-                      <p className="text-slate-600 mb-2 whitespace-pre-line">{parsed.obs}</p>
-                      {log.referral && <p className="text-xs text-purple-600 font-bold">➔ {log.referral}</p>}
+                      <p className="text-slate-600 mb-2 whitespace-pre-line print:text-black">{parsed.obs}</p>
+                      {log.referral && <p className="text-xs text-purple-600 font-bold print:text-black">➔ Encaminhado: {log.referral}</p>}
                     </div>
                   )
                 })}
@@ -584,7 +592,7 @@ export default function App() {
             </div>
 
             {!isEditing && (
-              <div className="p-4 bg-slate-50 border-t flex justify-end gap-3">
+              <div className="p-4 bg-slate-50 border-t flex justify-end gap-3 no-print">
                 <button onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl bg-white border font-bold text-slate-600">Cancelar</button>
                 <button onClick={handleSaveLog} className="px-6 py-2 rounded-xl bg-indigo-600 text-white font-bold flex items-center gap-2"><Save size={18}/> Salvar Registro</button>
               </div>
