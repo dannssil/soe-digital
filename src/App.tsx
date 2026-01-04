@@ -3,7 +3,8 @@ import { supabase } from './supabaseClient';
 import { 
   LayoutDashboard, Users, FileText, LogOut, 
   Search, Plus, Save, X, ChevronDown, CheckSquare, 
-  AlertTriangle, Heart, BookOpen, Calendar, Folder, Camera
+  AlertTriangle, Heart, BookOpen, Calendar, Folder, Camera,
+  Phone, MapPin, User
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -39,8 +40,10 @@ interface Student {
   name: string;      
   class_id: string;  
   turno?: string;
-  responsavel?: string;
-  photo_url?: string; // NOVO: Link da foto
+  guardian_name?: string;  // CORRIGIDO (Nome real do banco)
+  guardian_phone?: string; // CORRIGIDO (Nome real do banco)
+  address?: string;        // CORRIGIDO (Nome real do banco)
+  photo_url?: string; 
   logs?: Log[];
 }
 
@@ -54,7 +57,7 @@ interface Log {
   resolved?: boolean;
 }
 
-// --- AVATAR INTELIGENTE (Mostra foto ou iniciais) ---
+// --- AVATAR ---
 function Avatar({ name, src, size = "md" }: { name: string, src?: string, size?: "sm" | "md" | "lg" }) {
   const safeName = name || "Aluno";
   const initials = safeName.substring(0, 2).toUpperCase();
@@ -71,7 +74,6 @@ function Avatar({ name, src, size = "md" }: { name: string, src?: string, size?:
       />
     );
   }
-
   return (
     <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-white`} style={{ width: pxSize[size], height: pxSize[size] }}>
       {initials}
@@ -90,13 +92,15 @@ export default function App() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
-  const [uploading, setUploading] = useState(false); // Estado de upload
+  const [uploading, setUploading] = useState(false);
 
   // Form Novo Aluno
   const [newName, setNewName] = useState('');
   const [newClass, setNewClass] = useState('');
   const [newTurno, setNewTurno] = useState('Matutino');
   const [newResponsavel, setNewResponsavel] = useState('');
+  const [newPhone, setNewPhone] = useState('');   
+  const [newAddress, setNewAddress] = useState(''); 
   
   // Form Atendimento
   const [solicitante, setSolicitante] = useState('Professor');
@@ -114,7 +118,6 @@ export default function App() {
   async function fetchStudents() {
     setLoading(true);
     setErrorMsg('');
-    
     const { data, error } = await supabase
       .from('students') 
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date)`)
@@ -129,44 +132,25 @@ export default function App() {
     setLoading(false);
   }
 
-  // --- UPLOAD DE FOTO ---
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return;
-    
     setUploading(true);
     const file = event.target.files[0];
     const fileExt = file.name.split('.').pop();
     const fileName = `${selectedStudent.id}-${Math.random()}.${fileExt}`;
     const filePath = `${fileName}`;
 
-    // 1. Enviar para o bucket 'photos'
-    const { error: uploadError } = await supabase.storage
-      .from('photos')
-      .upload(filePath, file);
+    const { error: uploadError } = await supabase.storage.from('photos').upload(filePath, file);
+    if (uploadError) { alert('Erro no upload: ' + uploadError.message); setUploading(false); return; }
 
-    if (uploadError) {
-      alert('Erro no upload: ' + uploadError.message);
-      setUploading(false);
-      return;
-    }
+    const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(filePath);
 
-    // 2. Pegar o link público
-    const { data: { publicUrl } } = supabase.storage
-      .from('photos')
-      .getPublicUrl(filePath);
+    const { error: updateError } = await supabase.from('students').update({ photo_url: publicUrl }).eq('id', selectedStudent.id);
 
-    // 3. Salvar link no banco
-    const { error: updateError } = await supabase
-      .from('students')
-      .update({ photo_url: publicUrl })
-      .eq('id', selectedStudent.id);
-
-    if (updateError) {
-      alert('Erro ao salvar link: ' + updateError.message);
-    } else {
-      // Atualizar interface
+    if (updateError) alert('Erro ao salvar link: ' + updateError.message);
+    else {
       setSelectedStudent({ ...selectedStudent, photo_url: publicUrl });
-      fetchStudents(); // Atualiza a lista geral também
+      fetchStudents();
     }
     setUploading(false);
   }
@@ -175,19 +159,22 @@ export default function App() {
     e.preventDefault();
     if (!newName || !newClass) return;
 
+    // CORREÇÃO: Usando os nomes exatos das colunas do seu banco
     const { error } = await supabase
       .from('students')
       .insert([{ 
         name: newName, 
         class_id: newClass, 
         turno: newTurno,
-        responsavel: newResponsavel
+        guardian_name: newResponsavel, // Nome certo
+        guardian_phone: newPhone,      // Nome certo
+        address: newAddress            // Nome certo
       }]);
 
     if (error) alert('Erro ao cadastrar: ' + error.message);
     else {
       alert('Aluno cadastrado!');
-      setNewName(''); setNewClass(''); setNewResponsavel('');
+      setNewName(''); setNewClass(''); setNewResponsavel(''); setNewPhone(''); setNewAddress('');
       setIsNewStudentModalOpen(false);
       fetchStudents();
     }
@@ -195,13 +182,7 @@ export default function App() {
 
   async function handleSaveLog() {
     if (!selectedStudent) return;
-    
-    const descriptionCompiled = JSON.stringify({
-      solicitante,
-      motivos: motivosSelecionados,
-      acoes: acoesSelecionadas,
-      obs: obsLivre
-    });
+    const descriptionCompiled = JSON.stringify({ solicitante, motivos: motivosSelecionados, acoes: acoesSelecionadas, obs: obsLivre });
 
     const { error } = await supabase
       .from('logs')
@@ -258,18 +239,14 @@ export default function App() {
           </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
-          <button className="flex items-center gap-2 text-sm text-slate-400 hover:text-white">
-            <LogOut size={16} /> Sair
-          </button>
+          <button className="flex items-center gap-2 text-sm text-slate-400 hover:text-white"><LogOut size={16} /> Sair</button>
         </div>
       </aside>
 
       {/* MAIN */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         <header className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm z-10">
-          <h2 className="text-xl font-bold text-slate-800">
-            {view === 'dashboard' ? 'Visão Geral' : 'Gerenciamento de Alunos'}
-          </h2>
+          <h2 className="text-xl font-bold text-slate-800">{view === 'dashboard' ? 'Visão Geral' : 'Gerenciamento de Alunos'}</h2>
           <div className="flex items-center gap-3">
              <div className="text-right hidden md:block">
                <p className="text-sm font-bold text-slate-700">{SYSTEM_USER}</p>
@@ -280,14 +257,9 @@ export default function App() {
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
-          
           {errorMsg && (
             <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-3">
-              <AlertTriangle />
-              <div>
-                <p className="font-bold">Atenção:</p>
-                <p className="text-sm">{errorMsg}</p>
-              </div>
+              <AlertTriangle /><div><p className="font-bold">Atenção:</p><p className="text-sm">{errorMsg}</p></div>
             </div>
           )}
 
@@ -299,9 +271,7 @@ export default function App() {
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-slate-500 text-sm font-bold uppercase">Atendimentos</p>
-                <h3 className="text-4xl font-bold text-indigo-600 mt-2">
-                  {students.reduce((acc, s) => acc + (s.logs?.length || 0), 0)}
-                </h3>
+                <h3 className="text-4xl font-bold text-indigo-600 mt-2">{students.reduce((acc, s) => acc + (s.logs?.length || 0), 0)}</h3>
               </div>
             </div>
           )}
@@ -311,32 +281,18 @@ export default function App() {
               <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between">
                 <div className="relative flex-1 max-w-lg">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                  <input 
-                    className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
-                    placeholder="Buscar estudante..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                  />
+                  <input className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm" placeholder="Buscar estudante..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
-                <button 
-                  onClick={() => setIsNewStudentModalOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all"
-                >
+                <button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all">
                   <Plus size={20} /> Novo Aluno
                 </button>
               </div>
 
               {loading ? <p className="text-center text-slate-500">Carregando dados...</p> : 
-               filteredTurmas.length === 0 ? (
-                 <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
-                   <Users size={48} className="mx-auto text-slate-300 mb-4"/>
-                   <p className="text-slate-500">Nenhum aluno encontrado.</p>
-                 </div>
-               ) :
+               filteredTurmas.length === 0 ? <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300"><Users size={48} className="mx-auto text-slate-300 mb-4"/><p className="text-slate-500">Nenhum aluno encontrado.</p></div> :
                filteredTurmas.map(turma => {
                  const turmaAlunos = studentsByClass[turma].filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
                  if (turmaAlunos.length === 0) return null;
-
                  return (
                   <div key={turma} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8">
                     <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center gap-3">
@@ -346,11 +302,7 @@ export default function App() {
                     </div>
                     <div className="divide-y divide-slate-100">
                       {turmaAlunos.map(student => (
-                        <div 
-                          key={student.id} 
-                          className="px-6 py-4 flex items-center justify-between hover:bg-indigo-50 cursor-pointer transition-colors group"
-                          onClick={() => { setSelectedStudent(student); setIsModalOpen(true); }}
-                        >
+                        <div key={student.id} className="px-6 py-4 flex items-center justify-between hover:bg-indigo-50 cursor-pointer transition-colors group" onClick={() => { setSelectedStudent(student); setIsModalOpen(true); }}>
                           <div className="flex items-center gap-4">
                             <Avatar name={student.name} src={student.photo_url} />
                             <div>
@@ -358,7 +310,6 @@ export default function App() {
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <span className="bg-slate-100 px-2 rounded font-bold text-slate-600">{student.class_id}</span>
                                 {student.turno && <span>• {student.turno}</span>}
-                                {student.responsavel && <span>• Resp: {student.responsavel}</span>}
                               </div>
                             </div>
                           </div>
@@ -378,7 +329,7 @@ export default function App() {
       {/* MODAL NOVO ALUNO */}
       {isNewStudentModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <h3 className="text-xl font-bold mb-4">Novo Aluno</h3>
             <form onSubmit={handleAddStudent} className="space-y-4">
               <input className="w-full p-3 border rounded-xl" placeholder="Nome Completo" value={newName} onChange={e => setNewName(e.target.value)} />
@@ -388,10 +339,14 @@ export default function App() {
                    <option>Matutino</option><option>Vespertino</option><option>Integral</option>
                 </select>
               </div>
-              <input className="w-full p-3 border rounded-xl" placeholder="Nome do Responsável" value={newResponsavel} onChange={e => setNewResponsavel(e.target.value)} />
+              <input className="w-full p-3 border rounded-xl" placeholder="Responsável (Mãe/Pai)" value={newResponsavel} onChange={e => setNewResponsavel(e.target.value)} />
+              <div className="grid grid-cols-2 gap-4">
+                <input className="w-full p-3 border rounded-xl" placeholder="Telefone Contato" value={newPhone} onChange={e => setNewPhone(e.target.value)} />
+                <input className="w-full p-3 border rounded-xl" placeholder="Endereço / Cidade" value={newAddress} onChange={e => setNewAddress(e.target.value)} />
+              </div>
               <div className="flex gap-2 justify-end mt-4">
                 <button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="px-4 py-2 text-slate-500">Cancelar</button>
-                <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">Salvar</button>
+                <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">Salvar Cadastro</button>
               </div>
             </form>
           </div>
@@ -401,22 +356,19 @@ export default function App() {
       {/* MODAL ATENDIMENTO */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
             <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50">
               <div className="flex items-center gap-4">
-                {/* ÁREA DE FOTO INTERATIVA */}
                 <div className="relative group">
                   <Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="lg" />
                   <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                    <Camera size={20} />
-                    <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={uploading} />
+                    <Camera size={20} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={uploading} />
                   </label>
                   {uploading && <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div></div>}
                 </div>
-
                 <div>
                   <h2 className="text-2xl font-bold text-slate-800">{selectedStudent.name}</h2>
-                  <p className="text-slate-500">Turma {selectedStudent.class_id}</p>
+                  <p className="text-slate-500">Turma {selectedStudent.class_id} • {selectedStudent.turno}</p>
                 </div>
               </div>
               <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 hover:text-red-500" size={28}/></button>
@@ -424,8 +376,32 @@ export default function App() {
 
             <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-8 space-y-6">
+                
+                {/* DADOS CADASTRAIS (AGORA VAI APARECER!) */}
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2"><User size={14}/> Dados Cadastrais</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                    <div>
+                      <span className="block text-xs font-bold text-slate-500 mb-1">Responsável</span>
+                      <p className="font-medium text-slate-800">{selectedStudent.guardian_name || "—"}</p>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-slate-500 mb-1">Telefone</span>
+                      <p className="font-medium text-slate-800 flex items-center gap-2">
+                        {selectedStudent.guardian_phone ? <><Phone size={14} className="text-green-600"/> {selectedStudent.guardian_phone}</> : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-slate-500 mb-1">Endereço</span>
+                      <p className="font-medium text-slate-800 flex items-center gap-2">
+                         {selectedStudent.address ? <><MapPin size={14} className="text-red-500"/> {selectedStudent.address}</> : "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                  <h3 className="text-xs font-bold text-indigo-800 uppercase mb-3">1. Detalhes</h3>
+                  <h3 className="text-xs font-bold text-indigo-800 uppercase mb-3">2. Novo Atendimento</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-bold text-slate-500">Solicitante</label>
@@ -441,7 +417,7 @@ export default function App() {
                 </div>
 
                 <div>
-                  <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">2. Motivos</h3>
+                  <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">Motivos e Ações</h3>
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <p className="text-xs font-bold text-amber-600 uppercase mb-2">Comportamento</p>
@@ -463,31 +439,24 @@ export default function App() {
                 </div>
 
                 <div>
-                  <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">3. Ações e Encaminhamentos</h3>
-                  <div className="grid grid-cols-2 gap-6">
-                     <div className="bg-slate-50 p-3 rounded-xl">
-                       {ACOES_REALIZADAS.map(a => (
-                         <label key={a} className="flex gap-2 text-sm text-slate-700 mb-1"><input type="checkbox" checked={acoesSelecionadas.includes(a)} onChange={() => toggleItem(acoesSelecionadas, setAcoesSelecionadas, a)}/> {a}</label>
-                       ))}
+                   <h3 className="font-bold text-slate-800 mb-3">Encaminhamentos</h3>
+                   <div className="grid grid-cols-2 gap-6">
+                     <select className="w-full p-2 border rounded" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}>
+                       <option value="">-- Encaminhar para --</option>
+                       {ENCAMINHAMENTOS.map(e => <option key={e} value={e}>{e}</option>)}
+                     </select>
+                     <div onClick={() => setResolvido(!resolvido)} className={`p-3 rounded border flex items-center gap-2 cursor-pointer ${resolvido ? 'bg-green-50 border-green-300' : 'bg-slate-50'}`}>
+                       <div className={`w-5 h-5 border rounded flex items-center justify-center ${resolvido ? 'bg-green-500 text-white' : 'bg-white'}`}>{resolvido && <CheckSquare size={14}/>}</div>
+                       <span className="text-sm font-bold">Caso Resolvido?</span>
                      </div>
-                     <div className="space-y-3">
-                       <select className="w-full p-2 border rounded" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}>
-                         <option value="">-- Encaminhar para --</option>
-                         {ENCAMINHAMENTOS.map(e => <option key={e} value={e}>{e}</option>)}
-                       </select>
-                       <div onClick={() => setResolvido(!resolvido)} className={`p-3 rounded border flex items-center gap-2 cursor-pointer ${resolvido ? 'bg-green-50 border-green-300' : 'bg-slate-50'}`}>
-                         <div className={`w-5 h-5 border rounded flex items-center justify-center ${resolvido ? 'bg-green-500 text-white' : 'bg-white'}`}>{resolvido && <CheckSquare size={14}/>}</div>
-                         <span className="text-sm font-bold">Caso Resolvido?</span>
-                       </div>
-                     </div>
-                  </div>
+                   </div>
                 </div>
                 
-                <textarea className="w-full p-4 border rounded-xl" rows={3} placeholder="Observações..." value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
+                <textarea className="w-full p-4 border rounded-xl" rows={3} placeholder="Observações detalhadas..." value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
               </div>
 
-              <div className="lg:col-span-4 bg-slate-50 rounded-xl p-4 overflow-y-auto max-h-[600px]">
-                <h3 className="text-xs font-bold text-slate-400 uppercase mb-4">Histórico</h3>
+              <div className="lg:col-span-4 bg-slate-50 rounded-xl p-4 overflow-y-auto max-h-[700px]">
+                <h3 className="text-xs font-bold text-slate-400 uppercase mb-4">Histórico do Aluno</h3>
                 {!selectedStudent.logs?.length && <p className="text-slate-400 text-center">Nenhum registro.</p>}
                 {selectedStudent.logs?.map(log => {
                   let parsed = { motivos: [], obs: log.description };
