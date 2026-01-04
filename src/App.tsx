@@ -29,10 +29,6 @@ const MOTIVOS_SOCIAL = [
   "Isolamento / dificuldade de socialização", "Queixas de colegas / professores",
   "Outros"
 ];
-const ACOES_REALIZADAS = [
-  "Escuta individual", "Mediação de conflito", "Comunicação à família",
-  "Contato com professor", "Encaminhamento à coordenação", "Encaminhamento à direção"
-];
 const ENCAMINHAMENTOS = [
   "Coordenação pedagógica", "Psicologia escolar", "Família / responsáveis",
   "Direção", "Conselho Tutelar",
@@ -49,7 +45,6 @@ interface Student {
   guardian_phone?: string; 
   address?: string;        
   photo_url?: string; 
-  // NOVOS CAMPOS ACADÊMICOS
   absences?: number;
   performance?: string;
   grades?: string;
@@ -108,29 +103,24 @@ export default function App() {
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // ESTADO DA ABA ATIVA NO MODAL (NOVO!)
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico'>('perfil');
 
-  // Estados de EDIÇÃO
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editClass, setEditClass] = useState('');
   const [editGuardian, setEditGuardian] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
-  // Novos Campos de Edição
   const [editAbsences, setEditAbsences] = useState(0);
   const [editPerformance, setEditPerformance] = useState('');
   const [editGrades, setEditGrades] = useState('');
 
-  // Form Novo Aluno
   const [newName, setNewName] = useState('');
   const [newClass, setNewClass] = useState('');
   const [newResponsavel, setNewResponsavel] = useState('');
   const [newPhone, setNewPhone] = useState('');   
   const [newAddress, setNewAddress] = useState(''); 
   
-  // Form Atendimento
   const [solicitante, setSolicitante] = useState('Professor');
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
   const [acoesSelecionadas, setAcoesSelecionadas] = useState<string[]>([]);
@@ -178,7 +168,6 @@ export default function App() {
     }
   };
 
-  // --- FUNÇÕES DE EDIÇÃO ---
   function startEditing() {
     if (!selectedStudent) return;
     setEditName(selectedStudent.name);
@@ -305,7 +294,7 @@ export default function App() {
         <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
           <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><Lock className="text-indigo-600" size={32} /></div>
           <h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso Restrito</h1>
-          <p className="text-slate-500 mb-6 text-sm">"SOE Digital ATUALIZADO" - CED 4 Guará</p>
+          <p className="text-slate-500 mb-6 text-sm">SOE Digital - CED 4 Guará</p>
           <form onSubmit={handleLogin} className="space-y-4">
             <input type="password" className={`w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-center text-lg ${loginError ? 'border-red-500 bg-red-50' : 'border-slate-300'}`} placeholder="Digite a Senha" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setLoginError(false); }} />
             {loginError && <p className="text-red-500 text-xs font-bold">Senha incorreta.</p>}
@@ -327,16 +316,14 @@ export default function App() {
           .modal-overlay { position: static !important; background: white !important; padding: 0 !important; }
           .new-log-area, .tabs-header { display: none !important; }
           .print-header { display: block !important; }
-          .tab-content { display: block !important; } /* Força mostrar tudo na impressão */
+          .tab-content { display: block !important; }
         }
         .print-header { display: none; }
       `}</style>
-
-      {/* SIDEBAR */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shadow-2xl z-20">
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
           <div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} className="text-white"/></div>
-          <div><h1 className="font-bold text-lg">"SOE Digital ATUALIZADO"</h1><p className="text-[10px] uppercase text-slate-400">CED 4 Guará</p></div>
+          <div><h1 className="font-bold text-lg">SOE Digital</h1><p className="text-[10px] uppercase text-slate-400">CED 4 Guará</p></div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
@@ -344,8 +331,6 @@ export default function App() {
         </nav>
         <div className="p-4 border-t border-slate-800"><button onClick={handleLogout} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white w-full"><LogOut size={16} /> Sair</button></div>
       </aside>
-
-      {/* MAIN */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         <header className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm z-10">
           <h2 className="text-xl font-bold text-slate-800">{view === 'dashboard' ? 'Visão Geral' : 'Gerenciamento de Alunos'}</h2>
@@ -357,22 +342,18 @@ export default function App() {
              </div>
           </div>
         </header>
-
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
           {errorMsg && <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-3"><AlertTriangle /><div><p className="font-bold">Atenção:</p><p className="text-sm">{errorMsg}</p></div></div>}
-
           {view === 'dashboard' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-slate-500 text-sm font-bold uppercase">Total de Alunos</p><h3 className="text-4xl font-bold text-slate-800 mt-2">{students.length}</h3></div>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-slate-500 text-sm font-bold uppercase">Atendimentos</p><h3 className="text-4xl font-bold text-indigo-600 mt-2">{students.reduce((acc, s) => acc + (s.logs?.length || 0), 0)}</h3></div>
-              {/* WIDGET DE ALERTA DE FALTAS/RISCO */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">
                 <p className="text-slate-500 text-sm font-bold uppercase">Rendimento Crítico</p>
                 <h3 className="text-4xl font-bold text-red-600 mt-2">{students.filter(s => s.performance === 'Crítico' || s.performance === 'Baixo').length}</h3>
               </div>
             </div>
           )}
-
           {view === 'students' && (
             <div className="max-w-6xl mx-auto">
               <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between">
@@ -382,7 +363,6 @@ export default function App() {
                 </div>
                 <button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all"><Plus size={20} /> Novo Aluno</button>
               </div>
-
               {loading ? <p className="text-center text-slate-500">Carregando dados...</p> : 
                filteredTurmas.length === 0 ? <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300"><Users size={48} className="mx-auto text-slate-300 mb-4"/><p className="text-slate-500">Nenhum aluno encontrado.</p></div> :
                filteredTurmas.map(turma => {
@@ -405,7 +385,6 @@ export default function App() {
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <span className="bg-slate-100 px-2 rounded font-bold text-slate-600">{student.class_id}</span>
                                 <span>• Vespertino</span>
-                                {/* INDICADOR VISUAL DE RENDIMENTO NA LISTA */}
                                 {student.performance === 'Crítico' && <span className="flex items-center gap-1 text-red-600 font-bold bg-red-50 px-2 rounded-full border border-red-100"><AlertCircle size={10}/> Atenção</span>}
                               </div>
                             </div>
@@ -422,8 +401,6 @@ export default function App() {
           )}
         </div>
       </main>
-
-      {/* MODAL NOVO ALUNO */}
       {isNewStudentModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
@@ -447,27 +424,20 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* MODAL DO ALUNO COM ABAS */}
       {isModalOpen && selectedStudent && (
         <div className="modal-overlay fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
-            
-            {/* CABEÇALHO DE IMPRESSÃO */}
             <div className="print-header p-8 border-b-2 border-black mb-4 text-center">
                <h1 className="font-bold text-xl uppercase">Governo do Distrito Federal</h1>
                <h2 className="font-bold text-lg uppercase">Secretaria de Estado de Educação</h2>
                <h3 className="font-bold text-lg uppercase mt-2">Centro Educacional 04 do Guará</h3>
                <p className="font-bold text-sm mt-4 uppercase border p-2 inline-block">Serviço de Orientação Educacional - SOE</p>
             </div>
-
             <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50 no-print">
               <div className="flex items-center gap-4">
                 <div className="relative group">
                   <Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="lg" />
-                  <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                    <Camera size={20} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={uploading} />
-                  </label>
+                  <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"><Camera size={20} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={uploading} /></label>
                   {uploading && <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div></div>}
                 </div>
                 <div>
@@ -499,121 +469,57 @@ export default function App() {
                 <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 hover:text-red-500" size={28}/></button>
               </div>
             </div>
-
-            {/* BARRA DE ABAS (NOVA NAVEGAÇÃO) */}
             <div className="flex border-b px-8 tabs-header no-print">
-              <button onClick={() => setActiveTab('perfil')} className={`px-6 py-4 font-bold text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'perfil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-                <User size={16}/> Perfil e Dados
-              </button>
-              <button onClick={() => setActiveTab('academico')} className={`px-6 py-4 font-bold text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'academico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-                <GraduationCap size={16}/> Acadêmico
-              </button>
-              <button onClick={() => setActiveTab('historico')} className={`px-6 py-4 font-bold text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'historico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-                <History size={16}/> Atendimentos e Histórico
-              </button>
+              <button onClick={() => setActiveTab('perfil')} className={`px-6 py-4 font-bold text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'perfil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><User size={16}/> Perfil e Dados</button>
+              <button onClick={() => setActiveTab('academico')} className={`px-6 py-4 font-bold text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'academico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><GraduationCap size={16}/> Acadêmico</button>
+              <button onClick={() => setActiveTab('historico')} className={`px-6 py-4 font-bold text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'historico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><History size={16}/> Atendimentos e Histórico</button>
             </div>
-
             <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
-              
-              {/* CONTEÚDO DA ABA PERFIL */}
               {(activeTab === 'perfil' || isEditing) && (
                 <div className={`p-6 rounded-xl border border-slate-200 shadow-sm mb-6 ${isEditing ? 'bg-amber-50 border-amber-200' : 'bg-white'} tab-content`}>
                   <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center gap-2 print:text-black">Dados Pessoais</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-                    <div>
-                      <span className="block text-xs font-bold text-slate-500 mb-1">Responsável</span>
-                      {isEditing ? <input className="w-full p-2 border rounded" value={editGuardian} onChange={e => setEditGuardian(e.target.value)} /> : <p className="font-medium text-lg text-slate-800">{selectedStudent.guardian_name || "—"}</p>}
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-slate-500 mb-1">Telefone</span>
-                      {isEditing ? <input className="w-full p-2 border rounded" value={editPhone} onChange={e => setEditPhone(e.target.value)} /> : <p className="font-medium text-lg text-slate-800">{selectedStudent.guardian_phone || "—"}</p>}
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-slate-500 mb-1">Endereço</span>
-                      {isEditing ? <input className="w-full p-2 border rounded" value={editAddress} onChange={e => setEditAddress(e.target.value)} /> : <p className="font-medium text-lg text-slate-800">{selectedStudent.address || "—"}</p>}
-                    </div>
+                    <div><span className="block text-xs font-bold text-slate-500 mb-1">Responsável</span>{isEditing ? <input className="w-full p-2 border rounded" value={editGuardian} onChange={e => setEditGuardian(e.target.value)} /> : <p className="font-medium text-lg text-slate-800">{selectedStudent.guardian_name || "—"}</p>}</div>
+                    <div><span className="block text-xs font-bold text-slate-500 mb-1">Telefone</span>{isEditing ? <input className="w-full p-2 border rounded" value={editPhone} onChange={e => setEditPhone(e.target.value)} /> : <p className="font-medium text-lg text-slate-800">{selectedStudent.guardian_phone || "—"}</p>}</div>
+                    <div><span className="block text-xs font-bold text-slate-500 mb-1">Endereço</span>{isEditing ? <input className="w-full p-2 border rounded" value={editAddress} onChange={e => setEditAddress(e.target.value)} /> : <p className="font-medium text-lg text-slate-800">{selectedStudent.address || "—"}</p>}</div>
                   </div>
                 </div>
               )}
-
-              {/* CONTEÚDO DA ABA ACADÊMICO (NOVO!) */}
               {(activeTab === 'academico' || isEditing) && (
                 <div className={`p-6 rounded-xl border border-slate-200 shadow-sm mb-6 ${isEditing ? 'bg-amber-50 border-amber-200' : 'bg-white'} tab-content`}>
                   <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center gap-2 print:text-black">Desempenho Escolar</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* FALTAS */}
                     <div className="bg-slate-50 p-4 rounded-lg border">
                       <span className="block text-xs font-bold text-slate-500 mb-1">Total de Faltas</span>
-                      {isEditing ? (
-                        <input type="number" className="w-full p-2 border rounded text-2xl font-bold" value={editAbsences} onChange={e => setEditAbsences(Number(e.target.value))} />
-                      ) : (
-                        <p className={`text-3xl font-bold ${selectedStudent.absences && selectedStudent.absences > 15 ? 'text-red-600' : 'text-slate-800'}`}>{selectedStudent.absences || 0}</p>
-                      )}
+                      {isEditing ? <input type="number" className="w-full p-2 border rounded text-2xl font-bold" value={editAbsences} onChange={e => setEditAbsences(Number(e.target.value))} /> : <p className={`text-3xl font-bold ${selectedStudent.absences && selectedStudent.absences > 15 ? 'text-red-600' : 'text-slate-800'}`}>{selectedStudent.absences || 0}</p>}
                       <p className="text-[10px] text-slate-400 mt-1">Acima de 15 faltas = Risco</p>
                     </div>
-
-                    {/* RENDIMENTO */}
                     <div className="bg-slate-50 p-4 rounded-lg border">
                       <span className="block text-xs font-bold text-slate-500 mb-1">Situação / Rendimento</span>
-                      {isEditing ? (
-                        <select className="w-full p-2 border rounded font-bold" value={editPerformance} onChange={e => setEditPerformance(e.target.value)}>
-                          <option value="">Selecione...</option>
-                          {OPCOES_RENDIMENTO.map(op => <option key={op}>{op}</option>)}
-                        </select>
-                      ) : (
-                        <p className={`text-2xl font-bold ${selectedStudent.performance === 'Crítico' ? 'text-red-600' : 'text-slate-800'}`}>{selectedStudent.performance || "Não avaliado"}</p>
-                      )}
+                      {isEditing ? <select className="w-full p-2 border rounded font-bold" value={editPerformance} onChange={e => setEditPerformance(e.target.value)}><option value="">Selecione...</option>{OPCOES_RENDIMENTO.map(op => <option key={op}>{op}</option>)}</select> : <p className={`text-2xl font-bold ${selectedStudent.performance === 'Crítico' ? 'text-red-600' : 'text-slate-800'}`}>{selectedStudent.performance || "Não avaliado"}</p>}
                     </div>
-
-                    {/* NOTAS (TEXTO LIVRE) */}
                     <div className="bg-slate-50 p-4 rounded-lg border col-span-1 md:col-span-3">
                       <span className="block text-xs font-bold text-slate-500 mb-2">Resumo de Notas / Observações Pedagógicas</span>
-                      {isEditing ? (
-                        <textarea className="w-full p-2 border rounded h-24" placeholder="Ex: Port: 8.0, Mat: 4.5 (Recuperação), Hist: 9.0..." value={editGrades} onChange={e => setEditGrades(e.target.value)} />
-                      ) : (
-                        <p className="text-sm text-slate-700 whitespace-pre-line">{selectedStudent.grades || "Sem notas registradas."}</p>
-                      )}
+                      {isEditing ? <textarea className="w-full p-2 border rounded h-24" placeholder="Ex: Port: 8.0, Mat: 4.5 (Recuperação), Hist: 9.0..." value={editGrades} onChange={e => setEditGrades(e.target.value)} /> : <p className="text-sm text-slate-700 whitespace-pre-line">{selectedStudent.grades || "Sem notas registradas."}</p>}
                     </div>
                   </div>
                 </div>
               )}
-
-              {/* CONTEÚDO DA ABA HISTÓRICO (Atendimentos) */}
               {(activeTab === 'historico' && !isEditing) && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 tab-content">
                   <div className="lg:col-span-7 space-y-6 no-print">
                     <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 new-log-area">
                       <h3 className="text-xs font-bold text-indigo-800 uppercase mb-3 flex items-center gap-2"><FileText size={14}/> Novo Atendimento</h3>
                       <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs font-bold text-slate-500">Solicitante</label>
-                          <select className="w-full mt-1 p-2 border rounded bg-white" value={solicitante} onChange={e => setSolicitante(e.target.value)}>
-                            <option>Professor</option><option>Coordenação</option><option>Direção</option><option>Responsável</option><option>Disciplinar</option>
-                          </select>
-                        </div>
+                        <div><label className="text-xs font-bold text-slate-500">Solicitante</label><select className="w-full mt-1 p-2 border rounded bg-white" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Direção</option><option>Responsável</option><option>Disciplinar</option></select></div>
                         <div><label className="text-xs font-bold text-slate-500">Data</label><div className="mt-1 p-2 bg-slate-200 rounded text-slate-600 text-sm">{new Date().toLocaleDateString()}</div></div>
                       </div>
                     </div>
-                    
-                    <div className="new-log-area">
-                      <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">Motivos</h3>
-                      <div className="grid grid-cols-2 gap-6">
-                        <div><p className="text-xs font-bold text-amber-600 uppercase mb-2">Comportamento</p>{MOTIVOS_COMPORTAMENTO.map(m => (<label key={m} className="flex gap-2 text-sm text-slate-600 mb-1 cursor-pointer"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div>
-                        <div><p className="text-xs font-bold text-blue-600 uppercase mb-2">Pedagógico</p>{[...MOTIVOS_PEDAGOGICO, ...MOTIVOS_SOCIAL].map(m => (<label key={m} className="flex gap-2 text-sm text-slate-600 mb-1 cursor-pointer"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div>
-                      </div>
-                    </div>
-
-                    <div className="new-log-area">
-                       <h3 className="font-bold text-slate-800 mb-3">Encaminhamentos</h3>
-                       <div className="grid grid-cols-2 gap-6">
-                         <select className="w-full p-2 border rounded" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Encaminhar para --</option>{ENCAMINHAMENTOS.map(e => <option key={e} value={e}>{e}</option>)}</select>
-                         <div onClick={() => setResolvido(!resolvido)} className={`p-3 rounded border flex items-center gap-2 cursor-pointer ${resolvido ? 'bg-green-50 border-green-300' : 'bg-slate-50'}`}><div className={`w-5 h-5 border rounded flex items-center justify-center ${resolvido ? 'bg-green-500 text-white' : 'bg-white'}`}>{resolvido && <CheckSquare size={14}/>}</div><span className="text-sm font-bold">Caso Resolvido?</span></div>
-                       </div>
-                    </div>
+                    <div className="new-log-area"><h3 className="font-bold text-slate-800 mb-3 border-b pb-2">Motivos</h3><div className="grid grid-cols-2 gap-6"><div><p className="text-xs font-bold text-amber-600 uppercase mb-2">Comportamento</p>{MOTIVOS_COMPORTAMENTO.map(m => (<label key={m} className="flex gap-2 text-sm text-slate-600 mb-1 cursor-pointer"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div><div><p className="text-xs font-bold text-blue-600 uppercase mb-2">Pedagógico</p>{[...MOTIVOS_PEDAGOGICO, ...MOTIVOS_SOCIAL].map(m => (<label key={m} className="flex gap-2 text-sm text-slate-600 mb-1 cursor-pointer"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div></div>
+                    <div className="new-log-area"><h3 className="font-bold text-slate-800 mb-3">Encaminhamentos</h3><div className="grid grid-cols-2 gap-6"><select className="w-full p-2 border rounded" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Encaminhar para --</option>{ENCAMINHAMENTOS.map(e => <option key={e} value={e}>{e}</option>)}</select><div onClick={() => setResolvido(!resolvido)} className={`p-3 rounded border flex items-center gap-2 cursor-pointer ${resolvido ? 'bg-green-50 border-green-300' : 'bg-slate-50'}`}><div className={`w-5 h-5 border rounded flex items-center justify-center ${resolvido ? 'bg-green-500 text-white' : 'bg-white'}`}>{resolvido && <CheckSquare size={14}/>}</div><span className="text-sm font-bold">Caso Resolvido?</span></div></div></div>
                     <textarea className="w-full p-4 border rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all text-base leading-relaxed new-log-area" rows={8} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
                     <div className="flex justify-end"><button onClick={handleSaveLog} className="px-6 py-3 rounded-xl bg-indigo-600 text-white font-bold flex items-center gap-2 shadow-lg hover:bg-indigo-700"><Save size={18}/> Salvar Registro</button></div>
                   </div>
-
                   <div className="lg:col-span-5 bg-slate-100 rounded-xl p-4 overflow-y-auto max-h-[800px] print:col-span-12 print:bg-white print:border print:border-black">
                     <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 print:text-black">Histórico Completo</h3>
                     {!selectedStudent.logs?.length && <p className="text-slate-400 text-center">Nenhum registro.</p>}
@@ -631,7 +537,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-
             </div>
           </div>
         </div>
