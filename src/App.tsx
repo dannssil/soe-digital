@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut, 
   Search, Plus, Save, X, ChevronDown, CheckSquare, 
   AlertTriangle, Camera, Phone, MapPin, User, Pencil, Printer, Lock,
-  GraduationCap, AlertCircle, FileText, History
+  GraduationCap, AlertCircle, FileText, History, Folder // <--- FOLDER ADICIONADO AQUI
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
