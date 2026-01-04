@@ -43,7 +43,7 @@ interface Student {
   id: any; 
   name: string;      
   class_id: string;  
-  turno?: string;
+  // turno removido do banco, será fixo no código
   guardian_name?: string;  
   guardian_phone?: string; 
   address?: string;        
@@ -103,7 +103,6 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editClass, setEditClass] = useState('');
-  const [editTurno, setEditTurno] = useState('');
   const [editGuardian, setEditGuardian] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
@@ -111,7 +110,7 @@ export default function App() {
   // Form Novo Aluno
   const [newName, setNewName] = useState('');
   const [newClass, setNewClass] = useState('');
-  const [newTurno, setNewTurno] = useState('Matutino');
+  // const [newTurno, setNewTurno] = useState('Vespertino'); // Removido
   const [newResponsavel, setNewResponsavel] = useState('');
   const [newPhone, setNewPhone] = useState('');   
   const [newAddress, setNewAddress] = useState(''); 
@@ -152,7 +151,6 @@ export default function App() {
     if (!selectedStudent) return;
     setEditName(selectedStudent.name);
     setEditClass(selectedStudent.class_id);
-    setEditTurno(selectedStudent.turno || 'Matutino');
     setEditGuardian(selectedStudent.guardian_name || '');
     setEditPhone(selectedStudent.guardian_phone || '');
     setEditAddress(selectedStudent.address || '');
@@ -162,12 +160,12 @@ export default function App() {
   async function saveEdits() {
     if (!selectedStudent) return;
     
+    // ATUALIZADO: Não envia mais o campo 'turno'
     const { error } = await supabase
       .from('students')
       .update({
         name: editName,
         class_id: editClass,
-        turno: editTurno,
         guardian_name: editGuardian,
         guardian_phone: editPhone,
         address: editAddress
@@ -179,10 +177,9 @@ export default function App() {
     } else {
       alert('Dados atualizados com sucesso!');
       setIsEditing(false);
-      // Atualiza o local e a lista
       const updatedStudent = { 
         ...selectedStudent, 
-        name: editName, class_id: editClass, turno: editTurno, 
+        name: editName, class_id: editClass, 
         guardian_name: editGuardian, guardian_phone: editPhone, address: editAddress 
       };
       setSelectedStudent(updatedStudent);
@@ -190,7 +187,6 @@ export default function App() {
     }
   }
 
-  // Upload Fotos
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return;
     setUploading(true);
@@ -225,7 +221,16 @@ export default function App() {
   async function handleAddStudent(e: React.FormEvent) {
     e.preventDefault();
     if (!newName || !newClass) return;
-    const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, turno: newTurno, guardian_name: newResponsavel, guardian_phone: newPhone, address: newAddress }]);
+    
+    // ATUALIZADO: Não envia 'turno', pois não existe a coluna e todos são Vespertino
+    const { error } = await supabase.from('students').insert([{ 
+      name: newName, 
+      class_id: newClass, 
+      guardian_name: newResponsavel, 
+      guardian_phone: newPhone, 
+      address: newAddress 
+    }]);
+
     if (error) alert('Erro ao cadastrar: ' + error.message);
     else {
       alert('Aluno cadastrado!');
@@ -257,8 +262,13 @@ export default function App() {
 
   const handleLogout = () => { if(confirm("Deseja realmente sair?")) window.location.reload(); };
 
+  // --- FILTRO DE TURMAS ---
   const studentsByClass = students.reduce((acc, student) => {
     const turma = student.class_id || 'Sem Turma';
+    
+    // FILTRO: Se a turma começar com "1", ignora este aluno
+    if (turma.trim().startsWith('1')) return acc;
+
     if (!acc[turma]) acc[turma] = [];
     acc[turma].push(student);
     return acc;
@@ -363,7 +373,8 @@ export default function App() {
                               <p className="font-bold text-slate-800 group-hover:text-indigo-700">{student.name}</p>
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <span className="bg-slate-100 px-2 rounded font-bold text-slate-600">{student.class_id}</span>
-                                {student.turno && <span>• {student.turno}</span>}
+                                {/* TURNO FIXO AGORA */}
+                                <span>• Vespertino</span>
                               </div>
                             </div>
                           </div>
@@ -389,9 +400,8 @@ export default function App() {
               <input className="w-full p-3 border rounded-xl" placeholder="Nome Completo" value={newName} onChange={e => setNewName(e.target.value)} />
               <div className="grid grid-cols-2 gap-4">
                 <input className="w-full p-3 border rounded-xl" placeholder="Turma (ex: 6A)" value={newClass} onChange={e => setNewClass(e.target.value)} />
-                <select className="w-full p-3 border rounded-xl bg-white" value={newTurno} onChange={e => setNewTurno(e.target.value)}>
-                   <option>Matutino</option><option>Vespertino</option><option>Integral</option>
-                </select>
+                {/* CAMPO TURNO REMOVIDO DA TELA - É AUTOMÁTICO */}
+                <div className="w-full p-3 border rounded-xl bg-slate-100 text-slate-500 flex items-center">Vespertino (Automático)</div>
               </div>
               <input className="w-full p-3 border rounded-xl" placeholder="Responsável (Mãe/Pai)" value={newResponsavel} onChange={e => setNewResponsavel(e.target.value)} />
               <div className="grid grid-cols-2 gap-4">
@@ -430,9 +440,9 @@ export default function App() {
                      <div className="flex items-center gap-3">
                        <div>
                           <h2 className="text-2xl font-bold text-slate-800">{selectedStudent.name}</h2>
-                          <p className="text-slate-500">Turma {selectedStudent.class_id} • {selectedStudent.turno}</p>
+                          {/* TURNO FIXO */}
+                          <p className="text-slate-500">Turma {selectedStudent.class_id} • Vespertino</p>
                        </div>
-                       {/* BOTAO LAPIS BEM VISIVEL AQUI */}
                        <button onClick={startEditing} className="p-2 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 transition-colors" title="Editar Dados">
                           <Pencil size={18} />
                        </button>
@@ -485,14 +495,6 @@ export default function App() {
                       }
                     </div>
                   </div>
-                  {isEditing && (
-                     <div className="mt-4 pt-4 border-t border-amber-200">
-                       <label className="text-xs font-bold text-slate-500 block mb-1">Turno</label>
-                       <select className="p-1 border rounded w-full bg-white" value={editTurno} onChange={e => setEditTurno(e.target.value)}>
-                         <option>Matutino</option><option>Vespertino</option><option>Integral</option>
-                       </select>
-                     </div>
-                  )}
                 </div>
 
                 {/* ATENDIMENTO (Fica oculto durante edição para focar nos dados) */}
