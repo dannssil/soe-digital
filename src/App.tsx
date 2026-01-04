@@ -305,7 +305,7 @@ export default function App() {
         <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
           <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><Lock className="text-indigo-600" size={32} /></div>
           <h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso Restrito</h1>
-          <p className="text-slate-500 mb-6 text-sm">SOE Digital - CED 4 Guará</p>
+          <p className="text-slate-500 mb-6 text-sm">"SOE Digital ATUALIZADO" - CED 4 Guará</p>
           <form onSubmit={handleLogin} className="space-y-4">
             <input type="password" className={`w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-center text-lg ${loginError ? 'border-red-500 bg-red-50' : 'border-slate-300'}`} placeholder="Digite a Senha" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setLoginError(false); }} />
             {loginError && <p className="text-red-500 text-xs font-bold">Senha incorreta.</p>}
@@ -336,7 +336,7 @@ export default function App() {
       <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shadow-2xl z-20">
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
           <div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} className="text-white"/></div>
-          <div><h1 className="font-bold text-lg">SOE Digital</h1><p className="text-[10px] uppercase text-slate-400">CED 4 Guará</p></div>
+          <div><h1 className="font-bold text-lg">"SOE Digital ATUALIZADO"</h1><p className="text-[10px] uppercase text-slate-400">CED 4 Guará</p></div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
