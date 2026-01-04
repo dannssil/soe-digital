@@ -1,35 +1,33 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { 
-  LayoutDashboard, Users, FileText, Settings, LogOut, 
-  Search, Plus, Save, X, Filter, ChevronDown, CheckSquare, 
-  AlertTriangle, Heart, BookOpen, Menu, Calendar, Phone
+  LayoutDashboard, Users, FileText, LogOut, 
+  Search, Plus, Save, X, ChevronDown, CheckSquare, 
+  AlertTriangle, Heart, BookOpen, Calendar, Phone, Folder
 } from 'lucide-react';
 
-// --- CONFIGURAÇÕES E LISTAS (Recuperadas do seu pedido original) ---
+// --- CONFIGURAÇÕES DO SISTEMA ---
+const SYSTEM_USER = "Daniel Alves"; // Seu nome aqui
+const SYSTEM_ROLE = "SOE - CED 4 Guará";
 
+// --- LISTAS DE MOTIVOS (Seu pedido original) ---
 const MOTIVOS_COMPORTAMENTO = [
   "Conversa excessiva em sala", "Desacato / falta de respeito",
   "Agressividade verbal", "Agressividade física", "Uso indevido de celular",
   "Saída de sala sem autorização", "Bullying / conflito com colegas", "Desobediência às orientações"
 ];
-
 const MOTIVOS_PEDAGOGICO = [
   "Não realização de atividades", "Dificuldade de aprendizagem",
   "Falta de materiais", "Desatenção", "Desempenho abaixo do esperado"
 ];
-
 const MOTIVOS_SOCIAL = [
   "Ansiedade / desmotivação", "Problemas familiares",
   "Isolamento / dificuldade de socialização", "Queixas de colegas / professores"
 ];
-
 const ACOES_REALIZADAS = [
   "Escuta individual", "Mediação de conflito", "Comunicação à família",
-  "Contato com professor", "Encaminhamento à coordenação", "Encaminhamento à direção",
-  "Acompanhamento pedagógico", "Agendamento de retorno"
+  "Contato com professor", "Encaminhamento à coordenação", "Encaminhamento à direção"
 ];
-
 const ENCAMINHAMENTOS = [
   "Coordenação pedagógica", "Psicologia escolar", "Família / responsáveis",
   "Serviço social", "Direção", "Conselho Tutelar"
@@ -38,10 +36,10 @@ const ENCAMINHAMENTOS = [
 // --- INTERFACES ---
 interface Student {
   id: any; 
-  nome_do_aluno: string;
-  turma: string;
-  turno?: string;       // Recuperado
-  responsavel?: string; // Recuperado
+  nome_do_aluno: string; // Nome exato da coluna no seu banco
+  turma: string;         // Nome exato da coluna no seu banco
+  turno?: string;
+  responsavel?: string;
   logs?: Log[];
 }
 
@@ -55,23 +53,14 @@ interface Log {
   resolved?: boolean;
 }
 
-// --- COMPONENTE AVATAR (Visual bonito sem precisar de upload) ---
+// --- COMPONENTE AVATAR (Gera foto com iniciais) ---
 function Avatar({ name, size = "md" }: { name: string, size?: "sm" | "md" | "lg" }) {
-  const initials = (name || "?")
-    .split(' ')
-    .map(n => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  const safeName = name || "Aluno";
+  const initials = safeName.substring(0, 2).toUpperCase();
+  const sizeClasses = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-16 h-16 text-xl" };
   
-  const sizeClasses = {
-    sm: "w-8 h-8 text-xs",
-    md: "w-10 h-10 text-sm",
-    lg: "w-16 h-16 text-xl"
-  };
-
   return (
-    <div className={`${sizeClasses[size]} rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold border border-indigo-200 shadow-sm`}>
+    <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-white`}>
       {initials}
     </div>
   );
@@ -79,22 +68,22 @@ function Avatar({ name, size = "md" }: { name: string, size?: "sm" | "md" | "lg"
 
 // --- APP PRINCIPAL ---
 export default function App() {
-  // Estados Gerais
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'students'>('dashboard');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [view, setView] = useState<'dashboard' | 'students'>('students'); // Começa na lista
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  
+  // Modais
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false); // Modal novo aluno separado
+  const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
 
-  // Estados Novo Aluno (Completos)
+  // Cadastro Novo Aluno
   const [newName, setNewName] = useState('');
   const [newClass, setNewClass] = useState('');
-  const [newTurno, setNewTurno] = useState('Matutino');
-  const [newResponsavel, setNewResponsavel] = useState('');
   
-  // Estados do Formulário de Atendimento (Complexo)
+  // Atendimento
   const [solicitante, setSolicitante] = useState('Professor');
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
   const [acoesSelecionadas, setAcoesSelecionadas] = useState<string[]>([]);
@@ -107,48 +96,50 @@ export default function App() {
     fetchStudents();
   }, []);
 
+  // --- BUSCAR DADOS (Correção Crítica) ---
   async function fetchStudents() {
     setLoading(true);
-    // Busca correta na tabela 'estudantes'
+    setErrorMsg('');
+    
+    // Tenta buscar na tabela 'estudantes' (Português)
     const { data, error } = await supabase
       .from('estudantes') 
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date)`)
       .order('nome_do_aluno');
 
-    if (error) console.error("Erro ao buscar:", error);
-    else setStudents(data || []);
+    if (error) {
+      console.error("Erro Supabase:", error);
+      setErrorMsg(`Erro ao conectar: ${error.message}. Verifique se a tabela se chama 'estudantes'.`);
+    } else {
+      setStudents(data || []);
+    }
     setLoading(false);
   }
 
-  // --- CADASTRO DE ALUNO COMPLETO ---
+  // --- SALVAR NOVO ALUNO ---
   async function handleAddStudent(e: React.FormEvent) {
     e.preventDefault();
     if (!newName || !newClass) return;
 
     const { error } = await supabase
       .from('estudantes')
-      .insert([{ 
-        nome_do_aluno: newName, 
-        turma: newClass,
-        turno: newTurno,
-        responsavel: newResponsavel
-      }]);
+      .insert([{ nome_do_aluno: newName, turma: newClass }]);
 
     if (error) {
-      alert('Erro: ' + error.message);
+      alert('Erro ao cadastrar: ' + error.message);
     } else {
       alert('Aluno cadastrado com sucesso!');
-      setNewName(''); setNewClass(''); setNewResponsavel('');
+      setNewName(''); setNewClass('');
       setIsNewStudentModalOpen(false);
       fetchStudents();
     }
   }
 
-  // --- SALVAR ATENDIMENTO (LOGICA JSON) ---
+  // --- SALVAR ATENDIMENTO ---
   async function handleSaveLog() {
     if (!selectedStudent) return;
-
-    // Estrutura rica de dados salva como JSON
+    
+    // Salva os dados complexos como texto JSON
     const descriptionCompiled = JSON.stringify({
       solicitante,
       motivos: motivosSelecionados,
@@ -156,29 +147,22 @@ export default function App() {
       obs: obsLivre
     });
 
-    const mainCategory = motivosSelecionados.length > 0 ? "Ocorrência/Atendimento" : "Observação";
-
     const { error } = await supabase
       .from('logs')
       .insert([{
         student_id: selectedStudent.id,
-        category: mainCategory,
+        category: "Atendimento SOE",
         description: descriptionCompiled,
         referral: encaminhamento,
         return_date: dataRetorno || null,
         resolved: resolvido
       }]);
 
-    if (error) {
-      alert('Erro ao salvar: ' + error.message);
-    } else {
-      alert('Atendimento registrado!');
+    if (error) alert('Erro: ' + error.message);
+    else {
+      alert('Registro salvo!');
       setIsModalOpen(false);
-      // Resetar form
-      setMotivosSelecionados([]);
-      setAcoesSelecionadas([]);
-      setObsLivre('');
-      setEncaminhamento('');
+      setMotivosSelecionados([]); setAcoesSelecionadas([]); setObsLivre('');
       fetchStudents();
     }
   }
@@ -188,7 +172,7 @@ export default function App() {
     else setList([...list, item]);
   };
 
-  // Agrupamento por Turma
+  // Agrupar por Turmas (Pastas)
   const studentsByClass = students.reduce((acc, student) => {
     const turma = student.turma || 'Sem Turma';
     if (!acc[turma]) acc[turma] = [];
@@ -199,140 +183,136 @@ export default function App() {
   const filteredTurmas = Object.keys(studentsByClass).sort();
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
+    <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
       
-      {/* --- SIDEBAR FIXA --- */}
-      <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shadow-xl z-20">
+      {/* SIDEBAR FIXA */}
+      <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shadow-2xl z-20">
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-          <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-500/30"><BookOpen size={20} className="text-white"/></div>
+          <div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} className="text-white"/></div>
           <div>
-            <h1 className="font-bold text-lg tracking-tight">SOE Digital</h1>
-            <p className="text-[10px] uppercase tracking-widest text-slate-400">Gestão Escolar</p>
+            <h1 className="font-bold text-lg">SOE Digital</h1>
+            <p className="text-[10px] uppercase text-slate-400">CED 4 Guará</p>
           </div>
         </div>
-
-        <nav className="flex-1 p-4 space-y-1">
-          <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+        <nav className="flex-1 p-4 space-y-2">
+          <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
             <LayoutDashboard size={18} /> Dashboard
           </button>
-          <button onClick={() => setView('students')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'students' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+          <button onClick={() => setView('students')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'students' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
             <Users size={18} /> Alunos e Turmas
           </button>
         </nav>
-
         <div className="p-4 border-t border-slate-800">
-          <button className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors">
-            <LogOut size={16} /> Encerrar Sessão
+          <button className="flex items-center gap-2 text-sm text-slate-400 hover:text-white">
+            <LogOut size={16} /> Sair
           </button>
         </div>
       </aside>
 
-      {/* --- ÁREA PRINCIPAL --- */}
+      {/* ÁREA PRINCIPAL */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Topbar */}
+        {/* Topbar com SEU NOME */}
         <header className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm z-10">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-slate-800">
-              {view === 'dashboard' ? 'Painel de Controle' : 'Gerenciamento de Alunos'}
-            </h2>
-          </div>
+          <h2 className="text-xl font-bold text-slate-800">
+            {view === 'dashboard' ? 'Visão Geral' : 'Gerenciamento de Alunos'}
+          </h2>
           <div className="flex items-center gap-3">
-             <span className="text-sm text-slate-500">Olá, Coordenador</span>
-             <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">C</div>
+             <div className="text-right hidden md:block">
+               <p className="text-sm font-bold text-slate-700">{SYSTEM_USER}</p>
+               <p className="text-xs text-slate-500">{SYSTEM_ROLE}</p>
+             </div>
+             <Avatar name={SYSTEM_USER} />
           </div>
         </header>
 
-        {/* Conteúdo com Scroll */}
-        <div className="flex-1 overflow-y-auto p-8">
+        {/* Conteúdo */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
           
+          {/* MENSAGEM DE ERRO (DIAGNÓSTICO) */}
+          {errorMsg && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-3">
+              <AlertTriangle />
+              <div>
+                <p className="font-bold">Erro de Conexão:</p>
+                <p className="text-sm">{errorMsg}</p>
+              </div>
+            </div>
+          )}
+
           {view === 'dashboard' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-4 mb-2">
-                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Users size={24}/></div>
-                  <div>
-                    <p className="text-sm text-slate-500 font-medium uppercase">Total de Alunos</p>
-                    <h3 className="text-3xl font-bold text-slate-800">{students.length}</h3>
-                  </div>
-                </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <p className="text-slate-500 text-sm font-bold uppercase">Total de Alunos</p>
+                <h3 className="text-4xl font-bold text-slate-800 mt-2">{students.length}</h3>
               </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-4 mb-2">
-                  <div className="p-3 bg-purple-50 text-purple-600 rounded-xl"><FileText size={24}/></div>
-                  <div>
-                    <p className="text-sm text-slate-500 font-medium uppercase">Atendimentos</p>
-                    <h3 className="text-3xl font-bold text-slate-800">{students.reduce((acc, s) => acc + (s.logs?.length || 0), 0)}</h3>
-                  </div>
-                </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <p className="text-slate-500 text-sm font-bold uppercase">Atendimentos Realizados</p>
+                <h3 className="text-4xl font-bold text-indigo-600 mt-2">
+                  {students.reduce((acc, s) => acc + (s.logs?.length || 0), 0)}
+                </h3>
               </div>
-              {/* Mais cards aqui */}
             </div>
           )}
 
           {view === 'students' && (
-            <div className="max-w-5xl mx-auto">
-              {/* Barra de Ações */}
+            <div className="max-w-6xl mx-auto">
               <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between">
-                <div className="relative flex-1 max-w-md">
+                <div className="relative flex-1 max-w-lg">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                   <input 
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none shadow-sm transition-all"
-                    placeholder="Buscar por nome, turma..."
+                    className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
+                    placeholder="Buscar estudante..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <button 
                   onClick={() => setIsNewStudentModalOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 transition-all transform hover:-translate-y-1"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all"
                 >
-                  <Plus size={20} /> Cadastrar Aluno
+                  <Plus size={20} /> Novo Aluno
                 </button>
               </div>
 
-              {/* Lista por Turmas */}
-              {loading ? <div className="text-center py-20 text-slate-400">Carregando base de dados...</div> : 
+              {/* LISTAGEM POR PASTAS DE TURMA */}
+              {loading ? <p className="text-center text-slate-500">Carregando dados...</p> : 
+               filteredTurmas.length === 0 ? (
+                 <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
+                   <Users size={48} className="mx-auto text-slate-300 mb-4"/>
+                   <p className="text-slate-500">Nenhum aluno encontrado.</p>
+                   <p className="text-xs text-slate-400 mt-1">Verifique se há dados na tabela 'estudantes' no Supabase.</p>
+                 </div>
+               ) :
                filteredTurmas.map(turma => {
                  const turmaAlunos = studentsByClass[turma].filter(s => s.nome_do_aluno.toLowerCase().includes(searchTerm.toLowerCase()));
                  if (turmaAlunos.length === 0) return null;
 
                  return (
-                  <div key={turma} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-8">
-                    <div className="bg-slate-50/50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                      <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                        <span className="w-2 h-6 bg-indigo-500 rounded-full"></span>
-                        Turma {turma}
-                      </h3>
-                      <span className="text-xs font-bold bg-white border px-3 py-1 rounded-full text-slate-500">
-                        {turmaAlunos.length} estudantes
-                      </span>
+                  <div key={turma} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                      <Folder className="text-indigo-500" />
+                      <h3 className="font-bold text-slate-700 text-lg">Turma {turma}</h3>
+                      <span className="bg-white border px-2 py-0.5 rounded-md text-xs font-bold text-slate-500">{turmaAlunos.length}</span>
                     </div>
-                    <div className="divide-y divide-slate-50">
+                    <div className="divide-y divide-slate-100">
                       {turmaAlunos.map(student => (
                         <div 
                           key={student.id} 
-                          className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors group"
+                          className="px-6 py-4 flex items-center justify-between hover:bg-indigo-50 cursor-pointer transition-colors group"
                           onClick={() => { setSelectedStudent(student); setIsModalOpen(true); }}
                         >
                           <div className="flex items-center gap-4">
                             <Avatar name={student.nome_do_aluno} />
                             <div>
-                              <p className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{student.nome_do_aluno}</p>
-                              <div className="flex items-center gap-2 text-xs text-slate-400">
-                                <span>ID: #{student.id}</span>
-                                {student.turno && <span>• {student.turno}</span>}
-                              </div>
+                              <p className="font-bold text-slate-800 group-hover:text-indigo-700">{student.nome_do_aluno}</p>
+                              {student.logs && student.logs.length > 0 && (
+                                <span className="text-xs text-amber-600 font-bold flex items-center gap-1 mt-1">
+                                  <AlertTriangle size={12}/> {student.logs.length} ocorrências
+                                </span>
+                              )}
                             </div>
                           </div>
-                          
-                          <div className="flex items-center gap-4">
-                             {student.logs && student.logs.length > 0 && (
-                               <div className="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100">
-                                 <FileText size={12}/> {student.logs.length} Reg.
-                               </div>
-                             )}
-                             <ChevronDown className="text-slate-300 group-hover:text-indigo-500" />
-                          </div>
+                          <ChevronDown className="text-slate-300 group-hover:text-indigo-500" />
                         </div>
                       ))}
                     </div>
@@ -345,237 +325,128 @@ export default function App() {
         </div>
       </main>
 
-      {/* --- MODAL 1: NOVO ALUNO (AGORA COM TURNO E RESPONSÁVEL) --- */}
+      {/* MODAL NOVO ALUNO */}
       {isNewStudentModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-fade-in-up">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-slate-800">Novo Cadastro</h3>
-              <button onClick={() => setIsNewStudentModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
-            </div>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4">Cadastrar Novo Aluno</h3>
             <form onSubmit={handleAddStudent} className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-600 mb-1">Nome Completo</label>
-                <input className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ex: Ana Silva" />
+              <input className="w-full p-3 border rounded-xl" placeholder="Nome Completo" value={newName} onChange={e => setNewName(e.target.value)} />
+              <input className="w-full p-3 border rounded-xl" placeholder="Turma (ex: 301)" value={newClass} onChange={e => setNewClass(e.target.value)} />
+              <div className="flex gap-2 justify-end mt-4">
+                <button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="px-4 py-2 text-slate-500">Cancelar</button>
+                <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">Salvar</button>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-1">Turma</label>
-                  <input className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={newClass} onChange={e => setNewClass(e.target.value)} placeholder="Ex: 301" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-1">Turno</label>
-                  <select className="w-full p-3 border rounded-xl bg-white" value={newTurno} onChange={e => setNewTurno(e.target.value)}>
-                    <option>Matutino</option>
-                    <option>Vespertino</option>
-                    <option>Noturno</option>
-                    <option>Integral</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-600 mb-1">Nome do Responsável</label>
-                <input className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={newResponsavel} onChange={e => setNewResponsavel(e.target.value)} placeholder="Opcional" />
-              </div>
-              <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl mt-2 transition-colors">Confirmar Cadastro</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* --- MODAL 2: ATENDIMENTO COMPLETO --- */}
+      {/* MODAL DE ATENDIMENTO (PREMIUM) */}
       {isModalOpen && selectedStudent && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
-            
-            {/* Header */}
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
             <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50">
-              <div className="flex items-center gap-5">
+              <div className="flex items-center gap-4">
                 <Avatar name={selectedStudent.nome_do_aluno} size="lg" />
                 <div>
                   <h2 className="text-2xl font-bold text-slate-800">{selectedStudent.nome_do_aluno}</h2>
-                  <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
-                    <span className="bg-white border px-2 py-0.5 rounded font-semibold text-slate-600">Turma {selectedStudent.turma}</span>
-                    <span className="flex items-center gap-1"><Calendar size={14}/> {selectedStudent.turno || 'Não informado'}</span>
-                    {selectedStudent.responsavel && <span className="flex items-center gap-1 text-indigo-600"><Users size={14}/> Resp: {selectedStudent.responsavel}</span>}
-                  </div>
+                  <p className="text-slate-500">Turma {selectedStudent.turma}</p>
                 </div>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={24} className="text-slate-400"/></button>
+              <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 hover:text-red-500" size={28}/></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 bg-white">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
-                {/* ESQUERDA: FORMULÁRIO (8 colunas) */}
-                <div className="lg:col-span-8 space-y-8">
-                  
-                  {/* Seção 1 */}
-                  <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100">
-                    <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-wide mb-4 flex items-center gap-2">
-                      <FileText size={16}/> 1. Identificação do Atendimento
-                    </h3>
-                    <div className="grid grid-cols-2 gap-6">
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase">Solicitado por</label>
-                        <select className="w-full mt-1 p-2 border rounded-lg bg-white" value={solicitante} onChange={e => setSolicitante(e.target.value)}>
-                          <option>Professor</option>
-                          <option>Coordenação</option>
-                          <option>Direção</option>
-                          <option>Responsável</option>
-                          <option>Espontâneo</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase">Data do Registro</label>
-                        <div className="mt-1 p-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium border border-slate-200">
-                          {new Date().toLocaleDateString()} às {new Date().toLocaleTimeString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Seção 2 */}
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800 border-b pb-2 mb-4">2. Motivo do Atendimento</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <p className="text-xs font-bold text-amber-600 uppercase flex items-center gap-1"><AlertTriangle size={14}/> Comportamento</p>
-                        {MOTIVOS_COMPORTAMENTO.map(m => (
-                          <label key={m} className="flex items-start gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-900">
-                            <input type="checkbox" className="mt-1 rounded text-indigo-600" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)} />
-                            {m}
-                          </label>
-                        ))}
-                      </div>
-                      <div className="space-y-6">
-                        <div className="space-y-3">
-                          <p className="text-xs font-bold text-blue-600 uppercase flex items-center gap-1"><BookOpen size={14}/> Pedagógico</p>
-                          {MOTIVOS_PEDAGOGICO.map(m => (
-                            <label key={m} className="flex items-start gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-900">
-                              <input type="checkbox" className="mt-1 rounded text-indigo-600" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)} />
-                              {m}
-                            </label>
-                          ))}
-                        </div>
-                        <div className="space-y-3">
-                          <p className="text-xs font-bold text-rose-500 uppercase flex items-center gap-1"><Heart size={14}/> Social / Emocional</p>
-                          {MOTIVOS_SOCIAL.map(m => (
-                            <label key={m} className="flex items-start gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-900">
-                              <input type="checkbox" className="mt-1 rounded text-indigo-600" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)} />
-                              {m}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Seção 3 e 4 */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t">
+            <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* ESQUERDA: FORMULÁRIO */}
+              <div className="lg:col-span-8 space-y-6">
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                  <h3 className="text-xs font-bold text-indigo-800 uppercase mb-3">1. Detalhes</h3>
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <h3 className="text-sm font-bold text-slate-800 mb-3">3. Ações Realizadas</h3>
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
-                        {ACOES_REALIZADAS.map(a => (
-                          <label key={a} className="flex items-center gap-2 text-sm text-slate-700">
-                            <input type="checkbox" checked={acoesSelecionadas.includes(a)} onChange={() => toggleItem(acoesSelecionadas, setAcoesSelecionadas, a)}/>
-                            {a}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-slate-800 mb-3">4. Encaminhamentos</h3>
-                      <select className="w-full p-2.5 border rounded-lg text-sm" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}>
-                        <option value="">-- Selecione se houver --</option>
-                        {ENCAMINHAMENTOS.map(e => <option key={e} value={e}>{e}</option>)}
+                      <label className="text-xs font-bold text-slate-500">Solicitante</label>
+                      <select className="w-full mt-1 p-2 border rounded bg-white" value={solicitante} onChange={e => setSolicitante(e.target.value)}>
+                        <option>Professor</option><option>Coordenação</option><option>Direção</option>
                       </select>
-                      
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase">Previsão de Retorno</label>
-                        <input type="date" className="w-full mt-1 p-2 border rounded-lg text-sm" value={dataRetorno} onChange={e => setDataRetorno(e.target.value)} />
-                      </div>
-
-                      <div className={`p-3 rounded-lg border flex items-center gap-3 cursor-pointer transition-colors ${resolvido ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setResolvido(!resolvido)}>
-                        <div className={`w-5 h-5 rounded border flex items-center justify-center ${resolvido ? 'bg-green-500 border-green-500 text-white' : 'bg-white'}`}>
-                          {resolvido && <CheckSquare size={14}/>}
-                        </div>
-                        <span className={`text-sm font-bold ${resolvido ? 'text-green-700' : 'text-slate-500'}`}>Situação Resolvida</span>
-                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500">Data</label>
+                      <div className="mt-1 p-2 bg-slate-200 rounded text-slate-600 text-sm">{new Date().toLocaleDateString()}</div>
                     </div>
                   </div>
-
-                  <div className="pt-4 border-t">
-                    <h3 className="text-sm font-bold text-slate-800 mb-2">5. Observações Detalhadas</h3>
-                    <textarea 
-                      className="w-full p-4 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 leading-relaxed shadow-sm"
-                      rows={4}
-                      placeholder="Descreva aqui os detalhes da conversa, combinados e percepções..."
-                      value={obsLivre}
-                      onChange={e => setObsLivre(e.target.value)}
-                    />
-                  </div>
-
                 </div>
 
-                {/* DIREITA: HISTÓRICO (4 colunas) */}
-                <div className="lg:col-span-4 flex flex-col h-full">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
-                    <Calendar size={14}/> Histórico de Registros
-                  </h3>
-                  <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-100 overflow-y-auto p-4 space-y-4 max-h-[600px]">
-                    {!selectedStudent.logs || selectedStudent.logs.length === 0 ? (
-                       <div className="text-center py-10 opacity-50">
-                         <FileText size={40} className="mx-auto mb-2 text-slate-300"/>
-                         <p className="text-sm text-slate-400">Nenhum registro encontrado.</p>
+                <div>
+                  <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">2. Motivos</h3>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-xs font-bold text-amber-600 uppercase mb-2">Comportamento</p>
+                      {MOTIVOS_COMPORTAMENTO.map(m => (
+                        <label key={m} className="flex gap-2 text-sm text-slate-600 mb-1 cursor-pointer">
+                          <input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}
+                        </label>
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-blue-600 uppercase mb-2">Pedagógico/Social</p>
+                      {[...MOTIVOS_PEDAGOGICO, ...MOTIVOS_SOCIAL].map(m => (
+                        <label key={m} className="flex gap-2 text-sm text-slate-600 mb-1 cursor-pointer">
+                          <input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">3. Ações e Encaminhamentos</h3>
+                  <div className="grid grid-cols-2 gap-6">
+                     <div className="bg-slate-50 p-3 rounded-xl">
+                       {ACOES_REALIZADAS.map(a => (
+                         <label key={a} className="flex gap-2 text-sm text-slate-700 mb-1"><input type="checkbox" checked={acoesSelecionadas.includes(a)} onChange={() => toggleItem(acoesSelecionadas, setAcoesSelecionadas, a)}/> {a}</label>
+                       ))}
+                     </div>
+                     <div className="space-y-3">
+                       <select className="w-full p-2 border rounded" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}>
+                         <option value="">-- Encaminhar para --</option>
+                         {ENCAMINHAMENTOS.map(e => <option key={e} value={e}>{e}</option>)}
+                       </select>
+                       <div onClick={() => setResolvido(!resolvido)} className={`p-3 rounded border flex items-center gap-2 cursor-pointer ${resolvido ? 'bg-green-50 border-green-300' : 'bg-slate-50'}`}>
+                         <div className={`w-5 h-5 border rounded flex items-center justify-center ${resolvido ? 'bg-green-500 text-white' : 'bg-white'}`}>{resolvido && <CheckSquare size={14}/>}</div>
+                         <span className="text-sm font-bold">Caso Resolvido?</span>
                        </div>
-                    ) : (
-                      selectedStudent.logs
-                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                      .map(log => {
-                        let detalhes = { motivos: [], acoes: [], obs: log.description };
-                        try {
-                          const parsed = JSON.parse(log.description);
-                          if (parsed.motivos) detalhes = parsed;
-                        } catch (e) {}
-
-                        return (
-                          <div key={log.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start mb-3 pb-2 border-b border-slate-50">
-                              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{new Date(log.created_at).toLocaleDateString()}</span>
-                              {log.resolved && <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-100">RESOLVIDO</span>}
-                            </div>
-                            
-                            {detalhes.motivos && detalhes.motivos.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-3">
-                                {detalhes.motivos.map((m:any) => <span key={m} className="text-[10px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{m}</span>)}
-                              </div>
-                            )}
-
-                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{detalhes.obs}</p>
-                            
-                            {log.referral && (
-                              <div className="mt-3 pt-2 border-t border-slate-50 text-xs font-semibold text-purple-600 flex items-center gap-1">
-                                ➔ {log.referral}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })
-                    )}
+                     </div>
                   </div>
                 </div>
+                
+                <textarea className="w-full p-4 border rounded-xl" rows={3} placeholder="Observações detalhadas..." value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
+              </div>
 
+              {/* DIREITA: HISTÓRICO */}
+              <div className="lg:col-span-4 bg-slate-50 rounded-xl p-4 overflow-y-auto max-h-[600px]">
+                <h3 className="text-xs font-bold text-slate-400 uppercase mb-4">Histórico</h3>
+                {!selectedStudent.logs?.length && <p className="text-slate-400 text-center">Nenhum registro.</p>}
+                {selectedStudent.logs?.map(log => {
+                  let parsed = { motivos: [], obs: log.description };
+                  try { parsed = JSON.parse(log.description) } catch(e) {}
+                  return (
+                    <div key={log.id} className="bg-white p-3 rounded-lg border shadow-sm mb-3 text-sm">
+                      <div className="flex justify-between mb-2">
+                        <span className="font-bold text-indigo-600">{new Date(log.created_at).toLocaleDateString()}</span>
+                        {log.resolved && <span className="text-[10px] bg-green-100 text-green-700 px-2 rounded">OK</span>}
+                      </div>
+                      <p className="text-slate-600 mb-2">{parsed.obs}</p>
+                      {log.referral && <p className="text-xs text-purple-600 font-bold">➔ {log.referral}</p>}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
-            <div className="p-5 border-t bg-slate-50 flex justify-end gap-3">
-              <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-colors">Cancelar</button>
-              <button onClick={handleSaveLog} className="px-8 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all transform active:scale-95 flex items-center gap-2">
-                <Save size={18}/> Salvar Registro
-              </button>
+            <div className="p-4 bg-slate-50 border-t flex justify-end gap-3">
+              <button onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl bg-white border font-bold text-slate-600">Cancelar</button>
+              <button onClick={handleSaveLog} className="px-6 py-2 rounded-xl bg-indigo-600 text-white font-bold flex items-center gap-2"><Save size={18}/> Salvar Registro</button>
             </div>
-
           </div>
         </div>
       )}
