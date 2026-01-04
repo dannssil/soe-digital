@@ -3,14 +3,14 @@ import { supabase } from './supabaseClient';
 import { 
   LayoutDashboard, Users, FileText, LogOut, 
   Search, Plus, Save, X, ChevronDown, CheckSquare, 
-  AlertTriangle, Heart, BookOpen, Calendar, Phone, Folder
+  AlertTriangle, Heart, BookOpen, Calendar, Folder
 } from 'lucide-react';
 
-// --- CONFIGURAÇÕES DO SISTEMA ---
-const SYSTEM_USER = "Daniel Alves"; // Seu nome aqui
+// --- CONFIGURAÇÕES ---
+const SYSTEM_USER = "Daniel Alves"; 
 const SYSTEM_ROLE = "SOE - CED 4 Guará";
 
-// --- LISTAS DE MOTIVOS (Seu pedido original) ---
+// --- LISTAS ---
 const MOTIVOS_COMPORTAMENTO = [
   "Conversa excessiva em sala", "Desacato / falta de respeito",
   "Agressividade verbal", "Agressividade física", "Uso indevido de celular",
@@ -36,8 +36,8 @@ const ENCAMINHAMENTOS = [
 // --- INTERFACES ---
 interface Student {
   id: any; 
-  nome_do_aluno: string; // Nome exato da coluna no seu banco
-  turma: string;         // Nome exato da coluna no seu banco
+  nome_do_aluno: string; // Se não aparecer o nome, trocaremos para 'name'
+  turma: string;         
   turno?: string;
   responsavel?: string;
   logs?: Log[];
@@ -53,7 +53,7 @@ interface Log {
   resolved?: boolean;
 }
 
-// --- COMPONENTE AVATAR (Gera foto com iniciais) ---
+// --- AVATAR ---
 function Avatar({ name, size = "md" }: { name: string, size?: "sm" | "md" | "lg" }) {
   const safeName = name || "Aluno";
   const initials = safeName.substring(0, 2).toUpperCase();
@@ -66,24 +66,25 @@ function Avatar({ name, size = "md" }: { name: string, size?: "sm" | "md" | "lg"
   );
 }
 
-// --- APP PRINCIPAL ---
+// --- APP ---
 export default function App() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [view, setView] = useState<'dashboard' | 'students'>('students'); // Começa na lista
+  const [view, setView] = useState<'dashboard' | 'students'>('students');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
-  // Modais
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
 
-  // Cadastro Novo Aluno
+  // Form Novo Aluno
   const [newName, setNewName] = useState('');
   const [newClass, setNewClass] = useState('');
+  const [newTurno, setNewTurno] = useState('Matutino');
+  const [newResponsavel, setNewResponsavel] = useState('');
   
-  // Atendimento
+  // Form Atendimento
   const [solicitante, setSolicitante] = useState('Professor');
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
   const [acoesSelecionadas, setAcoesSelecionadas] = useState<string[]>([]);
@@ -96,50 +97,51 @@ export default function App() {
     fetchStudents();
   }, []);
 
-  // --- BUSCAR DADOS (Correção Crítica) ---
   async function fetchStudents() {
     setLoading(true);
     setErrorMsg('');
     
-    // Tenta buscar na tabela 'estudantes' (Português)
+    // CORREÇÃO: Buscando na tabela 'students' (conforme seu print)
     const { data, error } = await supabase
-      .from('estudantes') 
+      .from('students') 
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date)`)
-      .order('nome_do_aluno');
+      .order('nome_do_aluno'); // Se der erro de coluna, troque para 'name'
 
     if (error) {
       console.error("Erro Supabase:", error);
-      setErrorMsg(`Erro ao conectar: ${error.message}. Verifique se a tabela se chama 'estudantes'.`);
+      setErrorMsg(`Erro de conexão: ${error.message}`);
     } else {
       setStudents(data || []);
     }
     setLoading(false);
   }
 
-  // --- SALVAR NOVO ALUNO ---
   async function handleAddStudent(e: React.FormEvent) {
     e.preventDefault();
     if (!newName || !newClass) return;
 
+    // CORREÇÃO: Inserindo na tabela 'students'
     const { error } = await supabase
-      .from('estudantes')
-      .insert([{ nome_do_aluno: newName, turma: newClass }]);
+      .from('students')
+      .insert([{ 
+        nome_do_aluno: newName, 
+        turma: newClass,
+        turno: newTurno,
+        responsavel: newResponsavel
+      }]);
 
-    if (error) {
-      alert('Erro ao cadastrar: ' + error.message);
-    } else {
-      alert('Aluno cadastrado com sucesso!');
-      setNewName(''); setNewClass('');
+    if (error) alert('Erro ao cadastrar: ' + error.message);
+    else {
+      alert('Aluno cadastrado!');
+      setNewName(''); setNewClass(''); setNewResponsavel('');
       setIsNewStudentModalOpen(false);
       fetchStudents();
     }
   }
 
-  // --- SALVAR ATENDIMENTO ---
   async function handleSaveLog() {
     if (!selectedStudent) return;
     
-    // Salva os dados complexos como texto JSON
     const descriptionCompiled = JSON.stringify({
       solicitante,
       motivos: motivosSelecionados,
@@ -172,7 +174,6 @@ export default function App() {
     else setList([...list, item]);
   };
 
-  // Agrupar por Turmas (Pastas)
   const studentsByClass = students.reduce((acc, student) => {
     const turma = student.turma || 'Sem Turma';
     if (!acc[turma]) acc[turma] = [];
@@ -185,7 +186,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
       
-      {/* SIDEBAR FIXA */}
+      {/* SIDEBAR */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shadow-2xl z-20">
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
           <div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} className="text-white"/></div>
@@ -209,9 +210,8 @@ export default function App() {
         </div>
       </aside>
 
-      {/* ÁREA PRINCIPAL */}
+      {/* MAIN */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Topbar com SEU NOME */}
         <header className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm z-10">
           <h2 className="text-xl font-bold text-slate-800">
             {view === 'dashboard' ? 'Visão Geral' : 'Gerenciamento de Alunos'}
@@ -225,15 +225,13 @@ export default function App() {
           </div>
         </header>
 
-        {/* Conteúdo */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
           
-          {/* MENSAGEM DE ERRO (DIAGNÓSTICO) */}
           {errorMsg && (
             <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-3">
               <AlertTriangle />
               <div>
-                <p className="font-bold">Erro de Conexão:</p>
+                <p className="font-bold">Atenção:</p>
                 <p className="text-sm">{errorMsg}</p>
               </div>
             </div>
@@ -246,7 +244,7 @@ export default function App() {
                 <h3 className="text-4xl font-bold text-slate-800 mt-2">{students.length}</h3>
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-slate-500 text-sm font-bold uppercase">Atendimentos Realizados</p>
+                <p className="text-slate-500 text-sm font-bold uppercase">Atendimentos</p>
                 <h3 className="text-4xl font-bold text-indigo-600 mt-2">
                   {students.reduce((acc, s) => acc + (s.logs?.length || 0), 0)}
                 </h3>
@@ -274,13 +272,12 @@ export default function App() {
                 </button>
               </div>
 
-              {/* LISTAGEM POR PASTAS DE TURMA */}
               {loading ? <p className="text-center text-slate-500">Carregando dados...</p> : 
                filteredTurmas.length === 0 ? (
                  <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
                    <Users size={48} className="mx-auto text-slate-300 mb-4"/>
                    <p className="text-slate-500">Nenhum aluno encontrado.</p>
-                   <p className="text-xs text-slate-400 mt-1">Verifique se há dados na tabela 'estudantes' no Supabase.</p>
+                   {!errorMsg && <p className="text-xs text-slate-400 mt-1">A conexão parece OK, mas a tabela 'students' pode estar vazia.</p>}
                  </div>
                ) :
                filteredTurmas.map(turma => {
@@ -305,11 +302,10 @@ export default function App() {
                             <Avatar name={student.nome_do_aluno} />
                             <div>
                               <p className="font-bold text-slate-800 group-hover:text-indigo-700">{student.nome_do_aluno}</p>
-                              {student.logs && student.logs.length > 0 && (
-                                <span className="text-xs text-amber-600 font-bold flex items-center gap-1 mt-1">
-                                  <AlertTriangle size={12}/> {student.logs.length} ocorrências
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2 text-xs text-slate-500">
+                                {student.turno && <span>{student.turno}</span>}
+                                {student.responsavel && <span>• Resp: {student.responsavel}</span>}
+                              </div>
                             </div>
                           </div>
                           <ChevronDown className="text-slate-300 group-hover:text-indigo-500" />
@@ -329,10 +325,16 @@ export default function App() {
       {isNewStudentModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold mb-4">Cadastrar Novo Aluno</h3>
+            <h3 className="text-xl font-bold mb-4">Novo Aluno</h3>
             <form onSubmit={handleAddStudent} className="space-y-4">
               <input className="w-full p-3 border rounded-xl" placeholder="Nome Completo" value={newName} onChange={e => setNewName(e.target.value)} />
-              <input className="w-full p-3 border rounded-xl" placeholder="Turma (ex: 301)" value={newClass} onChange={e => setNewClass(e.target.value)} />
+              <div className="grid grid-cols-2 gap-4">
+                <input className="w-full p-3 border rounded-xl" placeholder="Turma" value={newClass} onChange={e => setNewClass(e.target.value)} />
+                <select className="w-full p-3 border rounded-xl bg-white" value={newTurno} onChange={e => setNewTurno(e.target.value)}>
+                   <option>Matutino</option><option>Vespertino</option><option>Integral</option>
+                </select>
+              </div>
+              <input className="w-full p-3 border rounded-xl" placeholder="Nome do Responsável" value={newResponsavel} onChange={e => setNewResponsavel(e.target.value)} />
               <div className="flex gap-2 justify-end mt-4">
                 <button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="px-4 py-2 text-slate-500">Cancelar</button>
                 <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">Salvar</button>
@@ -342,7 +344,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE ATENDIMENTO (PREMIUM) */}
+      {/* MODAL ATENDIMENTO */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
@@ -358,7 +360,6 @@ export default function App() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* ESQUERDA: FORMULÁRIO */}
               <div className="lg:col-span-8 space-y-6">
                 <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                   <h3 className="text-xs font-bold text-indigo-800 uppercase mb-3">1. Detalhes</h3>
@@ -419,10 +420,9 @@ export default function App() {
                   </div>
                 </div>
                 
-                <textarea className="w-full p-4 border rounded-xl" rows={3} placeholder="Observações detalhadas..." value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
+                <textarea className="w-full p-4 border rounded-xl" rows={3} placeholder="Observações..." value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
               </div>
 
-              {/* DIREITA: HISTÓRICO */}
               <div className="lg:col-span-4 bg-slate-50 rounded-xl p-4 overflow-y-auto max-h-[600px]">
                 <h3 className="text-xs font-bold text-slate-400 uppercase mb-4">Histórico</h3>
                 {!selectedStudent.logs?.length && <p className="text-slate-400 text-center">Nenhum registro.</p>}
