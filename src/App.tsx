@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import { 
   LayoutDashboard, Users, FileText, LogOut, 
   Search, Plus, Save, X, ChevronDown, CheckSquare, 
-  AlertTriangle, Heart, BookOpen, Calendar, Folder
+  AlertTriangle, Heart, BookOpen, Calendar, Folder, Camera
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -37,9 +37,10 @@ const ENCAMINHAMENTOS = [
 interface Student {
   id: any; 
   name: string;      
-  class_id: string;  // CORRIGIDO: O nome no seu banco é class_id
+  class_id: string;  
   turno?: string;
   responsavel?: string;
+  photo_url?: string; // NOVO: Link da foto
   logs?: Log[];
 }
 
@@ -53,14 +54,26 @@ interface Log {
   resolved?: boolean;
 }
 
-// --- AVATAR ---
-function Avatar({ name, size = "md" }: { name: string, size?: "sm" | "md" | "lg" }) {
+// --- AVATAR INTELIGENTE (Mostra foto ou iniciais) ---
+function Avatar({ name, src, size = "md" }: { name: string, src?: string, size?: "sm" | "md" | "lg" }) {
   const safeName = name || "Aluno";
   const initials = safeName.substring(0, 2).toUpperCase();
   const sizeClasses = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-16 h-16 text-xl" };
+  const pxSize = { sm: 32, md: 40, lg: 64 };
   
+  if (src) {
+    return (
+      <img 
+        src={src} 
+        alt={name} 
+        className={`${sizeClasses[size]} rounded-full object-cover shadow-sm ring-2 ring-white bg-gray-100`}
+        style={{ width: pxSize[size], height: pxSize[size] }}
+      />
+    );
+  }
+
   return (
-    <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-white`}>
+    <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-white`} style={{ width: pxSize[size], height: pxSize[size] }}>
       {initials}
     </div>
   );
@@ -77,6 +90,7 @@ export default function App() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
+  const [uploading, setUploading] = useState(false); // Estado de upload
 
   // Form Novo Aluno
   const [newName, setNewName] = useState('');
@@ -101,7 +115,6 @@ export default function App() {
     setLoading(true);
     setErrorMsg('');
     
-    // Busca na tabela 'students'
     const { data, error } = await supabase
       .from('students') 
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date)`)
@@ -116,16 +129,57 @@ export default function App() {
     setLoading(false);
   }
 
+  // --- UPLOAD DE FOTO ---
+  async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return;
+    
+    setUploading(true);
+    const file = event.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${selectedStudent.id}-${Math.random()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    // 1. Enviar para o bucket 'photos'
+    const { error: uploadError } = await supabase.storage
+      .from('photos')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      alert('Erro no upload: ' + uploadError.message);
+      setUploading(false);
+      return;
+    }
+
+    // 2. Pegar o link público
+    const { data: { publicUrl } } = supabase.storage
+      .from('photos')
+      .getPublicUrl(filePath);
+
+    // 3. Salvar link no banco
+    const { error: updateError } = await supabase
+      .from('students')
+      .update({ photo_url: publicUrl })
+      .eq('id', selectedStudent.id);
+
+    if (updateError) {
+      alert('Erro ao salvar link: ' + updateError.message);
+    } else {
+      // Atualizar interface
+      setSelectedStudent({ ...selectedStudent, photo_url: publicUrl });
+      fetchStudents(); // Atualiza a lista geral também
+    }
+    setUploading(false);
+  }
+
   async function handleAddStudent(e: React.FormEvent) {
     e.preventDefault();
     if (!newName || !newClass) return;
 
-    // CORREÇÃO: Usando 'class_id' para salvar a turma
     const { error } = await supabase
       .from('students')
       .insert([{ 
         name: newName, 
-        class_id: newClass, // AQUI MUDOU
+        class_id: newClass, 
         turno: newTurno,
         responsavel: newResponsavel
       }]);
@@ -175,7 +229,6 @@ export default function App() {
   };
 
   const studentsByClass = students.reduce((acc, student) => {
-    // CORREÇÃO CRÍTICA: Usando student.class_id para agrupar as pastas
     const turma = student.class_id || 'Sem Turma';
     if (!acc[turma]) acc[turma] = [];
     acc[turma].push(student);
@@ -299,7 +352,7 @@ export default function App() {
                           onClick={() => { setSelectedStudent(student); setIsModalOpen(true); }}
                         >
                           <div className="flex items-center gap-4">
-                            <Avatar name={student.name} />
+                            <Avatar name={student.name} src={student.photo_url} />
                             <div>
                               <p className="font-bold text-slate-800 group-hover:text-indigo-700">{student.name}</p>
                               <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -351,7 +404,16 @@ export default function App() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
             <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50">
               <div className="flex items-center gap-4">
-                <Avatar name={selectedStudent.name} size="lg" />
+                {/* ÁREA DE FOTO INTERATIVA */}
+                <div className="relative group">
+                  <Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="lg" />
+                  <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                    <Camera size={20} />
+                    <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={uploading} />
+                  </label>
+                  {uploading && <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div></div>}
+                </div>
+
                 <div>
                   <h2 className="text-2xl font-bold text-slate-800">{selectedStudent.name}</h2>
                   <p className="text-slate-500">Turma {selectedStudent.class_id}</p>
