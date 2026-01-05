@@ -1,16 +1,17 @@
+import StudentList from './StudentList';
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   LayoutDashboard, Users, BookOpen, LogOut, 
   Search, Plus, Save, X, ChevronDown, CheckSquare, 
   AlertTriangle, Camera, Phone, MapPin, User, Pencil, Printer, Lock,
-  GraduationCap, AlertCircle, FileText, History, Folder // <--- FOLDER ADICIONADO AQUI
+  GraduationCap, AlertCircle, FileText, History, Folder 
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
 const SYSTEM_USER_NAME = "Daniel Alves"; 
 const SYSTEM_ROLE = "SOE - CED 4 Guará";
-const ACCESS_PASSWORD = "Ced@1rf1"; // <--- SUA SENHA AQUI
+const ACCESS_PASSWORD = "Ced@1rf1"; 
 
 // --- LISTAS ---
 const MOTIVOS_COMPORTAMENTO = [
@@ -95,7 +96,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [view, setView] = useState<'dashboard' | 'students'>('students');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); // Nota: Mantivemos o state, mas a busca agora acontece dentro do StudentList
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [adminPhoto, setAdminPhoto] = useState<string | null>(localStorage.getItem('adminPhoto'));
 
@@ -278,16 +279,6 @@ export default function App() {
     else setList([...list, item]);
   };
 
-  const studentsByClass = students.reduce((acc, student) => {
-    const turma = student.class_id || 'Sem Turma';
-    if (turma.trim().startsWith('1')) return acc;
-    if (!acc[turma]) acc[turma] = [];
-    acc[turma].push(student);
-    return acc;
-  }, {} as Record<string, Student[]>);
-
-  const filteredTurmas = Object.keys(studentsByClass).sort();
-
   if (!isAuthenticated) {
     return (
       <div className="h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -344,6 +335,7 @@ export default function App() {
         </header>
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
           {errorMsg && <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-3"><AlertTriangle /><div><p className="font-bold">Atenção:</p><p className="text-sm">{errorMsg}</p></div></div>}
+          
           {view === 'dashboard' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-slate-500 text-sm font-bold uppercase">Total de Alunos</p><h3 className="text-4xl font-bold text-slate-800 mt-2">{students.length}</h3></div>
@@ -354,53 +346,38 @@ export default function App() {
               </div>
             </div>
           )}
+
           {view === 'students' && (
             <div className="max-w-6xl mx-auto">
               <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between">
-                <div className="relative flex-1 max-w-lg">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                  <input className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm" placeholder="Buscar estudante..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <div className="relative flex-1 max-w-lg invisible"> 
+                  {/* Busca agora é interna no componente StudentList, deixei invisível para manter layout ou pode remover */}
                 </div>
                 <button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all"><Plus size={20} /> Novo Aluno</button>
               </div>
-              {loading ? <p className="text-center text-slate-500">Carregando dados...</p> : 
-               filteredTurmas.length === 0 ? <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300"><Users size={48} className="mx-auto text-slate-300 mb-4"/><p className="text-slate-500">Nenhum aluno encontrado.</p></div> :
-               filteredTurmas.map(turma => {
-                 const turmaAlunos = studentsByClass[turma].filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
-                 if (turmaAlunos.length === 0) return null;
-                 return (
-                  <div key={turma} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-                      <Folder className="text-indigo-500" />
-                      <h3 className="font-bold text-slate-700 text-lg">Turma {turma}</h3>
-                      <span className="bg-white border px-2 py-0.5 rounded-md text-xs font-bold text-slate-500">{turmaAlunos.length}</span>
-                    </div>
-                    <div className="divide-y divide-slate-100">
-                      {turmaAlunos.map(student => (
-                        <div key={student.id} className="px-6 py-4 flex items-center justify-between hover:bg-indigo-50 cursor-pointer transition-colors group" onClick={() => { setSelectedStudent(student); setIsEditing(false); setActiveTab('perfil'); setIsModalOpen(true); }}>
-                          <div className="flex items-center gap-4">
-                            <Avatar name={student.name} src={student.photo_url} />
-                            <div>
-                              <p className="font-bold text-slate-800 group-hover:text-indigo-700">{student.name}</p>
-                              <div className="flex items-center gap-2 text-xs text-slate-500">
-                                <span className="bg-slate-100 px-2 rounded font-bold text-slate-600">{student.class_id}</span>
-                                <span>• Vespertino</span>
-                                {student.performance === 'Crítico' && <span className="flex items-center gap-1 text-red-600 font-bold bg-red-50 px-2 rounded-full border border-red-100"><AlertCircle size={10}/> Atenção</span>}
-                              </div>
-                            </div>
-                          </div>
-                          <ChevronDown className="text-slate-300 group-hover:text-indigo-500" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                 )
-               })
-              }
+              
+              {/* --- AQUI ESTÁ A MUDANÇA PRINCIPAL --- */}
+              {loading ? (
+                <p className="text-center text-slate-500">Carregando dados...</p>
+              ) : (
+                <StudentList 
+                  students={students} 
+                  onSelectStudent={(student) => {
+                    setSelectedStudent(student);
+                    setIsEditing(false);
+                    setActiveTab('perfil');
+                    setIsModalOpen(true);
+                  }}
+                />
+              )}
+              {/* ----------------------------------- */}
+
             </div>
           )}
         </div>
       </main>
+      
+      {/* MODAL NOVO ALUNO */}
       {isNewStudentModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
@@ -424,6 +401,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* MODAL DETALHES ALUNO */}
       {isModalOpen && selectedStudent && (
         <div className="modal-overlay fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
