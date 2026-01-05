@@ -2,11 +2,13 @@ import StudentList from './StudentList';
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import * as XLSX from 'xlsx'; 
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { 
   LayoutDashboard, Users, BookOpen, LogOut, 
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Printer, Lock,
   GraduationCap, FileText, History, Upload, FileSpreadsheet,
-  TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, UserCircle
+  TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, UserCircle, FileDown
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -97,10 +99,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico'>('perfil');
   const [isEditing, setIsEditing] = useState(false);
   
-  // Novo State para Filtro de Turma
   const [selectedClassFilter, setSelectedClassFilter] = useState<string | null>(null);
 
-  // States de Edição
   const [editName, setEditName] = useState('');
   const [editClass, setEditClass] = useState('');
   const [editGuardian, setEditGuardian] = useState('');
@@ -116,7 +116,6 @@ export default function App() {
   const [newPhone, setNewPhone] = useState('');   
   const [newAddress, setNewAddress] = useState(''); 
 
-  // Atendimento
   const [solicitante, setSolicitante] = useState('Professor');
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
   const [acoesSelecionadas, setAcoesSelecionadas] = useState<string[]>([]);
@@ -148,7 +147,119 @@ export default function App() {
 
   const handleLogout = () => { if(confirm("Sair?")) { localStorage.removeItem('soe_auth'); window.location.reload(); } };
 
-  // --- LÓGICA DE RISCO ---
+  // --- FUNÇÃO GERADORA DE PDF OFICIAL ---
+  const generatePDF = () => {
+    if (!selectedStudent) return;
+    const doc = new jsPDF();
+
+    // Cabeçalho Oficial
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
+    doc.text("SECRETARIA DE ESTADO DE EDUCAÇÃO", 105, 20, { align: "center" });
+    doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ", 105, 25, { align: "center" });
+    doc.text("SERVIÇO DE ORIENTAÇÃO EDUCACIONAL - SOE", 105, 32, { align: "center" });
+    doc.setLineWidth(0.5);
+    doc.line(20, 35, 190, 35);
+
+    // Dados do Aluno
+    doc.setFontSize(12);
+    doc.text(`FICHA INDIVIDUAL DE ACOMPANHAMENTO`, 105, 45, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Aluno(a):`, 20, 55);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${selectedStudent.name}`, 40, 55);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(`Turma:`, 150, 55);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${selectedStudent.class_id}`, 165, 55);
+
+    doc.setFont("helvetica", "normal");
+    doc.text(`Responsável:`, 20, 62);
+    doc.text(`${selectedStudent.guardian_name || "Não informado"}`, 45, 62);
+    
+    doc.text(`Telefone:`, 150, 62);
+    doc.text(`${selectedStudent.guardian_phone || "-"}`, 168, 62);
+
+    // Tabela de Desempenho
+    doc.setFont("helvetica", "bold");
+    doc.text("DESEMPENHO ACADÊMICO (IMPORTADO)", 20, 75);
+    
+    if (selectedStudent.desempenho && selectedStudent.desempenho.length > 0) {
+      const tableData = selectedStudent.desempenho.map(d => [
+        d.bimestre,
+        d.lp?.toString() || "-", d.mat?.toString() || "-", d.cie?.toString() || "-",
+        d.his?.toString() || "-", d.geo?.toString() || "-", d.ing?.toString() || "-",
+        d.art?.toString() || "-", d.edf?.toString() || "-", d.pd1?.toString() || "-",
+        d.faltas_bimestre?.toString() || "0"
+      ]);
+
+      autoTable(doc, {
+        startY: 80,
+        head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [79, 70, 229], fontSize: 8 }, // Cor Indigo
+        styles: { fontSize: 8, halign: 'center' },
+      });
+    } else {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.text("Nenhum dado acadêmico registrado.", 20, 85);
+    }
+
+    // Histórico de Atendimentos
+    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 95;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("HISTÓRICO DE ATENDIMENTOS", 20, finalY);
+
+    if (selectedStudent.logs && selectedStudent.logs.length > 0) {
+      let currentY = finalY + 10;
+      selectedStudent.logs.forEach((log) => {
+        if (currentY > 270) { doc.addPage(); currentY = 20; } // Nova página se acabar espaço
+        
+        let parsed = { obs: log.description, solicitante: 'SOE', motivos: [] };
+        try { parsed = JSON.parse(log.description); } catch (e) {}
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text(`${new Date(log.created_at).toLocaleDateString()} - Solicitante: ${parsed.solicitante || 'SOE'}`, 20, currentY);
+        
+        doc.setFont("helvetica", "normal");
+        const splitObs = doc.splitTextToSize(`Relato: ${parsed.obs}`, 170);
+        doc.text(splitObs, 20, currentY + 5);
+        
+        currentY += 10 + (splitObs.length * 4);
+        
+        if (log.referral) {
+           doc.setFont("helvetica", "bold");
+           doc.setTextColor(100);
+           doc.text(`Encaminhamento: ${log.referral}`, 20, currentY - 2);
+           doc.setTextColor(0);
+        }
+        
+        doc.setDrawColor(200);
+        doc.line(20, currentY, 190, currentY);
+        currentY += 8;
+      });
+    } else {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.text("Nenhum atendimento registrado para este aluno.", 20, finalY + 10);
+    }
+
+    // Rodapé Assinatura
+    doc.line(60, 280, 150, 280);
+    doc.setFontSize(8);
+    doc.text("Assinatura do Responsável SOE", 105, 285, { align: "center" });
+
+    doc.save(`Ficha_${selectedStudent.name}.pdf`);
+  };
+
   const checkRisk = (student: Student) => {
     const totalFaltas = student.desempenho?.reduce((acc, d) => acc + (d.faltas_bimestre || 0), 0) || 0;
     const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null;
@@ -160,43 +271,29 @@ export default function App() {
     return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas };
   };
 
-  // --- RENDERIZAR DASHBOARD OTIMIZADO ---
   const renderDashboard = () => {
-    // Filtra lista de risco
     let studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
-    
-    // Se houver filtro de turma, aplica
-    if (selectedClassFilter) {
-      studentsInRisk = studentsInRisk.filter(s => s.class_id === selectedClassFilter);
-    }
-
-    // Lista de turmas (excluindo status como ABANDONO ou TRANSFERIDO se estiverem aparecendo como turma)
+    if (selectedClassFilter) studentsInRisk = studentsInRisk.filter(s => s.class_id === selectedClassFilter);
     const turmas = [...new Set(students.map(s => s.class_id))].sort();
 
     return (
       <div className="space-y-6 h-full flex flex-col">
-        {/* Banner Importação */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex items-center justify-between flex-shrink-0">
           <div><h3 className="text-2xl font-bold">Painel de Controle SOE</h3><p className="opacity-90">Gestão Pedagógica e Disciplinar</p></div>
           <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-50 flex items-center gap-2"><Upload size={20}/> Importar Notas</button>
         </div>
 
-        {/* ÁREA PRINCIPAL: DIVIDIDA EM 2 COLUNAS */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 overflow-hidden min-h-0">
-          
-          {/* COLUNA 1: LISTA DE RISCO (COM SCROLL) */}
           <div className="bg-white rounded-2xl border border-red-100 shadow-sm flex flex-col h-full overflow-hidden">
             <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <AlertCircle className="text-red-600" size={20} />
-                <div>
-                  <h3 className="font-bold text-red-800 uppercase">Alunos em Alerta {selectedClassFilter && `(${selectedClassFilter})`}</h3>
+                <div><h3 className="font-bold text-red-800 uppercase">Alunos em Alerta {selectedClassFilter && `(${selectedClassFilter})`}</h3>
                   {selectedClassFilter && <span className="text-[10px] text-red-600 cursor-pointer underline" onClick={() => setSelectedClassFilter(null)}>Limpar Filtro</span>}
                 </div>
               </div>
               <span className="text-[10px] text-red-500 font-bold bg-white px-2 py-1 rounded border border-red-200">{studentsInRisk.length} Casos</span>
             </div>
-            
             <div className="flex-1 overflow-y-auto p-2">
               {studentsInRisk.length > 0 ? (
                 <div className="space-y-2">
@@ -206,10 +303,7 @@ export default function App() {
                       <div key={s.id} className="p-3 bg-white border border-slate-100 rounded-xl hover:border-red-300 hover:shadow-md transition-all cursor-pointer flex items-center justify-between group" onClick={() => { setSelectedStudent(s); setIsModalOpen(true); }}>
                         <div className="flex items-center gap-3">
                           <Avatar name={s.name} src={s.photo_url} size="sm" />
-                          <div>
-                            <p className="font-bold text-slate-800 text-sm group-hover:text-red-700">{s.name}</p>
-                            <p className="text-xs text-slate-500 font-bold">Turma {s.class_id}</p>
-                          </div>
+                          <div><p className="font-bold text-slate-800 text-sm group-hover:text-red-700">{s.name}</p><p className="text-xs text-slate-500 font-bold">Turma {s.class_id}</p></div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           {risk.reprovadoFalta && <span className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded">REP. FALTA ({risk.totalFaltas})</span>}
@@ -220,24 +314,16 @@ export default function App() {
                   })}
                 </div>
               ) : (
-                <div className="h-full flex items-center justify-center flex-col text-slate-400">
-                  <CheckSquare size={48} className="mb-2 opacity-20"/>
-                  <p>Tudo tranquilo! Nenhum aluno {selectedClassFilter ? `da turma ${selectedClassFilter}` : ''} em zona de risco.</p>
-                </div>
+                <div className="h-full flex items-center justify-center flex-col text-slate-400"><CheckSquare size={48} className="mb-2 opacity-20"/><p>Tudo tranquilo! Nenhum aluno {selectedClassFilter ? `da turma ${selectedClassFilter}` : ''} em zona de risco.</p></div>
               )}
             </div>
           </div>
 
-          {/* COLUNA 2: ESTATÍSTICAS DAS TURMAS (AGORA CLICÁVEIS E ARRUMADAS) */}
           <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm flex flex-col h-full overflow-hidden">
             <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="text-indigo-600" size={20} />
-                <h3 className="font-bold text-indigo-800 uppercase">Estatísticas por Turma</h3>
-              </div>
+              <div className="flex items-center gap-2"><BarChart3 className="text-indigo-600" size={20} /><h3 className="font-bold text-indigo-800 uppercase">Estatísticas por Turma</h3></div>
               <p className="text-[10px] text-indigo-400">Toque para filtrar</p>
             </div>
-            
             <div className="flex-1 overflow-y-auto p-4">
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {turmas.map(t => {
@@ -245,26 +331,12 @@ export default function App() {
                   const riscoTurma = alunosTurma.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoNotas; }).length;
                   const percent = Math.round((riscoTurma / alunosTurma.length) * 100) || 0;
                   const isSelected = selectedClassFilter === t;
-                  
                   return (
-                    <div 
-                      key={t} 
-                      onClick={() => setSelectedClassFilter(isSelected ? null : t)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-105' : 'bg-slate-50 border-slate-100 hover:border-indigo-300 hover:shadow-md'}`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <h4 className={`font-bold text-lg ${isSelected ? 'text-white' : 'text-slate-700'}`}>{t}</h4>
-                        <span className={`text-[10px] font-bold ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>{alunosTurma.length}</span>
-                      </div>
-                      
+                    <div key={t} onClick={() => setSelectedClassFilter(isSelected ? null : t)} className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-105' : 'bg-slate-50 border-slate-100 hover:border-indigo-300 hover:shadow-md'}`}>
+                      <div className="flex justify-between items-start"><h4 className={`font-bold text-lg ${isSelected ? 'text-white' : 'text-slate-700'}`}>{t}</h4><span className={`text-[10px] font-bold ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>{alunosTurma.length}</span></div>
                       <div className="mt-2">
-                        <div className="flex justify-between text-[10px] mb-1">
-                          <span className={isSelected ? 'text-indigo-100' : 'text-slate-500'}>Risco</span>
-                          <span className={`font-bold ${isSelected ? 'text-white' : percent > 30 ? 'text-red-600' : 'text-green-600'}`}>{percent}%</span>
-                        </div>
-                        <div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? 'bg-indigo-800' : 'bg-slate-200'}`}>
-                          <div className={`h-full ${percent > 30 ? 'bg-red-500' : percent > 15 ? 'bg-orange-400' : 'bg-green-500'}`} style={{ width: `${percent}%` }}></div>
-                        </div>
+                        <div className="flex justify-between text-[10px] mb-1"><span className={isSelected ? 'text-indigo-100' : 'text-slate-500'}>Risco</span><span className={`font-bold ${isSelected ? 'text-white' : percent > 30 ? 'text-red-600' : 'text-green-600'}`}>{percent}%</span></div>
+                        <div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? 'bg-indigo-800' : 'bg-slate-200'}`}><div className={`h-full ${percent > 30 ? 'bg-red-500' : percent > 15 ? 'bg-orange-400' : 'bg-green-500'}`} style={{ width: `${percent}%` }}></div></div>
                       </div>
                     </div>
                   )
@@ -272,7 +344,6 @@ export default function App() {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     );
@@ -464,8 +535,8 @@ export default function App() {
                 <div><h2 className="text-2xl font-bold text-slate-800">{selectedStudent.name}</h2><p className="text-sm text-slate-500 font-bold uppercase">Turma {selectedStudent.class_id}</p></div>
               </div>
               <div className="flex items-center gap-2">
+                <button onClick={generatePDF} className="p-2 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200" title="Gerar PDF Oficial"><FileDown size={18} /></button>
                 <button onClick={startEditing} className="p-2 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200" title="Editar"><Pencil size={18} /></button>
-                <button onClick={handlePrint} className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200" title="Imprimir"><Printer size={18} /></button>
                 <button onClick={() => setIsExitModalOpen(true)} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200" title="Registrar Saída"><LogOut size={18} /></button>
                 <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 hover:text-red-500" size={28}/></button>
               </div>
@@ -479,7 +550,6 @@ export default function App() {
 
             <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
               
-              {/* ABA DADOS PESSOAIS (REESTILIZADA COM VISUAL PREMIUM) */}
               {activeTab === 'perfil' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 tab-content">
                   <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
@@ -549,7 +619,6 @@ export default function App() {
 
               {activeTab === 'historico' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 tab-content">
-                  {/* ÁREA DE NOVO ATENDIMENTO - RESTAURADA A VERSÃO LARGA */}
                   <div className="lg:col-span-7 space-y-6 no-print">
                     <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm new-log-area">
                        <h3 className="font-bold text-indigo-800 mb-6 border-b pb-2 uppercase text-sm flex items-center gap-2"><FileText size={18}/> Novo Registro de Atendimento</h3>
