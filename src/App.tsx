@@ -96,7 +96,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [view, setView] = useState<'dashboard' | 'students'>('students');
-  const [searchTerm, setSearchTerm] = useState(''); // Nota: Mantivemos o state, mas a busca agora acontece dentro do StudentList
+  // State de busca removido daqui pois agora fica dentro do StudentList (mas mantemos a props se precisar passar)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [adminPhoto, setAdminPhoto] = useState<string | null>(localStorage.getItem('adminPhoto'));
 
@@ -146,6 +146,12 @@ export default function App() {
     const { data, error } = await supabase
       .from('students') 
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date)`)
+      // --- CORREÇÃO IMPORTANTE: FILTRO DE ATIVOS ---
+      // Se a coluna 'status' não existir no banco, isso pode dar erro. 
+      // Se deu erro antes, verifique se rodou o comando SQL no Supabase.
+      // Se não tiver certeza, remova a linha abaixo temporariamente.
+      .eq('status', 'ATIVO') 
+      // ---------------------------------------------
       .order('name'); 
 
     if (error) setErrorMsg(`Erro de conexão: ${error.message}`);
@@ -249,7 +255,8 @@ export default function App() {
   async function handleAddStudent(e: React.FormEvent) {
     e.preventDefault();
     if (!newName || !newClass) return;
-    const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, guardian_name: newResponsavel, guardian_phone: newPhone, address: newAddress }]);
+    // AO CRIAR NOVO ALUNO, MANTEMOS O STATUS ATIVO
+    const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, guardian_name: newResponsavel, guardian_phone: newPhone, address: newAddress, status: 'ATIVO' }]);
     if (error) alert('Erro ao cadastrar: ' + error.message);
     else {
       alert('Aluno cadastrado!');
@@ -351,12 +358,12 @@ export default function App() {
             <div className="max-w-6xl mx-auto">
               <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between">
                 <div className="relative flex-1 max-w-lg invisible"> 
-                  {/* Busca agora é interna no componente StudentList, deixei invisível para manter layout ou pode remover */}
+                  {/* Busca agora é interna no componente StudentList */}
                 </div>
                 <button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all"><Plus size={20} /> Novo Aluno</button>
               </div>
               
-              {/* --- AQUI ESTÁ A MUDANÇA PRINCIPAL --- */}
+              {/* --- AQUI ESTÁ A LISTA DE PASTAS --- */}
               {loading ? (
                 <p className="text-center text-slate-500">Carregando dados...</p>
               ) : (
