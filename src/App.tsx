@@ -1,11 +1,12 @@
 import StudentList from './StudentList';
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import * as XLSX from 'xlsx'; 
 import { 
   LayoutDashboard, Users, BookOpen, LogOut, 
   Plus, Save, X, CheckSquare, 
   AlertTriangle, Camera, User, Pencil, Printer, Lock,
-  GraduationCap, FileText, History
+  GraduationCap, FileText, History, Upload, FileSpreadsheet
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -104,11 +105,15 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
   
-  // --- NOVOS STATES PARA SAÍDA ---
+  // STATES DE SAÍDA
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [exitReason, setExitReason] = useState('');
   const [exitType, setExitType] = useState<'TRANSFERIDO' | 'ABANDONO'>('TRANSFERIDO');
-  // -------------------------------
+
+  // STATES DE IMPORTAÇÃO
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [selectedBimestre, setSelectedBimestre] = useState('1º Bimestre');
 
   const [uploading, setUploading] = useState(false);
 
@@ -222,7 +227,6 @@ export default function App() {
     }
   }
 
-  // --- NOVA FUNÇÃO DE SAÍDA ---
   async function handleRegisterExit() {
     if (!selectedStudent || !exitReason) {
       alert("Por favor, informe o motivo da saída.");
@@ -247,7 +251,74 @@ export default function App() {
       fetchStudents(); 
     }
   }
-  // ---------------------------
+
+  // --- FUNÇÃO DE IMPORTAR EXCEL CORRIGIDA ---
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setImporting(true);
+    
+    const file = e.target.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const workbook = XLSX.read(bstr, { type: 'binary' });
+        const wsname = workbook.SheetNames[0];
+        const ws = workbook.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        let count = 0;
+        
+        // AQUI FOI FEITA A CORREÇÃO: "const row of data" (sem :any)
+        for (const row of (data as any[])) {
+          const nomeExcel = row['ESTUDANTE']?.toString().toUpperCase().trim();
+          
+          if (!nomeExcel) continue;
+
+          const alunoEncontrado = students.find(s => s.name.toUpperCase().trim() === nomeExcel);
+
+          if (alunoEncontrado) {
+            const parseNota = (val: any) => {
+              if (!val) return null;
+              if (typeof val === 'number') return val;
+              const strVal = val.toString().replace(',', '.');
+              return parseFloat(strVal) || null;
+            };
+
+            const notasParaSalvar = {
+              aluno_id: alunoEncontrado.id,
+              bimestre: selectedBimestre,
+              art: parseNota(row['ART']),
+              cie: parseNota(row['CIE']),
+              edf: parseNota(row['EDF']),
+              geo: parseNota(row['GEO']),
+              his: parseNota(row['HIS']),
+              ing: parseNota(row['ING']),
+              lp:  parseNota(row['LP']),
+              mat: parseNota(row['MAT']),
+              pd1: parseNota(row['PD1']),
+              pd2: parseNota(row['PD2']),
+              pd3: parseNota(row['PD3']),
+              faltas_bimestre: row['FALTAS'] ? parseInt(row['FALTAS']) : 0 
+            };
+
+            await supabase.from('desempenho_bimestral').insert([notasParaSalvar]);
+            count++;
+          }
+        }
+        
+        alert(`Processo concluído! Dados de ${count} alunos foram importados.`);
+        setIsImportModalOpen(false);
+        setImporting(false);
+      } catch (error) {
+        alert('Erro ao processar arquivo: ' + error);
+        setImporting(false);
+      }
+    };
+    reader.readAsBinaryString(file);
+  }
+  // -----------------------------------------------------------------
 
   const handlePrint = () => window.print();
 
@@ -373,12 +444,29 @@ export default function App() {
           {errorMsg && <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-3"><AlertTriangle /><div><p className="font-bold">Atenção:</p><p className="text-sm">{errorMsg}</p></div></div>}
           
           {view === 'dashboard' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-slate-500 text-sm font-bold uppercase">Total de Alunos</p><h3 className="text-4xl font-bold text-slate-800 mt-2">{students.length}</h3></div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-slate-500 text-sm font-bold uppercase">Atendimentos</p><h3 className="text-4xl font-bold text-indigo-600 mt-2">{students.reduce((acc, s) => acc + (s.logs?.length || 0), 0)}</h3></div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">
-                <p className="text-slate-500 text-sm font-bold uppercase">Rendimento Crítico</p>
-                <h3 className="text-4xl font-bold text-red-600 mt-2">{students.filter(s => s.performance === 'Crítico' || s.performance === 'Baixo').length}</h3>
+            <div className="space-y-6">
+              {/* --- BOTÃO DE IMPORTAÇÃO (NOVO) --- */}
+              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold">Importação de Dados</h3>
+                  <p className="opacity-90">Atualize as notas e faltas do iEducar via Excel.</p>
+                </div>
+                <button 
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-50 transition-all flex items-center gap-2"
+                >
+                  <Upload size={20}/> Importar Notas (Excel)
+                </button>
+              </div>
+              {/* ---------------------------------- */}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-slate-500 text-sm font-bold uppercase">Total de Alunos</p><h3 className="text-4xl font-bold text-slate-800 mt-2">{students.length}</h3></div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><p className="text-slate-500 text-sm font-bold uppercase">Atendimentos</p><h3 className="text-4xl font-bold text-indigo-600 mt-2">{students.reduce((acc, s) => acc + (s.logs?.length || 0), 0)}</h3></div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">
+                  <p className="text-slate-500 text-sm font-bold uppercase">Rendimento Crítico</p>
+                  <h3 className="text-4xl font-bold text-red-600 mt-2">{students.filter(s => s.performance === 'Crítico' || s.performance === 'Baixo').length}</h3>
+                </div>
               </div>
             </div>
           )}
@@ -435,7 +523,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE REGISTRO DE SAÍDA (NOVO) */}
+      {/* MODAL DE REGISTRO DE SAÍDA */}
       {isExitModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
@@ -476,6 +564,52 @@ export default function App() {
                 <button onClick={() => setIsExitModalOpen(false)} className="px-4 py-2 text-slate-500">Cancelar</button>
                 <button onClick={handleRegisterExit} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700">Confirmar Saída</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE IMPORTAÇÃO */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4 text-indigo-600 flex items-center gap-2">
+              <FileSpreadsheet size={24}/> Importar Excel
+            </h3>
+            <p className="text-sm text-slate-600 mb-6">
+              Selecione o arquivo <strong>.xlsx</strong> do iEducar. O sistema irá procurar os alunos pelo nome e atualizar as notas.
+            </p>
+            
+            <div className="space-y-4">
+               <div>
+                 <label className="block text-sm font-bold text-slate-700 mb-1">Referência (Bimestre)</label>
+                 <select 
+                   className="w-full p-3 border rounded-xl"
+                   value={selectedBimestre}
+                   onChange={e => setSelectedBimestre(e.target.value)}
+                 >
+                   <option>1º Bimestre</option>
+                   <option>2º Bimestre</option>
+                   <option>3º Bimestre</option>
+                   <option>4º Bimestre</option>
+                   <option>Recuperação Final</option>
+                 </select>
+               </div>
+
+               <div className="border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center bg-indigo-50">
+                  {importing ? (
+                    <p className="text-indigo-600 font-bold animate-pulse">Lendo arquivo e processando...</p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-500 mb-2">Clique para selecionar o arquivo</p>
+                      <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                    </>
+                  )}
+               </div>
+
+               <div className="flex justify-end mt-4">
+                 <button onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 text-slate-500" disabled={importing}>Fechar</button>
+               </div>
             </div>
           </div>
         </div>
