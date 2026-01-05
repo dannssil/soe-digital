@@ -50,7 +50,7 @@ interface Student {
   performance?: string;
   grades?: string;
   logs?: Log[];
-  status: string; // <--- AQUI ESTAVA FALTANDO! ISSO CORRIGE O ERRO.
+  status: string; 
 }
 
 interface Log {
@@ -103,6 +103,13 @@ export default function App() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
+  
+  // --- NOVOS STATES PARA SAÍDA ---
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const [exitReason, setExitReason] = useState('');
+  const [exitType, setExitType] = useState<'TRANSFERIDO' | 'ABANDONO'>('TRANSFERIDO');
+  // -------------------------------
+
   const [uploading, setUploading] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico'>('perfil');
@@ -214,6 +221,33 @@ export default function App() {
       fetchStudents();
     }
   }
+
+  // --- NOVA FUNÇÃO DE SAÍDA ---
+  async function handleRegisterExit() {
+    if (!selectedStudent || !exitReason) {
+      alert("Por favor, informe o motivo da saída.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('students')
+      .update({ 
+        status: exitType, 
+        exit_reason: exitReason,
+        exit_date: new Date().toISOString()
+      })
+      .eq('id', selectedStudent.id);
+
+    if (error) {
+      alert('Erro ao registrar saída: ' + error.message);
+    } else {
+      alert('Saída registrada com sucesso! O aluno não aparecerá mais na lista ativa.');
+      setIsExitModalOpen(false);
+      setIsModalOpen(false); 
+      fetchStudents(); 
+    }
+  }
+  // ---------------------------
 
   const handlePrint = () => window.print();
 
@@ -401,6 +435,52 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL DE REGISTRO DE SAÍDA (NOVO) */}
+      {isExitModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4 text-red-600 flex items-center gap-2">
+              <LogOut size={24}/> Registrar Saída
+            </h3>
+            <p className="text-sm text-slate-600 mb-4">
+              O aluno será removido da lista de turmas ativas, mas seus dados permanecerão salvos no banco de dados.
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Saída</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="exitType" checked={exitType === 'TRANSFERIDO'} onChange={() => setExitType('TRANSFERIDO')} />
+                    Transferência
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="exitType" checked={exitType === 'ABANDONO'} onChange={() => setExitType('ABANDONO')} />
+                    Abandono
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Motivo / Destino</label>
+                <textarea 
+                  className="w-full p-3 border rounded-xl" 
+                  rows={3}
+                  placeholder="Ex: Mudança de endereço para Taguatinga..."
+                  value={exitReason}
+                  onChange={e => setExitReason(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end mt-4">
+                <button onClick={() => setIsExitModalOpen(false)} className="px-4 py-2 text-slate-500">Cancelar</button>
+                <button onClick={handleRegisterExit} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700">Confirmar Saída</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DETALHES ALUNO */}
       {isModalOpen && selectedStudent && (
         <div className="modal-overlay fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -438,6 +518,7 @@ export default function App() {
                        </div>
                        <button onClick={startEditing} className="p-2 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 transition-colors" title="Editar Dados"><Pencil size={18} /></button>
                        <button onClick={handlePrint} className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200 transition-colors" title="Imprimir Ficha"><Printer size={18} /></button>
+                       <button onClick={() => setIsExitModalOpen(true)} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors" title="Registrar Saída"><LogOut size={18} /></button>
                      </div>
                    )}
                 </div>
