@@ -157,12 +157,11 @@ export default function App() {
 
   const handleLogout = () => { if(confirm("Sair?")) { localStorage.removeItem('soe_auth'); window.location.reload(); } };
 
-  // --- PDF ATUALIZADO (TELEFONE SEM CORTAR) ---
+  // --- PDF ATUALIZADO (COM DATA DE IMPRESSÃO) ---
   const generatePDF = () => {
     if (!selectedStudent) return;
     const doc = new jsPDF();
 
-    // Cabeçalho
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
@@ -179,25 +178,24 @@ export default function App() {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     
-    // Linha 1: Aluno e Turma
     doc.text(`Aluno(a):`, 20, 55);
     doc.setFont("helvetica", "bold");
     doc.text(`${selectedStudent.name}`, 40, 55);
+    
     doc.setFont("helvetica", "normal");
     doc.text(`Turma:`, 150, 55);
     doc.setFont("helvetica", "bold");
     doc.text(`${selectedStudent.class_id}`, 165, 55);
 
-    // Linha 2: Responsável (linha inteira)
     doc.setFont("helvetica", "normal");
     doc.text(`Responsável:`, 20, 62);
     doc.text(`${selectedStudent.guardian_name || "Não informado"}`, 45, 62);
     
-    // Linha 3: Telefone (linha inteira para não cortar)
+    // Telefone com quebra de linha ajustada
     doc.text(`Telefone:`, 20, 69);
     doc.text(`${selectedStudent.guardian_phone || "-"}`, 45, 69);
 
-    // Tabela de Desempenho (Desce um pouco mais devido à linha extra)
+    // Tabela
     doc.setFont("helvetica", "bold");
     doc.text("DESEMPENHO ACADÊMICO", 20, 80);
     
@@ -237,7 +235,7 @@ export default function App() {
       const sortedLogs = [...selectedStudent.logs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       sortedLogs.forEach((log) => {
-        if (currentY > 270) { doc.addPage(); currentY = 20; }
+        if (currentY > 260) { doc.addPage(); currentY = 20; } // Ajuste margem inferior
         
         let parsed = { obs: log.description, solicitante: 'SOE', motivos: [] };
         try { parsed = JSON.parse(log.description); } catch (e) {}
@@ -271,9 +269,17 @@ export default function App() {
       doc.text("Nenhum atendimento registrado.", 20, finalY + 10);
     }
 
+    // Rodapé Assinatura
+    doc.setDrawColor(0);
     doc.line(60, 280, 150, 280);
     doc.setFontSize(8);
     doc.text("Assinatura do Responsável SOE", 105, 285, { align: "center" });
+
+    // --- DATA DE IMPRESSÃO ---
+    const dataAtual = new Date().toLocaleString('pt-BR');
+    doc.setFontSize(7);
+    doc.setTextColor(150); // Cinza claro
+    doc.text(`Documento gerado em: ${dataAtual}`, 20, 290);
 
     doc.save(`Ficha_${selectedStudent.name}.pdf`);
   };
@@ -641,6 +647,7 @@ export default function App() {
 
               {activeTab === 'historico' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 tab-content">
+                  {/* ÁREA DE NOVO ATENDIMENTO - RESTAURADA A VERSÃO LARGA */}
                   <div className="lg:col-span-7 space-y-6 no-print">
                     <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm new-log-area">
                        <h3 className="font-bold text-indigo-800 mb-6 border-b pb-2 uppercase text-sm flex items-center gap-2"><FileText size={18}/> Novo Registro de Atendimento</h3>
