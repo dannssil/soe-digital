@@ -4,10 +4,9 @@ import { supabase } from './supabaseClient';
 import * as XLSX from 'xlsx'; 
 import { 
   LayoutDashboard, Users, BookOpen, LogOut, 
-  Plus, Save, X, CheckSquare, 
-  AlertTriangle, Camera, User, Pencil, Printer, Lock,
+  Plus, Save, X, AlertTriangle, Camera, User, Pencil, Printer, Lock,
   GraduationCap, FileText, History, Upload, FileSpreadsheet,
-  TrendingDown, AlertCircle
+  TrendingDown, AlertCircle, BarChart3, CheckSquare 
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -15,7 +14,7 @@ const SYSTEM_USER_NAME = "Daniel Alves";
 const SYSTEM_ROLE = "SOE - CED 4 Guará";
 const ACCESS_PASSWORD = "Ced@1rf1"; 
 
-// --- LISTAS COMPLETAS (RESTAURADAS) ---
+// --- LISTAS ---
 const MOTIVOS_COMPORTAMENTO = [
   "Conversa excessiva em sala", "Desacato / falta de respeito",
   "Agressividade verbal", "Agressividade física", "Uso indevido de celular",
@@ -108,14 +107,13 @@ export default function App() {
   const [editPerformance, setEditPerformance] = useState('');
   const [editGrades, setEditGrades] = useState('');
   
-  // States de Novo Aluno
   const [newName, setNewName] = useState('');
   const [newClass, setNewClass] = useState('');
   const [newResponsavel, setNewResponsavel] = useState('');
   const [newPhone, setNewPhone] = useState('');   
   const [newAddress, setNewAddress] = useState(''); 
 
-  // FORMULÁRIO DE ATENDIMENTO (RESTAURADO)
+  // Atendimento
   const [solicitante, setSolicitante] = useState('Professor');
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
   const [acoesSelecionadas, setAcoesSelecionadas] = useState<string[]>([]);
@@ -147,6 +145,7 @@ export default function App() {
 
   const handleLogout = () => { if(confirm("Sair?")) { localStorage.removeItem('soe_auth'); window.location.reload(); } };
 
+  // --- LÓGICA DE RISCO ---
   const checkRisk = (student: Student) => {
     const totalFaltas = student.desempenho?.reduce((acc, d) => acc + (d.faltas_bimestre || 0), 0) || 0;
     const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null;
@@ -156,6 +155,110 @@ export default function App() {
       notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length;
     }
     return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas };
+  };
+
+  // --- RENDERIZAR DASHBOARD OTIMIZADO ---
+  const renderDashboard = () => {
+    const studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
+    const turmas = [...new Set(students.map(s => s.class_id))].sort();
+
+    return (
+      <div className="space-y-6 h-full flex flex-col">
+        {/* Banner Importação */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex items-center justify-between flex-shrink-0">
+          <div><h3 className="text-2xl font-bold">Painel de Controle SOE</h3><p className="opacity-90">Gestão Pedagógica e Disciplinar</p></div>
+          <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-50 flex items-center gap-2"><Upload size={20}/> Importar Notas</button>
+        </div>
+
+        {/* ÁREA PRINCIPAL: DIVIDIDA EM 2 COLUNAS */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 overflow-hidden min-h-0">
+          
+          {/* COLUNA 1: LISTA DE RISCO (COM SCROLL) */}
+          <div className="bg-white rounded-2xl border border-red-100 shadow-sm flex flex-col h-full overflow-hidden">
+            <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="text-red-600" size={20} />
+                <h3 className="font-bold text-red-800 uppercase">Alunos em Alerta ({studentsInRisk.length})</h3>
+              </div>
+              <span className="text-[10px] text-red-500 font-bold bg-white px-2 py-1 rounded border border-red-200">280 Faltas ou +3 Notas &lt; 5.0</span>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-2">
+              {studentsInRisk.length > 0 ? (
+                <div className="space-y-2">
+                  {studentsInRisk.map(s => {
+                    const risk = checkRisk(s);
+                    return (
+                      <div key={s.id} className="p-3 bg-white border border-slate-100 rounded-xl hover:border-red-300 hover:shadow-md transition-all cursor-pointer flex items-center justify-between group" onClick={() => { setSelectedStudent(s); setIsModalOpen(true); }}>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={s.name} src={s.photo_url} size="sm" />
+                          <div>
+                            <p className="font-bold text-slate-800 text-sm group-hover:text-red-700">{s.name}</p>
+                            <p className="text-xs text-slate-500 font-bold">Turma {s.class_id}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {risk.reprovadoFalta && <span className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded">REP. FALTA ({risk.totalFaltas})</span>}
+                          {risk.criticoNotas && <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded border border-purple-200">{risk.notasVermelhas} NOTAS VERMELHAS</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center flex-col text-slate-400">
+                  <CheckSquare size={48} className="mb-2 opacity-20"/>
+                  <p>Tudo tranquilo! Nenhum aluno em zona de risco.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* COLUNA 2: ESTATÍSTICAS DAS TURMAS (NOVO) */}
+          <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm flex flex-col h-full overflow-hidden">
+            <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="text-indigo-600" size={20} />
+                <h3 className="font-bold text-indigo-800 uppercase">Estatísticas por Turma</h3>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="grid grid-cols-1 gap-3">
+                {turmas.map(t => {
+                  const alunosTurma = students.filter(s => s.class_id === t);
+                  const riscoTurma = alunosTurma.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoNotas; }).length;
+                  const percent = Math.round((riscoTurma / alunosTurma.length) * 100) || 0;
+                  
+                  return (
+                    <div key={t} className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="w-16 flex-shrink-0 text-center">
+                        <h4 className="font-bold text-lg text-slate-700">{t}</h4>
+                        <span className="text-[10px] text-slate-400 block">{alunosTurma.length} Alunos</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-bold text-slate-500">Índice de Risco</span>
+                          <span className={`font-bold ${percent > 30 ? 'text-red-600' : 'text-green-600'}`}>{percent}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                          <div className={`h-full ${percent > 30 ? 'bg-red-500' : percent > 15 ? 'bg-orange-400' : 'bg-green-500'}`} style={{ width: `${percent}%` }}></div>
+                        </div>
+                      </div>
+                      <div className="text-right w-20 flex-shrink-0">
+                         <span className="block text-2xl font-bold text-slate-800 leading-none">{riscoTurma}</span>
+                         <span className="text-[10px] text-slate-400 uppercase">Em Alerta</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
   };
 
   const toggleItem = (list: string[], setList: any, item: string) => {
@@ -315,38 +418,7 @@ export default function App() {
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
-          {view === 'dashboard' ? (
-            <div className="space-y-8">
-               <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex items-center justify-between">
-                 <div><h3 className="text-2xl font-bold">Importação iEducar</h3><p className="opacity-90">Sincronize notas e faltas bimestrais.</p></div>
-                 <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-50 flex items-center gap-2"><Upload size={20}/> Importar Excel</button>
-               </div>
-               
-               <div className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
-                 <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center gap-2">
-                   <AlertCircle className="text-red-600" size={20} />
-                   <h3 className="font-bold text-red-800 uppercase">Alunos em Risco (Faltas/Notas)</h3>
-                 </div>
-                 <div className="divide-y divide-slate-100">
-                   {students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; }).map(s => {
-                     const risk = checkRisk(s);
-                     return (
-                       <div key={s.id} className="p-4 flex items-center justify-between hover:bg-slate-50 cursor-pointer" onClick={() => { setSelectedStudent(s); setIsModalOpen(true); }}>
-                         <div className="flex items-center gap-3">
-                           <Avatar name={s.name} src={s.photo_url} size="sm" />
-                           <span className="font-bold text-sm">{s.name} ({s.class_id})</span>
-                         </div>
-                         <div className="flex gap-2">
-                           {risk.reprovadoFalta && <span className="px-2 py-1 bg-red-600 text-white text-[10px] font-bold rounded">REPROVADO POR FALTA</span>}
-                           {risk.criticoNotas && <span className="px-2 py-1 bg-purple-600 text-white text-[10px] font-bold rounded">RISCO NOTAS</span>}
-                         </div>
-                       </div>
-                     )
-                   })}
-                 </div>
-               </div>
-            </div>
-          ) : (
+          {view === 'dashboard' ? renderDashboard() : (
             <div className="max-w-6xl mx-auto">
               <div className="flex justify-end mb-8"><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2"><Plus size={20} /> Novo Aluno</button></div>
               <StudentList students={students} onSelectStudent={(s) => { setSelectedStudent(s); setIsModalOpen(true); }} />
@@ -355,11 +427,10 @@ export default function App() {
         </div>
       </main>
 
-      {/* MODAL DETALHES ALUNO (TUDO RESTAURADO) */}
+      {/* MODAL DETALHES ALUNO */}
       {isModalOpen && selectedStudent && (
         <div className="modal-overlay fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden">
-            {/* CABEÇALHO DE IMPRESSÃO (Oculto na tela) */}
             <div className="print-header p-8 border-b-2 border-black mb-4 text-center">
                <h1 className="font-bold text-xl uppercase">Governo do Distrito Federal</h1>
                <h2 className="font-bold text-lg uppercase">Secretaria de Estado de Educação</h2>
@@ -439,8 +510,6 @@ export default function App() {
                   <div className="lg:col-span-7 space-y-6 no-print">
                     <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm new-log-area">
                        <h3 className="font-bold text-indigo-800 mb-6 border-b pb-2 uppercase text-sm flex items-center gap-2"><FileText size={18}/> Novo Registro de Atendimento</h3>
-                       
-                       {/* Linha 1: Selects */}
                        <div className="grid grid-cols-2 gap-6 mb-6">
                          <div><label className="text-xs font-bold text-slate-500 uppercase">Solicitante</label>
                            <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option><option>Próprio Aluno</option><option>Direção</option></select>
@@ -449,8 +518,6 @@ export default function App() {
                            <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{ENCAMINHAMENTOS.map(e => <option key={e}>{e}</option>)}</select>
                          </div>
                        </div>
-                       
-                       {/* Linha 2: Motivos em 3 Colunas */}
                        <label className="text-xs font-bold text-slate-500 uppercase block mb-3">Motivo do Atendimento</label>
                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                          <div>
@@ -466,20 +533,14 @@ export default function App() {
                             {MOTIVOS_SOCIAL.map(m => (<label key={m} className="flex gap-2 text-xs text-slate-600 cursor-pointer mb-1 hover:text-slate-900"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}
                          </div>
                        </div>
-                       
-                       {/* Linha 3: Área de Texto Ampla */}
                        <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Relatório Detalhado</label>
                        <textarea className="w-full p-4 border rounded-xl bg-slate-50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all shadow-inner" rows={10} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
-                       
-                       {/* Rodapé: Resolvido + Botão */}
                        <div className="flex justify-between items-center mt-6 pt-4 border-t">
                          <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-green-700 select-none p-2 hover:bg-green-50 rounded-lg transition-colors"><input type="checkbox" className="w-5 h-5 rounded text-green-600 focus:ring-green-500" checked={resolvido} onChange={e => setResolvido(e.target.checked)}/> Caso Resolvido / Finalizado</label>
                          <button onClick={handleSaveLog} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-transform active:scale-95 flex items-center gap-2"><Save size={18}/> Salvar Atendimento</button>
                        </div>
                     </div>
                   </div>
-
-                  {/* COLUNA DIREITA: HISTÓRICO */}
                   <div className="lg:col-span-5 bg-slate-100 rounded-xl p-4 overflow-y-auto max-h-[800px] print:col-span-12 print:bg-white print:border print:border-black">
                     <h3 className="text-xs font-bold text-slate-500 uppercase mb-4 print:text-black sticky top-0 bg-slate-100 py-2 z-10">Histórico de Registros</h3>
                     {selectedStudent.logs?.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum registro encontrado.</p>}
