@@ -15,26 +15,26 @@ const SYSTEM_USER_NAME = "Daniel Alves";
 const SYSTEM_ROLE = "SOE - CED 4 Guará";
 const ACCESS_PASSWORD = "Ced@1rf1"; 
 
-// --- LISTAS PARA ATENDIMENTOS ---
+// --- LISTAS COMPLETAS (RESTAURADAS) ---
 const MOTIVOS_COMPORTAMENTO = [
   "Conversa excessiva em sala", "Desacato / falta de respeito",
   "Agressividade verbal", "Agressividade física", "Uso indevido de celular",
   "Saída de sala sem autorização", "Bullying / conflito com colegas", 
-  "Desobediência às orientações", "Outros"
+  "Desobediência às orientações", "Uniforme inadequado", "Outros"
 ];
 const MOTIVOS_PEDAGOGICO = [
   "Não realização de atividades", "Dificuldade de aprendizagem",
   "Falta de materiais", "Desatenção", "Desempenho abaixo do esperado",
-  "Faltas excessivas / Infrequência", "Outros"
+  "Faltas excessivas / Infrequência", "Sono em sala", "Outros"
 ];
 const MOTIVOS_SOCIAL = [
   "Ansiedade / desmotivação", "Problemas familiares",
-  "Isolamento / dificuldade de socialização", "Queixas de colegas / professores",
-  "Outros"
+  "Isolamento / dificuldade de socialização", "Queixas de colegas",
+  "Questões de saúde / Laudo", "Vulnerabilidade social", "Outros"
 ];
 const ENCAMINHAMENTOS = [
   "Coordenação pedagógica", "Psicologia escolar", "Família / responsáveis",
-  "Direção", "Conselho Tutelar", "Sala de Recursos", "Equipe de Apoio à Aprendizagem", "Disciplinar"
+  "Direção", "Conselho Tutelar", "Sala de Recursos", "Equipe de Apoio à Aprendizagem", "Disciplinar", "Saúde"
 ];
 const OPCOES_RENDIMENTO = ["Excelente", "Bom", "Regular", "Baixo", "Crítico"];
 
@@ -96,14 +96,33 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [selectedBimestre, setSelectedBimestre] = useState('1º Bimestre');
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico'>('perfil');
+  const [isEditing, setIsEditing] = useState(false);
+  
+  // States de Edição
+  const [editName, setEditName] = useState('');
+  const [editClass, setEditClass] = useState('');
+  const [editGuardian, setEditGuardian] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editAbsences, setEditAbsences] = useState(0);
+  const [editPerformance, setEditPerformance] = useState('');
+  const [editGrades, setEditGrades] = useState('');
+  
+  // States de Novo Aluno
+  const [newName, setNewName] = useState('');
+  const [newClass, setNewClass] = useState('');
+  const [newResponsavel, setNewResponsavel] = useState('');
+  const [newPhone, setNewPhone] = useState('');   
+  const [newAddress, setNewAddress] = useState(''); 
 
-  // FORMULÁRIO DE ATENDIMENTO
+  // FORMULÁRIO DE ATENDIMENTO (RESTAURADO)
   const [solicitante, setSolicitante] = useState('Professor');
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
   const [acoesSelecionadas, setAcoesSelecionadas] = useState<string[]>([]);
   const [encaminhamento, setEncaminhamento] = useState('');
   const [resolvido, setResolvido] = useState(false);
-  const [obsLivre, setObsLivre] = useState("Relatório de Atendimento:\n\n- Relato do estudante:\n\n- Mediação realizada:\n\n- Combinados:");
+  const DEFAULT_OBS = "Relatório de Atendimento:\n\n- Relato do estudante:\n\n- Mediação realizada:\n\n- Combinados:";
+  const [obsLivre, setObsLivre] = useState(DEFAULT_OBS);
 
   useEffect(() => {
     const savedAuth = localStorage.getItem('soe_auth');
@@ -128,7 +147,6 @@ export default function App() {
 
   const handleLogout = () => { if(confirm("Sair?")) { localStorage.removeItem('soe_auth'); window.location.reload(); } };
 
-  // LÓGICA DE RISCO
   const checkRisk = (student: Student) => {
     const totalFaltas = student.desempenho?.reduce((acc, d) => acc + (d.faltas_bimestre || 0), 0) || 0;
     const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null;
@@ -137,13 +155,7 @@ export default function App() {
       const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf'];
       notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length;
     }
-    return {
-      reprovadoFalta: totalFaltas >= 280,
-      criticoFalta: totalFaltas >= 200,
-      criticoNotas: notasVermelhas > 3,
-      totalFaltas,
-      notasVermelhas
-    };
+    return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas };
   };
 
   const toggleItem = (list: string[], setList: any, item: string) => {
@@ -151,24 +163,32 @@ export default function App() {
     else setList([...list, item]);
   };
 
+  function startEditing() {
+    if (!selectedStudent) return;
+    setEditName(selectedStudent.name); setEditClass(selectedStudent.class_id); setEditGuardian(selectedStudent.guardian_name || '');
+    setEditPhone(selectedStudent.guardian_phone || ''); setEditAddress(selectedStudent.address || '');
+    setEditAbsences(selectedStudent.absences || 0); setEditPerformance(selectedStudent.performance || 'Regular');
+    setEditGrades(selectedStudent.grades || ''); setIsEditing(true);
+  }
+
+  async function saveEdits() {
+    if (!selectedStudent) return;
+    const { error } = await supabase.from('students').update({
+        name: editName, class_id: editClass, guardian_name: editGuardian, guardian_phone: editPhone, address: editAddress,
+        absences: editAbsences, performance: editPerformance, grades: editGrades
+      }).eq('id', selectedStudent.id);
+    if (error) alert('Erro: ' + error.message);
+    else { alert('Sucesso!'); setIsEditing(false); fetchStudents(); setIsModalOpen(false); }
+  }
+
   async function handleSaveLog() {
     if (!selectedStudent) return;
     const desc = JSON.stringify({ solicitante, motivos: motivosSelecionados, acoes: acoesSelecionadas, obs: obsLivre });
     const { error } = await supabase.from('logs').insert([{ 
-      student_id: selectedStudent.id, 
-      category: "Atendimento SOE", 
-      description: desc, 
-      referral: encaminhamento, 
-      resolved: resolvido 
+      student_id: selectedStudent.id, category: "Atendimento SOE", description: desc, referral: encaminhamento, resolved: resolvido 
     }]);
     if (error) alert('Erro: ' + error.message);
-    else { 
-      alert('Salvo com sucesso!'); 
-      setMotivosSelecionados([]); 
-      setObsLivre("Relatório de Atendimento:\n\n- Relato do estudante:\n\n- Mediação realizada:\n\n- Combinados:");
-      fetchStudents(); 
-      setIsModalOpen(false); 
-    }
+    else { alert('Salvo com sucesso!'); setMotivosSelecionados([]); setObsLivre(DEFAULT_OBS); fetchStudents(); setIsModalOpen(false); }
   }
 
   async function handleRegisterExit() {
@@ -176,6 +196,38 @@ export default function App() {
     const { error } = await supabase.from('students').update({ status: exitType, exit_reason: exitReason, exit_date: new Date().toISOString() }).eq('id', selectedStudent.id);
     if (error) alert('Erro: ' + error.message);
     else { alert('Saída registrada!'); setIsExitModalOpen(false); setIsModalOpen(false); fetchStudents(); }
+  }
+
+  async function handleAddStudent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newName || !newClass) return;
+    const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, guardian_name: newResponsavel, guardian_phone: newPhone, address: newAddress, status: 'ATIVO' }]);
+    if (error) alert('Erro: ' + error.message);
+    else { alert('Cadastrado!'); setNewName(''); setNewClass(''); setIsNewStudentModalOpen(false); fetchStudents(); }
+  }
+
+  async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return;
+    const file = event.target.files[0];
+    const fileName = `${selectedStudent.id}-${Math.random()}.${file.name.split('.').pop()}`;
+    const { data, error } = await supabase.storage.from('photos').upload(fileName, file);
+    if (error) { alert('Erro upload'); return; }
+    const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName);
+    await supabase.from('students').update({ photo_url: publicUrl }).eq('id', selectedStudent.id);
+    setSelectedStudent({ ...selectedStudent, photo_url: publicUrl });
+    fetchStudents();
+  }
+
+  function handleAdminPhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    if (event.target.files && event.target.files[0]) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setAdminPhoto(result);
+        localStorage.setItem('adminPhoto', result);
+      };
+      reader.readAsDataURL(event.target.files[0]);
+    }
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -211,6 +263,8 @@ export default function App() {
     reader.readAsBinaryString(file);
   }
 
+  const handlePrint = () => window.print();
+
   if (!isAuthenticated) {
     return (
       <div className="h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -230,6 +284,18 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
+      <style>{`
+        @media print {
+          aside, header, .no-print { display: none !important; }
+          body { background: white; }
+          .modal-content { box-shadow: none !important; width: 100% !important; max-width: 100% !important; height: auto !important; position: relative !important; overflow: visible !important; }
+          .modal-overlay { position: static !important; background: white !important; padding: 0 !important; }
+          .new-log-area, .tabs-header { display: none !important; }
+          .print-header { display: block !important; }
+          .tab-content { display: block !important; }
+        }
+        .print-header { display: none; }
+      `}</style>
       <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shadow-2xl z-20">
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
           <div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} className="text-white"/></div>
@@ -251,7 +317,6 @@ export default function App() {
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
           {view === 'dashboard' ? (
             <div className="space-y-8">
-               {/* Dashboard de Risco e Estatísticas */}
                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex items-center justify-between">
                  <div><h3 className="text-2xl font-bold">Importação iEducar</h3><p className="opacity-90">Sincronize notas e faltas bimestrais.</p></div>
                  <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-50 flex items-center gap-2"><Upload size={20}/> Importar Excel</button>
@@ -292,20 +357,33 @@ export default function App() {
 
       {/* MODAL DETALHES ALUNO (TUDO RESTAURADO) */}
       {isModalOpen && selectedStudent && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
-            <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50">
+        <div className="modal-overlay fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden">
+            {/* CABEÇALHO DE IMPRESSÃO (Oculto na tela) */}
+            <div className="print-header p-8 border-b-2 border-black mb-4 text-center">
+               <h1 className="font-bold text-xl uppercase">Governo do Distrito Federal</h1>
+               <h2 className="font-bold text-lg uppercase">Secretaria de Estado de Educação</h2>
+               <h3 className="font-bold text-lg uppercase mt-2">Centro Educacional 04 do Guará</h3>
+               <p className="font-bold text-sm mt-4 uppercase border p-2 inline-block">Serviço de Orientação Educacional - SOE</p>
+            </div>
+
+            <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50 no-print">
               <div className="flex items-center gap-4">
-                <Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="lg" />
+                <div className="relative group">
+                  <Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="lg" />
+                  <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"><Camera size={20} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload}/></label>
+                </div>
                 <div><h2 className="text-2xl font-bold text-slate-800">{selectedStudent.name}</h2><p className="text-sm text-slate-500 font-bold uppercase">Turma {selectedStudent.class_id}</p></div>
               </div>
               <div className="flex items-center gap-2">
+                <button onClick={startEditing} className="p-2 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200" title="Editar"><Pencil size={18} /></button>
+                <button onClick={handlePrint} className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200" title="Imprimir"><Printer size={18} /></button>
                 <button onClick={() => setIsExitModalOpen(true)} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200" title="Registrar Saída"><LogOut size={18} /></button>
                 <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 hover:text-red-500" size={28}/></button>
               </div>
             </div>
 
-            <div className="flex border-b px-8 bg-white overflow-x-auto">
+            <div className="flex border-b px-8 bg-white overflow-x-auto no-print">
               <button onClick={() => setActiveTab('perfil')} className={`px-6 py-4 font-bold text-sm border-b-2 whitespace-nowrap ${activeTab === 'perfil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>DADOS PESSOAIS</button>
               <button onClick={() => setActiveTab('academico')} className={`px-6 py-4 font-bold text-sm border-b-2 whitespace-nowrap ${activeTab === 'academico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>BOLETIM iEDUCAR</button>
               <button onClick={() => setActiveTab('historico')} className={`px-6 py-4 font-bold text-sm border-b-2 whitespace-nowrap ${activeTab === 'historico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>ATENDIMENTOS SOE</button>
@@ -313,23 +391,30 @@ export default function App() {
 
             <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
               {activeTab === 'perfil' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 tab-content">
                   <div className="bg-white p-6 rounded-xl border shadow-sm">
                     <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 border-b pb-2">Informações do Responsável</h3>
                     <div className="space-y-3">
-                      <p className="text-sm"><span className="font-bold text-slate-500">NOME:</span> {selectedStudent.guardian_name || "—"}</p>
-                      <p className="text-sm"><span className="font-bold text-slate-500">CONTATO:</span> {selectedStudent.guardian_phone || "—"}</p>
-                      <p className="text-sm"><span className="font-bold text-slate-500">ENDEREÇO:</span> {selectedStudent.address || "—"}</p>
+                      <p className="text-sm"><span className="font-bold text-slate-500">NOME:</span> {isEditing ? <input value={editGuardian} onChange={e=>setEditGuardian(e.target.value)} className="border rounded p-1"/> : selectedStudent.guardian_name || "—"}</p>
+                      <p className="text-sm"><span className="font-bold text-slate-500">CONTATO:</span> {isEditing ? <input value={editPhone} onChange={e=>setEditPhone(e.target.value)} className="border rounded p-1"/> : selectedStudent.guardian_phone || "—"}</p>
+                      <p className="text-sm"><span className="font-bold text-slate-500">ENDEREÇO:</span> {isEditing ? <input value={editAddress} onChange={e=>setEditAddress(e.target.value)} className="border rounded p-1"/> : selectedStudent.address || "—"}</p>
+                      {isEditing && <button onClick={saveEdits} className="mt-4 bg-green-600 text-white px-4 py-2 rounded font-bold">Salvar Alterações</button>}
                     </div>
                   </div>
                 </div>
               )}
 
               {activeTab === 'academico' && (
-                <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                <div className="bg-white rounded-xl border shadow-sm overflow-hidden tab-content">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 text-[10px] font-bold uppercase text-slate-500">
-                      <tr><th className="px-6 py-3">Bimestre</th><th className="px-2 py-3">LP</th><th className="px-2 py-3">MAT</th><th className="px-2 py-3">CIE</th><th className="px-2 py-3">HIS</th><th className="px-2 py-3 text-red-600">Faltas</th></tr>
+                      <tr>
+                        <th className="px-6 py-3">Bimestre</th>
+                        <th className="px-2 py-3">LP</th><th className="px-2 py-3">MAT</th><th className="px-2 py-3">CIE</th><th className="px-2 py-3">HIS</th><th className="px-2 py-3">GEO</th><th className="px-2 py-3">ING</th>
+                        <th className="px-2 py-3">ART</th><th className="px-2 py-3">EDF</th>
+                        <th className="px-2 py-3 bg-slate-100">PD1</th><th className="px-2 py-3 bg-slate-100">PD2</th><th className="px-2 py-3 bg-slate-100">PD3</th>
+                        <th className="px-2 py-3 text-red-600">Faltas</th>
+                      </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {selectedStudent.desempenho?.map((d, i) => (
@@ -337,8 +422,9 @@ export default function App() {
                           <td className="px-6 py-4 font-bold">{d.bimestre}</td>
                           <td className={`px-2 py-4 font-bold ${d.lp < 5 ? 'text-red-500' : ''}`}>{d.lp}</td>
                           <td className={`px-2 py-4 font-bold ${d.mat < 5 ? 'text-red-500' : ''}`}>{d.mat}</td>
-                          <td className="px-2 py-4">{d.cie}</td>
-                          <td className="px-2 py-4">{d.his}</td>
+                          <td className="px-2 py-4">{d.cie}</td><td className="px-2 py-4">{d.his}</td><td className="px-2 py-4">{d.geo}</td><td className="px-2 py-4">{d.ing}</td>
+                          <td className="px-2 py-4">{d.art}</td><td className="px-2 py-4">{d.edf}</td>
+                          <td className="px-2 py-4 bg-slate-50">{d.pd1}</td><td className="px-2 py-4 bg-slate-50">{d.pd2}</td><td className="px-2 py-4 bg-slate-50">{d.pd3}</td>
                           <td className="px-2 py-4 font-bold text-red-600 bg-red-50 text-center">{d.faltas_bimestre}</td>
                         </tr>
                       ))}
@@ -348,42 +434,68 @@ export default function App() {
               )}
 
               {activeTab === 'historico' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                  <div className="lg:col-span-7 space-y-6">
-                    <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm">
-                       <h3 className="font-bold text-indigo-800 mb-4 border-b pb-2 uppercase text-sm">Novo Atendimento</h3>
-                       <div className="grid grid-cols-2 gap-4 mb-4">
-                         <div><label className="text-[10px] font-bold text-slate-500">SOLICITANTE</label>
-                           <select className="w-full mt-1 p-2 border rounded text-sm bg-slate-50" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option></select>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 tab-content">
+                  {/* ÁREA DE NOVO ATENDIMENTO - RESTAURADA A VERSÃO LARGA */}
+                  <div className="lg:col-span-7 space-y-6 no-print">
+                    <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm new-log-area">
+                       <h3 className="font-bold text-indigo-800 mb-6 border-b pb-2 uppercase text-sm flex items-center gap-2"><FileText size={18}/> Novo Registro de Atendimento</h3>
+                       
+                       {/* Linha 1: Selects */}
+                       <div className="grid grid-cols-2 gap-6 mb-6">
+                         <div><label className="text-xs font-bold text-slate-500 uppercase">Solicitante</label>
+                           <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option><option>Próprio Aluno</option><option>Direção</option></select>
                          </div>
-                         <div><label className="text-[10px] font-bold text-slate-500">ENCAMINHAR PARA</label>
-                           <select className="w-full mt-1 p-2 border rounded text-sm bg-slate-50" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">Nenhum</option>{ENCAMINHAMENTOS.map(e => <option key={e}>{e}</option>)}</select>
+                         <div><label className="text-xs font-bold text-slate-500 uppercase">Encaminhar Para</label>
+                           <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{ENCAMINHAMENTOS.map(e => <option key={e}>{e}</option>)}</select>
                          </div>
                        </div>
-                       <label className="text-[10px] font-bold text-slate-500">MOTIVOS</label>
-                       <div className="grid grid-cols-2 gap-2 mt-1 mb-4">
-                         {MOTIVOS_COMPORTAMENTO.slice(0,4).map(m => (<label key={m} className="flex gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}
+                       
+                       {/* Linha 2: Motivos em 3 Colunas */}
+                       <label className="text-xs font-bold text-slate-500 uppercase block mb-3">Motivo do Atendimento</label>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                         <div>
+                            <p className="text-[10px] font-bold text-orange-600 uppercase mb-2">Comportamental</p>
+                            {MOTIVOS_COMPORTAMENTO.map(m => (<label key={m} className="flex gap-2 text-xs text-slate-600 cursor-pointer mb-1 hover:text-slate-900"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}
+                         </div>
+                         <div>
+                            <p className="text-[10px] font-bold text-blue-600 uppercase mb-2">Pedagógico</p>
+                            {MOTIVOS_PEDAGOGICO.map(m => (<label key={m} className="flex gap-2 text-xs text-slate-600 cursor-pointer mb-1 hover:text-slate-900"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}
+                         </div>
+                         <div>
+                            <p className="text-[10px] font-bold text-purple-600 uppercase mb-2">Social / Outros</p>
+                            {MOTIVOS_SOCIAL.map(m => (<label key={m} className="flex gap-2 text-xs text-slate-600 cursor-pointer mb-1 hover:text-slate-900"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}
+                         </div>
                        </div>
-                       <textarea className="w-full p-4 border rounded-xl bg-slate-50 text-sm" rows={8} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
-                       <div className="flex justify-between items-center mt-4">
-                         <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-green-700"><input type="checkbox" checked={resolvido} onChange={e => setResolvido(e.target.checked)}/> Caso Resolvido?</label>
-                         <button onClick={handleSaveLog} className="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold shadow-lg">Salvar Atendimento</button>
+                       
+                       {/* Linha 3: Área de Texto Ampla */}
+                       <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Relatório Detalhado</label>
+                       <textarea className="w-full p-4 border rounded-xl bg-slate-50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all shadow-inner" rows={10} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
+                       
+                       {/* Rodapé: Resolvido + Botão */}
+                       <div className="flex justify-between items-center mt-6 pt-4 border-t">
+                         <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-green-700 select-none p-2 hover:bg-green-50 rounded-lg transition-colors"><input type="checkbox" className="w-5 h-5 rounded text-green-600 focus:ring-green-500" checked={resolvido} onChange={e => setResolvido(e.target.checked)}/> Caso Resolvido / Finalizado</label>
+                         <button onClick={handleSaveLog} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-transform active:scale-95 flex items-center gap-2"><Save size={18}/> Salvar Atendimento</button>
                        </div>
                     </div>
                   </div>
-                  <div className="lg:col-span-5 bg-slate-200/50 rounded-xl p-4 overflow-y-auto max-h-[600px]">
-                    <h3 className="text-xs font-bold text-slate-500 uppercase mb-4">Registros Anteriores</h3>
+
+                  {/* COLUNA DIREITA: HISTÓRICO */}
+                  <div className="lg:col-span-5 bg-slate-100 rounded-xl p-4 overflow-y-auto max-h-[800px] print:col-span-12 print:bg-white print:border print:border-black">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase mb-4 print:text-black sticky top-0 bg-slate-100 py-2 z-10">Histórico de Registros</h3>
                     {selectedStudent.logs?.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum registro encontrado.</p>}
                     {selectedStudent.logs?.map(log => {
-                       let p = { obs: log.description }; try { p = JSON.parse(log.description); } catch(e) {}
+                       let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {}
                        return (
-                         <div key={log.id} className="bg-white p-4 rounded-lg border shadow-sm mb-3">
-                           <div className="flex justify-between text-[10px] font-bold text-indigo-600 mb-1">
-                             <span>{new Date(log.created_at).toLocaleDateString()}</span>
-                             {log.resolved && <span className="text-green-600 uppercase">Resolvido</span>}
+                         <div key={log.id} className="bg-white p-5 rounded-xl border shadow-sm mb-4 hover:shadow-md transition-shadow">
+                           <div className="flex justify-between items-start mb-3 border-b pb-2">
+                             <div>
+                               <span className="font-bold text-indigo-700 text-sm block">{new Date(log.created_at).toLocaleDateString()}</span>
+                               <span className="text-[10px] text-slate-400 uppercase font-bold">{p.solicitante || 'SOE'}</span>
+                             </div>
+                             {log.resolved ? <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-green-200">Resolvido</span> : <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-amber-200">Em Aberto</span>}
                            </div>
-                           <p className="text-xs text-slate-700 whitespace-pre-line">{p.obs}</p>
-                           {log.referral && <p className="mt-2 text-[10px] font-bold text-purple-600 border-t pt-1 uppercase">➔ Encaminhado: {log.referral}</p>}
+                           <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{p.obs}</p>
+                           {log.referral && <div className="mt-3 pt-2 border-t border-slate-50 flex items-center gap-2 text-xs font-bold text-purple-600 uppercase"><span className="bg-purple-50 p-1 rounded">➔ Encaminhado:</span> {log.referral}</div>}
                          </div>
                        )
                     })}
@@ -431,6 +543,24 @@ export default function App() {
                 <button onClick={handleRegisterExit} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold">CONFIRMAR</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* MODAL NOVO ALUNO */}
+      {isNewStudentModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <h3 className="text-xl font-bold mb-4">Novo Aluno</h3>
+            <form onSubmit={handleAddStudent} className="space-y-4">
+              <input className="w-full p-3 border rounded-xl" placeholder="Nome Completo" value={newName} onChange={e => setNewName(e.target.value)} />
+              <div className="grid grid-cols-2 gap-4">
+                <input className="w-full p-3 border rounded-xl" placeholder="Turma (ex: 6A)" value={newClass} onChange={e => setNewClass(e.target.value)} />
+                <div className="w-full p-3 border rounded-xl bg-slate-100 text-slate-500 flex items-center p-3 text-sm font-bold">Vespertino</div>
+              </div>
+              <input className="w-full p-3 border rounded-xl" placeholder="Responsável" value={newResponsavel} onChange={e => setNewResponsavel(e.target.value)} />
+              <div className="flex justify-end gap-2 mt-4"><button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="px-4 py-2">Cancelar</button><button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">Salvar</button></div>
+            </form>
           </div>
         </div>
       )}
