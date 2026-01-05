@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut, 
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Printer, Lock,
   GraduationCap, FileText, History, Upload, FileSpreadsheet,
-  TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, UserCircle, FileDown
+  TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, UserCircle, FileDown, CalendarDays
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -116,11 +116,14 @@ export default function App() {
   const [newPhone, setNewPhone] = useState('');   
   const [newAddress, setNewAddress] = useState(''); 
 
+  // Atendimento
   const [solicitante, setSolicitante] = useState('Professor');
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
   const [acoesSelecionadas, setAcoesSelecionadas] = useState<string[]>([]);
   const [encaminhamento, setEncaminhamento] = useState('');
   const [resolvido, setResolvido] = useState(false);
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]); // Data Hoje
+  
   const DEFAULT_OBS = "Relatório de Atendimento:\n\n- Relato do estudante:\n\n- Mediação realizada:\n\n- Combinados:";
   const [obsLivre, setObsLivre] = useState(DEFAULT_OBS);
 
@@ -135,7 +138,14 @@ export default function App() {
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`)
       .eq('status', 'ATIVO').order('name'); 
     if (error) setErrorMsg(`Erro: ${error.message}`);
-    else setStudents(data || []);
+    else {
+      // Ordenar logs por data (decrescente) no front-end para garantir
+      const sortedData = data?.map(student => ({
+        ...student,
+        logs: student.logs?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      }));
+      setStudents(sortedData || []);
+    }
     setLoading(false);
   }
 
@@ -147,12 +157,12 @@ export default function App() {
 
   const handleLogout = () => { if(confirm("Sair?")) { localStorage.removeItem('soe_auth'); window.location.reload(); } };
 
-  // --- FUNÇÃO GERADORA DE PDF OFICIAL ---
+  // --- PDF ATUALIZADO (TELEFONE SEM CORTAR) ---
   const generatePDF = () => {
     if (!selectedStudent) return;
     const doc = new jsPDF();
 
-    // Cabeçalho Oficial
+    // Cabeçalho
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
@@ -168,26 +178,31 @@ export default function App() {
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
+    
+    // Linha 1: Aluno e Turma
     doc.text(`Aluno(a):`, 20, 55);
     doc.setFont("helvetica", "bold");
     doc.text(`${selectedStudent.name}`, 40, 55);
-    
     doc.setFont("helvetica", "normal");
     doc.text(`Turma:`, 150, 55);
     doc.setFont("helvetica", "bold");
     doc.text(`${selectedStudent.class_id}`, 165, 55);
 
+    // Linha 2: Responsável (linha inteira)
     doc.setFont("helvetica", "normal");
     doc.text(`Responsável:`, 20, 62);
     doc.text(`${selectedStudent.guardian_name || "Não informado"}`, 45, 62);
     
-    doc.text(`Telefone:`, 150, 62);
-    doc.text(`${selectedStudent.guardian_phone || "-"}`, 168, 62);
+    // Linha 3: Telefone (linha inteira para não cortar)
+    doc.text(`Telefone:`, 20, 69);
+    doc.text(`${selectedStudent.guardian_phone || "-"}`, 45, 69);
 
-    // Tabela de Desempenho
+    // Tabela de Desempenho (Desce um pouco mais devido à linha extra)
     doc.setFont("helvetica", "bold");
-    doc.text("DESEMPENHO ACADÊMICO (IMPORTADO)", 20, 75);
+    doc.text("DESEMPENHO ACADÊMICO", 20, 80);
     
+    let tableStartY = 85;
+
     if (selectedStudent.desempenho && selectedStudent.desempenho.length > 0) {
       const tableData = selectedStudent.desempenho.map(d => [
         d.bimestre,
@@ -198,36 +213,40 @@ export default function App() {
       ]);
 
       autoTable(doc, {
-        startY: 80,
+        startY: tableStartY,
         head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']],
         body: tableData,
         theme: 'grid',
-        headStyles: { fillColor: [79, 70, 229], fontSize: 8 }, // Cor Indigo
+        headStyles: { fillColor: [79, 70, 229], fontSize: 8 },
         styles: { fontSize: 8, halign: 'center' },
       });
     } else {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
-      doc.text("Nenhum dado acadêmico registrado.", 20, 85);
+      doc.text("Nenhum dado acadêmico registrado.", 20, 90);
+      tableStartY = 90;
     }
 
-    // Histórico de Atendimentos
-    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 95;
+    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : tableStartY + 15;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.text("HISTÓRICO DE ATENDIMENTOS", 20, finalY);
 
     if (selectedStudent.logs && selectedStudent.logs.length > 0) {
       let currentY = finalY + 10;
-      selectedStudent.logs.forEach((log) => {
-        if (currentY > 270) { doc.addPage(); currentY = 20; } // Nova página se acabar espaço
+      const sortedLogs = [...selectedStudent.logs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      sortedLogs.forEach((log) => {
+        if (currentY > 270) { doc.addPage(); currentY = 20; }
         
         let parsed = { obs: log.description, solicitante: 'SOE', motivos: [] };
         try { parsed = JSON.parse(log.description); } catch (e) {}
 
+        const dataAtendimento = new Date(log.created_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
-        doc.text(`${new Date(log.created_at).toLocaleDateString()} - Solicitante: ${parsed.solicitante || 'SOE'}`, 20, currentY);
+        doc.text(`${dataAtendimento} - Solicitante: ${parsed.solicitante || 'SOE'}`, 20, currentY);
         
         doc.setFont("helvetica", "normal");
         const splitObs = doc.splitTextToSize(`Relato: ${parsed.obs}`, 170);
@@ -249,10 +268,9 @@ export default function App() {
     } else {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
-      doc.text("Nenhum atendimento registrado para este aluno.", 20, finalY + 10);
+      doc.text("Nenhum atendimento registrado.", 20, finalY + 10);
     }
 
-    // Rodapé Assinatura
     doc.line(60, 280, 150, 280);
     doc.setFontSize(8);
     doc.text("Assinatura do Responsável SOE", 105, 285, { align: "center" });
@@ -375,11 +393,15 @@ export default function App() {
   async function handleSaveLog() {
     if (!selectedStudent) return;
     const desc = JSON.stringify({ solicitante, motivos: motivosSelecionados, acoes: acoesSelecionadas, obs: obsLivre });
+    const selectedDateISO = new Date(attendanceDate).toISOString();
+
     const { error } = await supabase.from('logs').insert([{ 
-      student_id: selectedStudent.id, category: "Atendimento SOE", description: desc, referral: encaminhamento, resolved: resolvido 
+      student_id: selectedStudent.id, category: "Atendimento SOE", description: desc, referral: encaminhamento, resolved: resolvido,
+      created_at: selectedDateISO
     }]);
+    
     if (error) alert('Erro: ' + error.message);
-    else { alert('Salvo com sucesso!'); setMotivosSelecionados([]); setObsLivre(DEFAULT_OBS); fetchStudents(); setIsModalOpen(false); }
+    else { alert('Salvo com sucesso!'); setMotivosSelecionados([]); setObsLivre(DEFAULT_OBS); setAttendanceDate(new Date().toISOString().split('T')[0]); fetchStudents(); setIsModalOpen(false); }
   }
 
   async function handleRegisterExit() {
@@ -562,7 +584,7 @@ export default function App() {
                         <div className="bg-slate-100 p-2 rounded-lg"><User size={20} className="text-slate-500"/></div>
                         <div className="flex-1">
                           <span className="block text-xs font-bold text-slate-400 uppercase mb-1">Responsável Legal</span>
-                          {isEditing ? <input value={editGuardian} onChange={e=>setEditGuardian(e.target.value)} className="w-full border rounded p-2"/> : <p className="font-medium text-lg text-slate-800">{selectedStudent.guardian_name || "Não informado"}</p>}
+                          {isEditing ? <input value={editGuardian} onChange={e=>setEditGuardian(e.target.value)} className="w-full border rounded p-2"/> : <p className="font-medium text-lg text-slate-800 break-words">{selectedStudent.guardian_name || "Não informado"}</p>}
                         </div>
                       </div>
                       
@@ -570,7 +592,7 @@ export default function App() {
                         <div className="bg-slate-100 p-2 rounded-lg"><Phone size={20} className="text-slate-500"/></div>
                         <div className="flex-1">
                           <span className="block text-xs font-bold text-slate-400 uppercase mb-1">Telefone / WhatsApp</span>
-                          {isEditing ? <input value={editPhone} onChange={e=>setEditPhone(e.target.value)} className="w-full border rounded p-2"/> : <p className="font-medium text-lg text-slate-800">{selectedStudent.guardian_phone || "Não informado"}</p>}
+                          {isEditing ? <input value={editPhone} onChange={e=>setEditPhone(e.target.value)} className="w-full border rounded p-2"/> : <p className="font-medium text-lg text-slate-800 break-words whitespace-pre-line">{selectedStudent.guardian_phone || "Não informado"}</p>}
                         </div>
                       </div>
 
@@ -578,7 +600,7 @@ export default function App() {
                         <div className="bg-slate-100 p-2 rounded-lg"><MapPin size={20} className="text-slate-500"/></div>
                         <div className="flex-1">
                           <span className="block text-xs font-bold text-slate-400 uppercase mb-1">Endereço Residencial</span>
-                          {isEditing ? <input value={editAddress} onChange={e=>setEditAddress(e.target.value)} className="w-full border rounded p-2"/> : <p className="font-medium text-lg text-slate-800 leading-relaxed">{selectedStudent.address || "Não informado"}</p>}
+                          {isEditing ? <input value={editAddress} onChange={e=>setEditAddress(e.target.value)} className="w-full border rounded p-2"/> : <p className="font-medium text-lg text-slate-800 leading-relaxed break-words">{selectedStudent.address || "Não informado"}</p>}
                         </div>
                       </div>
 
@@ -630,6 +652,13 @@ export default function App() {
                            <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{ENCAMINHAMENTOS.map(e => <option key={e}>{e}</option>)}</select>
                          </div>
                        </div>
+                       
+                       {/* CAMPO DE DATA */}
+                       <div className="mb-6">
+                         <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1"><CalendarDays size={14}/> Data do Atendimento</label>
+                         <input type="date" className="w-full p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
+                       </div>
+
                        <label className="text-xs font-bold text-slate-500 uppercase block mb-3">Motivo do Atendimento</label>
                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                          <div>
@@ -658,11 +687,12 @@ export default function App() {
                     {selectedStudent.logs?.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum registro encontrado.</p>}
                     {selectedStudent.logs?.map(log => {
                        let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {}
+                       const dataVisual = new Date(log.created_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
                        return (
                          <div key={log.id} className="bg-white p-5 rounded-xl border shadow-sm mb-4 hover:shadow-md transition-shadow">
                            <div className="flex justify-between items-start mb-3 border-b pb-2">
                              <div>
-                               <span className="font-bold text-indigo-700 text-sm block">{new Date(log.created_at).toLocaleDateString()}</span>
+                               <span className="font-bold text-indigo-700 text-sm block">{dataVisual}</span>
                                <span className="text-[10px] text-slate-400 uppercase font-bold">{p.solicitante || 'SOE'}</span>
                              </div>
                              {log.resolved ? <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-green-200">Resolvido</span> : <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-amber-200">Em Aberto</span>}
