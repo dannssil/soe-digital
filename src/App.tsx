@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut, 
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Printer, Lock,
   GraduationCap, FileText, History, Upload, FileSpreadsheet,
-  TrendingDown, AlertCircle, BarChart3, CheckSquare 
+  TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, UserCircle
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -97,6 +97,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico'>('perfil');
   const [isEditing, setIsEditing] = useState(false);
   
+  // Novo State para Filtro de Turma
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string | null>(null);
+
   // States de Edição
   const [editName, setEditName] = useState('');
   const [editClass, setEditClass] = useState('');
@@ -159,7 +162,15 @@ export default function App() {
 
   // --- RENDERIZAR DASHBOARD OTIMIZADO ---
   const renderDashboard = () => {
-    const studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
+    // Filtra lista de risco
+    let studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
+    
+    // Se houver filtro de turma, aplica
+    if (selectedClassFilter) {
+      studentsInRisk = studentsInRisk.filter(s => s.class_id === selectedClassFilter);
+    }
+
+    // Lista de turmas (excluindo status como ABANDONO ou TRANSFERIDO se estiverem aparecendo como turma)
     const turmas = [...new Set(students.map(s => s.class_id))].sort();
 
     return (
@@ -178,9 +189,12 @@ export default function App() {
             <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <AlertCircle className="text-red-600" size={20} />
-                <h3 className="font-bold text-red-800 uppercase">Alunos em Alerta ({studentsInRisk.length})</h3>
+                <div>
+                  <h3 className="font-bold text-red-800 uppercase">Alunos em Alerta {selectedClassFilter && `(${selectedClassFilter})`}</h3>
+                  {selectedClassFilter && <span className="text-[10px] text-red-600 cursor-pointer underline" onClick={() => setSelectedClassFilter(null)}>Limpar Filtro</span>}
+                </div>
               </div>
-              <span className="text-[10px] text-red-500 font-bold bg-white px-2 py-1 rounded border border-red-200">280 Faltas ou +3 Notas &lt; 5.0</span>
+              <span className="text-[10px] text-red-500 font-bold bg-white px-2 py-1 rounded border border-red-200">{studentsInRisk.length} Casos</span>
             </div>
             
             <div className="flex-1 overflow-y-auto p-2">
@@ -208,46 +222,49 @@ export default function App() {
               ) : (
                 <div className="h-full flex items-center justify-center flex-col text-slate-400">
                   <CheckSquare size={48} className="mb-2 opacity-20"/>
-                  <p>Tudo tranquilo! Nenhum aluno em zona de risco.</p>
+                  <p>Tudo tranquilo! Nenhum aluno {selectedClassFilter ? `da turma ${selectedClassFilter}` : ''} em zona de risco.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* COLUNA 2: ESTATÍSTICAS DAS TURMAS (NOVO) */}
+          {/* COLUNA 2: ESTATÍSTICAS DAS TURMAS (AGORA CLICÁVEIS E ARRUMADAS) */}
           <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm flex flex-col h-full overflow-hidden">
             <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <BarChart3 className="text-indigo-600" size={20} />
                 <h3 className="font-bold text-indigo-800 uppercase">Estatísticas por Turma</h3>
               </div>
+              <p className="text-[10px] text-indigo-400">Toque para filtrar</p>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4">
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {turmas.map(t => {
                   const alunosTurma = students.filter(s => s.class_id === t);
                   const riscoTurma = alunosTurma.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoNotas; }).length;
                   const percent = Math.round((riscoTurma / alunosTurma.length) * 100) || 0;
+                  const isSelected = selectedClassFilter === t;
                   
                   return (
-                    <div key={t} className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="w-16 flex-shrink-0 text-center">
-                        <h4 className="font-bold text-lg text-slate-700">{t}</h4>
-                        <span className="text-[10px] text-slate-400 block">{alunosTurma.length} Alunos</span>
+                    <div 
+                      key={t} 
+                      onClick={() => setSelectedClassFilter(isSelected ? null : t)}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-105' : 'bg-slate-50 border-slate-100 hover:border-indigo-300 hover:shadow-md'}`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <h4 className={`font-bold text-lg ${isSelected ? 'text-white' : 'text-slate-700'}`}>{t}</h4>
+                        <span className={`text-[10px] font-bold ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>{alunosTurma.length}</span>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="font-bold text-slate-500">Índice de Risco</span>
-                          <span className={`font-bold ${percent > 30 ? 'text-red-600' : 'text-green-600'}`}>{percent}%</span>
+                      
+                      <div className="mt-2">
+                        <div className="flex justify-between text-[10px] mb-1">
+                          <span className={isSelected ? 'text-indigo-100' : 'text-slate-500'}>Risco</span>
+                          <span className={`font-bold ${isSelected ? 'text-white' : percent > 30 ? 'text-red-600' : 'text-green-600'}`}>{percent}%</span>
                         </div>
-                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? 'bg-indigo-800' : 'bg-slate-200'}`}>
                           <div className={`h-full ${percent > 30 ? 'bg-red-500' : percent > 15 ? 'bg-orange-400' : 'bg-green-500'}`} style={{ width: `${percent}%` }}></div>
                         </div>
-                      </div>
-                      <div className="text-right w-20 flex-shrink-0">
-                         <span className="block text-2xl font-bold text-slate-800 leading-none">{riscoTurma}</span>
-                         <span className="text-[10px] text-slate-400 uppercase">Em Alerta</span>
                       </div>
                     </div>
                   )
@@ -461,15 +478,41 @@ export default function App() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
+              
+              {/* ABA DADOS PESSOAIS (REESTILIZADA COM VISUAL PREMIUM) */}
               {activeTab === 'perfil' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 tab-content">
-                  <div className="bg-white p-6 rounded-xl border shadow-sm">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 border-b pb-2">Informações do Responsável</h3>
-                    <div className="space-y-3">
-                      <p className="text-sm"><span className="font-bold text-slate-500">NOME:</span> {isEditing ? <input value={editGuardian} onChange={e=>setEditGuardian(e.target.value)} className="border rounded p-1"/> : selectedStudent.guardian_name || "—"}</p>
-                      <p className="text-sm"><span className="font-bold text-slate-500">CONTATO:</span> {isEditing ? <input value={editPhone} onChange={e=>setEditPhone(e.target.value)} className="border rounded p-1"/> : selectedStudent.guardian_phone || "—"}</p>
-                      <p className="text-sm"><span className="font-bold text-slate-500">ENDEREÇO:</span> {isEditing ? <input value={editAddress} onChange={e=>setEditAddress(e.target.value)} className="border rounded p-1"/> : selectedStudent.address || "—"}</p>
-                      {isEditing && <button onClick={saveEdits} className="mt-4 bg-green-600 text-white px-4 py-2 rounded font-bold">Salvar Alterações</button>}
+                  <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+                    <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex items-center gap-2">
+                      <UserCircle className="text-indigo-600" />
+                      <h3 className="font-bold text-indigo-900 uppercase">Informações de Contato</h3>
+                    </div>
+                    <div className="p-6 space-y-6">
+                      <div className="flex items-start gap-4">
+                        <div className="bg-slate-100 p-2 rounded-lg"><User size={20} className="text-slate-500"/></div>
+                        <div className="flex-1">
+                          <span className="block text-xs font-bold text-slate-400 uppercase mb-1">Responsável Legal</span>
+                          {isEditing ? <input value={editGuardian} onChange={e=>setEditGuardian(e.target.value)} className="w-full border rounded p-2"/> : <p className="font-medium text-lg text-slate-800">{selectedStudent.guardian_name || "Não informado"}</p>}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-4">
+                        <div className="bg-slate-100 p-2 rounded-lg"><Phone size={20} className="text-slate-500"/></div>
+                        <div className="flex-1">
+                          <span className="block text-xs font-bold text-slate-400 uppercase mb-1">Telefone / WhatsApp</span>
+                          {isEditing ? <input value={editPhone} onChange={e=>setEditPhone(e.target.value)} className="w-full border rounded p-2"/> : <p className="font-medium text-lg text-slate-800">{selectedStudent.guardian_phone || "Não informado"}</p>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-4">
+                        <div className="bg-slate-100 p-2 rounded-lg"><MapPin size={20} className="text-slate-500"/></div>
+                        <div className="flex-1">
+                          <span className="block text-xs font-bold text-slate-400 uppercase mb-1">Endereço Residencial</span>
+                          {isEditing ? <input value={editAddress} onChange={e=>setEditAddress(e.target.value)} className="w-full border rounded p-2"/> : <p className="font-medium text-lg text-slate-800 leading-relaxed">{selectedStudent.address || "Não informado"}</p>}
+                        </div>
+                      </div>
+
+                      {isEditing && <button onClick={saveEdits} className="w-full mt-4 bg-green-600 text-white px-4 py-3 rounded-xl font-bold shadow-md hover:bg-green-700 transition-colors">Salvar Alterações</button>}
                     </div>
                   </div>
                 </div>
