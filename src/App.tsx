@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut, 
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Printer, Lock,
   GraduationCap, FileText, History, Upload, FileSpreadsheet,
-  TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, UserCircle, FileDown, CalendarDays
+  TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, UserCircle, FileDown, CalendarDays, Download
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -116,13 +116,12 @@ export default function App() {
   const [newPhone, setNewPhone] = useState('');   
   const [newAddress, setNewAddress] = useState(''); 
 
-  // Atendimento
   const [solicitante, setSolicitante] = useState('Professor');
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
   const [acoesSelecionadas, setAcoesSelecionadas] = useState<string[]>([]);
   const [encaminhamento, setEncaminhamento] = useState('');
   const [resolvido, setResolvido] = useState(false);
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]); // Data Hoje
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]); 
   
   const DEFAULT_OBS = "Relatório de Atendimento:\n\n- Relato do estudante:\n\n- Mediação realizada:\n\n- Combinados:";
   const [obsLivre, setObsLivre] = useState(DEFAULT_OBS);
@@ -139,7 +138,6 @@ export default function App() {
       .eq('status', 'ATIVO').order('name'); 
     if (error) setErrorMsg(`Erro: ${error.message}`);
     else {
-      // Ordenar logs por data (decrescente) no front-end para garantir
       const sortedData = data?.map(student => ({
         ...student,
         logs: student.logs?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -157,7 +155,54 @@ export default function App() {
 
   const handleLogout = () => { if(confirm("Sair?")) { localStorage.removeItem('soe_auth'); window.location.reload(); } };
 
-  // --- PDF ATUALIZADO (COM DATA DE IMPRESSÃO) ---
+  // --- EXPORTAR BACKUP ---
+  const handleExportBackup = async () => {
+    if(!confirm("Deseja baixar um backup completo de todos os dados?")) return;
+    
+    // 1. Buscar todos os dados
+    const { data: alunos } = await supabase.from('students').select('*');
+    const { data: notas } = await supabase.from('desempenho_bimestral').select('*');
+    const { data: logs } = await supabase.from('logs').select('*');
+
+    // 2. Criar planilha
+    const wb = XLSX.utils.book_new();
+    
+    // Aba Alunos
+    if(alunos) {
+      const wsAlunos = XLSX.utils.json_to_sheet(alunos);
+      XLSX.utils.book_append_sheet(wb, wsAlunos, "Alunos");
+    }
+
+    // Aba Notas
+    if(notas) {
+      const wsNotas = XLSX.utils.json_to_sheet(notas);
+      XLSX.utils.book_append_sheet(wb, wsNotas, "Notas");
+    }
+
+    // Aba Atendimentos
+    if(logs) {
+      const logsFormatados = logs.map(l => {
+        let parsed = { motivos: [], obs: '' };
+        try { parsed = JSON.parse(l.description) } catch(e) {}
+        return {
+          id: l.id,
+          aluno_id: l.student_id,
+          data: new Date(l.created_at).toLocaleDateString(),
+          categoria: l.category,
+          detalhes: parsed.obs,
+          motivos: Array.isArray(parsed.motivos) ? parsed.motivos.join(', ') : '',
+          encaminhamento: l.referral,
+          resolvido: l.resolved ? 'SIM' : 'NÃO'
+        };
+      });
+      const wsLogs = XLSX.utils.json_to_sheet(logsFormatados);
+      XLSX.utils.book_append_sheet(wb, wsLogs, "Atendimentos");
+    }
+
+    // 3. Baixar
+    XLSX.writeFile(wb, `Backup_SOE_${new Date().toLocaleDateString().replace(/\//g,'-')}.xlsx`);
+  };
+
   const generatePDF = () => {
     if (!selectedStudent) return;
     const doc = new jsPDF();
@@ -171,7 +216,6 @@ export default function App() {
     doc.setLineWidth(0.5);
     doc.line(20, 35, 190, 35);
 
-    // Dados do Aluno
     doc.setFontSize(12);
     doc.text(`FICHA INDIVIDUAL DE ACOMPANHAMENTO`, 105, 45, { align: "center" });
     
@@ -191,11 +235,9 @@ export default function App() {
     doc.text(`Responsável:`, 20, 62);
     doc.text(`${selectedStudent.guardian_name || "Não informado"}`, 45, 62);
     
-    // Telefone com quebra de linha ajustada
     doc.text(`Telefone:`, 20, 69);
     doc.text(`${selectedStudent.guardian_phone || "-"}`, 45, 69);
 
-    // Tabela
     doc.setFont("helvetica", "bold");
     doc.text("DESEMPENHO ACADÊMICO", 20, 80);
     
@@ -235,7 +277,7 @@ export default function App() {
       const sortedLogs = [...selectedStudent.logs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       sortedLogs.forEach((log) => {
-        if (currentY > 260) { doc.addPage(); currentY = 20; } // Ajuste margem inferior
+        if (currentY > 260) { doc.addPage(); currentY = 20; } 
         
         let parsed = { obs: log.description, solicitante: 'SOE', motivos: [] };
         try { parsed = JSON.parse(log.description); } catch (e) {}
@@ -269,16 +311,14 @@ export default function App() {
       doc.text("Nenhum atendimento registrado.", 20, finalY + 10);
     }
 
-    // Rodapé Assinatura
     doc.setDrawColor(0);
     doc.line(60, 280, 150, 280);
     doc.setFontSize(8);
     doc.text("Assinatura do Responsável SOE", 105, 285, { align: "center" });
 
-    // --- DATA DE IMPRESSÃO ---
     const dataAtual = new Date().toLocaleString('pt-BR');
     doc.setFontSize(7);
-    doc.setTextColor(150); // Cinza claro
+    doc.setTextColor(150); 
     doc.text(`Documento gerado em: ${dataAtual}`, 20, 290);
 
     doc.save(`Ficha_${selectedStudent.name}.pdf`);
@@ -304,7 +344,10 @@ export default function App() {
       <div className="space-y-6 h-full flex flex-col">
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex items-center justify-between flex-shrink-0">
           <div><h3 className="text-2xl font-bold">Painel de Controle SOE</h3><p className="opacity-90">Gestão Pedagógica e Disciplinar</p></div>
-          <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-50 flex items-center gap-2"><Upload size={20}/> Importar Notas</button>
+          <div className="flex gap-2">
+            <button onClick={handleExportBackup} className="bg-emerald-500 text-white px-4 py-3 rounded-xl font-bold shadow-md hover:bg-emerald-600 flex items-center gap-2 transition-all"><Download size={20}/> Backup</button>
+            <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-50 flex items-center gap-2 transition-all"><Upload size={20}/> Importar Notas</button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 overflow-hidden min-h-0">
@@ -647,7 +690,6 @@ export default function App() {
 
               {activeTab === 'historico' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 tab-content">
-                  {/* ÁREA DE NOVO ATENDIMENTO - RESTAURADA A VERSÃO LARGA */}
                   <div className="lg:col-span-7 space-y-6 no-print">
                     <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm new-log-area">
                        <h3 className="font-bold text-indigo-800 mb-6 border-b pb-2 uppercase text-sm flex items-center gap-2"><FileText size={18}/> Novo Registro de Atendimento</h3>
