@@ -8,7 +8,8 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut, 
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Printer, Lock,
   GraduationCap, FileText, History, Upload, FileSpreadsheet,
-  TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, UserCircle, FileDown, CalendarDays, Download
+  TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, 
+  UserCircle, FileDown, CalendarDays, Download, Menu
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -100,6 +101,9 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   
   const [selectedClassFilter, setSelectedClassFilter] = useState<string | null>(null);
+  
+  // State para Menu Mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [editName, setEditName] = useState('');
   const [editClass, setEditClass] = useState('');
@@ -158,169 +162,70 @@ export default function App() {
   // --- EXPORTAR BACKUP ---
   const handleExportBackup = async () => {
     if(!confirm("Deseja baixar um backup completo de todos os dados?")) return;
-    
-    // 1. Buscar todos os dados
     const { data: alunos } = await supabase.from('students').select('*');
     const { data: notas } = await supabase.from('desempenho_bimestral').select('*');
     const { data: logs } = await supabase.from('logs').select('*');
 
-    // 2. Criar planilha
     const wb = XLSX.utils.book_new();
-    
-    // Aba Alunos
-    if(alunos) {
-      const wsAlunos = XLSX.utils.json_to_sheet(alunos);
-      XLSX.utils.book_append_sheet(wb, wsAlunos, "Alunos");
-    }
-
-    // Aba Notas
-    if(notas) {
-      const wsNotas = XLSX.utils.json_to_sheet(notas);
-      XLSX.utils.book_append_sheet(wb, wsNotas, "Notas");
-    }
-
-    // Aba Atendimentos
+    if(alunos) { const wsAlunos = XLSX.utils.json_to_sheet(alunos); XLSX.utils.book_append_sheet(wb, wsAlunos, "Alunos"); }
+    if(notas) { const wsNotas = XLSX.utils.json_to_sheet(notas); XLSX.utils.book_append_sheet(wb, wsNotas, "Notas"); }
     if(logs) {
       const logsFormatados = logs.map(l => {
-        let parsed = { motivos: [], obs: '' };
-        try { parsed = JSON.parse(l.description) } catch(e) {}
-        return {
-          id: l.id,
-          aluno_id: l.student_id,
-          data: new Date(l.created_at).toLocaleDateString(),
-          categoria: l.category,
-          detalhes: parsed.obs,
-          motivos: Array.isArray(parsed.motivos) ? parsed.motivos.join(', ') : '',
-          encaminhamento: l.referral,
-          resolvido: l.resolved ? 'SIM' : 'NÃO'
-        };
+        let parsed = { motivos: [], obs: '' }; try { parsed = JSON.parse(l.description) } catch(e) {}
+        return { id: l.id, aluno_id: l.student_id, data: new Date(l.created_at).toLocaleDateString(), categoria: l.category, detalhes: parsed.obs, motivos: Array.isArray(parsed.motivos) ? parsed.motivos.join(', ') : '', encaminhamento: l.referral, resolvido: l.resolved ? 'SIM' : 'NÃO' };
       });
       const wsLogs = XLSX.utils.json_to_sheet(logsFormatados);
       XLSX.utils.book_append_sheet(wb, wsLogs, "Atendimentos");
     }
-
-    // 3. Baixar
     XLSX.writeFile(wb, `Backup_SOE_${new Date().toLocaleDateString().replace(/\//g,'-')}.xlsx`);
   };
 
   const generatePDF = () => {
     if (!selectedStudent) return;
     const doc = new jsPDF();
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10); doc.setFont("helvetica", "bold");
     doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
     doc.text("SECRETARIA DE ESTADO DE EDUCAÇÃO", 105, 20, { align: "center" });
     doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ", 105, 25, { align: "center" });
     doc.text("SERVIÇO DE ORIENTAÇÃO EDUCACIONAL - SOE", 105, 32, { align: "center" });
-    doc.setLineWidth(0.5);
-    doc.line(20, 35, 190, 35);
+    doc.setLineWidth(0.5); doc.line(20, 35, 190, 35);
 
-    doc.setFontSize(12);
-    doc.text(`FICHA INDIVIDUAL DE ACOMPANHAMENTO`, 105, 45, { align: "center" });
+    doc.setFontSize(12); doc.text(`FICHA INDIVIDUAL DE ACOMPANHAMENTO`, 105, 45, { align: "center" });
     
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    
-    doc.text(`Aluno(a):`, 20, 55);
-    doc.setFont("helvetica", "bold");
-    doc.text(`${selectedStudent.name}`, 40, 55);
-    
-    doc.setFont("helvetica", "normal");
-    doc.text(`Turma:`, 150, 55);
-    doc.setFont("helvetica", "bold");
-    doc.text(`${selectedStudent.class_id}`, 165, 55);
+    doc.setFontSize(10); doc.setFont("helvetica", "normal");
+    doc.text(`Aluno(a):`, 20, 55); doc.setFont("helvetica", "bold"); doc.text(`${selectedStudent.name}`, 40, 55);
+    doc.setFont("helvetica", "normal"); doc.text(`Turma:`, 150, 55); doc.setFont("helvetica", "bold"); doc.text(`${selectedStudent.class_id}`, 165, 55);
 
-    doc.setFont("helvetica", "normal");
-    doc.text(`Responsável:`, 20, 62);
-    doc.text(`${selectedStudent.guardian_name || "Não informado"}`, 45, 62);
-    
-    doc.text(`Telefone:`, 20, 69);
-    doc.text(`${selectedStudent.guardian_phone || "-"}`, 45, 69);
+    doc.setFont("helvetica", "normal"); doc.text(`Responsável:`, 20, 62); doc.text(`${selectedStudent.guardian_name || "Não informado"}`, 45, 62);
+    doc.text(`Telefone:`, 20, 69); doc.text(`${selectedStudent.guardian_phone || "-"}`, 45, 69);
 
-    doc.setFont("helvetica", "bold");
-    doc.text("DESEMPENHO ACADÊMICO", 20, 80);
-    
+    doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 20, 80);
     let tableStartY = 85;
-
     if (selectedStudent.desempenho && selectedStudent.desempenho.length > 0) {
-      const tableData = selectedStudent.desempenho.map(d => [
-        d.bimestre,
-        d.lp?.toString() || "-", d.mat?.toString() || "-", d.cie?.toString() || "-",
-        d.his?.toString() || "-", d.geo?.toString() || "-", d.ing?.toString() || "-",
-        d.art?.toString() || "-", d.edf?.toString() || "-", d.pd1?.toString() || "-",
-        d.faltas_bimestre?.toString() || "0"
-      ]);
-
-      autoTable(doc, {
-        startY: tableStartY,
-        head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [79, 70, 229], fontSize: 8 },
-        styles: { fontSize: 8, halign: 'center' },
-      });
-    } else {
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(9);
-      doc.text("Nenhum dado acadêmico registrado.", 20, 90);
-      tableStartY = 90;
-    }
+      const tableData = selectedStudent.desempenho.map(d => [d.bimestre, d.lp?.toString() || "-", d.mat?.toString() || "-", d.cie?.toString() || "-", d.his?.toString() || "-", d.geo?.toString() || "-", d.ing?.toString() || "-", d.art?.toString() || "-", d.edf?.toString() || "-", d.pd1?.toString() || "-", d.faltas_bimestre?.toString() || "0"]);
+      autoTable(doc, { startY: tableStartY, head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], body: tableData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 8 }, styles: { fontSize: 8, halign: 'center' } });
+    } else { doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.text("Nenhum dado acadêmico registrado.", 20, 90); tableStartY = 90; }
 
     const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : tableStartY + 15;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("HISTÓRICO DE ATENDIMENTOS", 20, finalY);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 20, finalY);
 
     if (selectedStudent.logs && selectedStudent.logs.length > 0) {
       let currentY = finalY + 10;
       const sortedLogs = [...selectedStudent.logs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
       sortedLogs.forEach((log) => {
         if (currentY > 260) { doc.addPage(); currentY = 20; } 
-        
-        let parsed = { obs: log.description, solicitante: 'SOE', motivos: [] };
-        try { parsed = JSON.parse(log.description); } catch (e) {}
-
+        let parsed = { obs: log.description, solicitante: 'SOE', motivos: [] }; try { parsed = JSON.parse(log.description); } catch (e) {}
         const dataAtendimento = new Date(log.created_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.text(`${dataAtendimento} - Solicitante: ${parsed.solicitante || 'SOE'}`, 20, currentY);
-        
-        doc.setFont("helvetica", "normal");
-        const splitObs = doc.splitTextToSize(`Relato: ${parsed.obs}`, 170);
-        doc.text(splitObs, 20, currentY + 5);
-        
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`${dataAtendimento} - Solicitante: ${parsed.solicitante || 'SOE'}`, 20, currentY);
+        doc.setFont("helvetica", "normal"); const splitObs = doc.splitTextToSize(`Relato: ${parsed.obs}`, 170); doc.text(splitObs, 20, currentY + 5);
         currentY += 10 + (splitObs.length * 4);
-        
-        if (log.referral) {
-           doc.setFont("helvetica", "bold");
-           doc.setTextColor(100);
-           doc.text(`Encaminhamento: ${log.referral}`, 20, currentY - 2);
-           doc.setTextColor(0);
-        }
-        
-        doc.setDrawColor(200);
-        doc.line(20, currentY, 190, currentY);
-        currentY += 8;
+        if (log.referral) { doc.setFont("helvetica", "bold"); doc.setTextColor(100); doc.text(`Encaminhamento: ${log.referral}`, 20, currentY - 2); doc.setTextColor(0); }
+        doc.setDrawColor(200); doc.line(20, currentY, 190, currentY); currentY += 8;
       });
-    } else {
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(9);
-      doc.text("Nenhum atendimento registrado.", 20, finalY + 10);
-    }
+    } else { doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.text("Nenhum atendimento registrado.", 20, finalY + 10); }
 
-    doc.setDrawColor(0);
-    doc.line(60, 280, 150, 280);
-    doc.setFontSize(8);
-    doc.text("Assinatura do Responsável SOE", 105, 285, { align: "center" });
-
-    const dataAtual = new Date().toLocaleString('pt-BR');
-    doc.setFontSize(7);
-    doc.setTextColor(150); 
-    doc.text(`Documento gerado em: ${dataAtual}`, 20, 290);
-
+    doc.setDrawColor(0); doc.line(60, 280, 150, 280); doc.setFontSize(8); doc.text("Assinatura do Responsável SOE", 105, 285, { align: "center" });
+    const dataAtual = new Date().toLocaleString('pt-BR'); doc.setFontSize(7); doc.setTextColor(150); doc.text(`Documento gerado em: ${dataAtual}`, 20, 290);
     doc.save(`Ficha_${selectedStudent.name}.pdf`);
   };
 
@@ -328,10 +233,7 @@ export default function App() {
     const totalFaltas = student.desempenho?.reduce((acc, d) => acc + (d.faltas_bimestre || 0), 0) || 0;
     const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null;
     let notasVermelhas = 0;
-    if (ultDesempenho) {
-      const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf'];
-      notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length;
-    }
+    if (ultDesempenho) { const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; }
     return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas };
   };
 
@@ -342,9 +244,9 @@ export default function App() {
 
     return (
       <div className="space-y-6 h-full flex flex-col">
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex items-center justify-between flex-shrink-0">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 flex-shrink-0">
           <div><h3 className="text-2xl font-bold">Painel de Controle SOE</h3><p className="opacity-90">Gestão Pedagógica e Disciplinar</p></div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-center">
             <button onClick={handleExportBackup} className="bg-emerald-500 text-white px-4 py-3 rounded-xl font-bold shadow-md hover:bg-emerald-600 flex items-center gap-2 transition-all"><Download size={20}/> Backup</button>
             <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-50 flex items-center gap-2 transition-all"><Upload size={20}/> Importar Notas</button>
           </div>
@@ -443,12 +345,7 @@ export default function App() {
     if (!selectedStudent) return;
     const desc = JSON.stringify({ solicitante, motivos: motivosSelecionados, acoes: acoesSelecionadas, obs: obsLivre });
     const selectedDateISO = new Date(attendanceDate).toISOString();
-
-    const { error } = await supabase.from('logs').insert([{ 
-      student_id: selectedStudent.id, category: "Atendimento SOE", description: desc, referral: encaminhamento, resolved: resolvido,
-      created_at: selectedDateISO
-    }]);
-    
+    const { error } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: "Atendimento SOE", description: desc, referral: encaminhamento, resolved: resolvido, created_at: selectedDateISO }]);
     if (error) alert('Erro: ' + error.message);
     else { alert('Salvo com sucesso!'); setMotivosSelecionados([]); setObsLivre(DEFAULT_OBS); setAttendanceDate(new Date().toISOString().split('T')[0]); fetchStudents(); setIsModalOpen(false); }
   }
@@ -545,7 +442,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
+    <div className="flex h-screen bg-slate-100 font-sans text-slate-800 relative">
       <style>{`
         @media print {
           aside, header, .no-print { display: none !important; }
@@ -558,25 +455,32 @@ export default function App() {
         }
         .print-header { display: none; }
       `}</style>
-      <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shadow-2xl z-20">
+      
+      {/* MOBILE MENU OVERLAY */}
+      {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
+
+      <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
           <div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} className="text-white"/></div>
           <div><h1 className="font-bold text-lg">SOE Digital</h1><p className="text-[10px] uppercase text-slate-400">CED 4 Guará</p></div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
-          <button onClick={() => setView('students')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'students' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}><Users size={18} /> Alunos e Turmas</button>
+          <button onClick={() => { setView('dashboard'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
+          <button onClick={() => { setView('students'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'students' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}><Users size={18} /> Alunos e Turmas</button>
         </nav>
         <div className="p-4 border-t border-slate-800"><button onClick={handleLogout} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white w-full"><LogOut size={16} /> Sair</button></div>
       </aside>
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm z-10">
-          <h2 className="text-xl font-bold text-slate-800 uppercase">{view === 'dashboard' ? 'Painel de Controle' : 'Gerenciamento'}</h2>
+      <main className="flex-1 flex flex-col h-full overflow-hidden w-full">
+        <header className="bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center shadow-sm z-10 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden text-slate-600"><Menu size={24}/></button>
+            <h2 className="text-lg md:text-xl font-bold text-slate-800 uppercase">{view === 'dashboard' ? 'Painel de Controle' : 'Gerenciamento'}</h2>
+          </div>
           <Avatar name={SYSTEM_USER_NAME} src={adminPhoto} />
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {view === 'dashboard' ? renderDashboard() : (
             <div className="max-w-6xl mx-auto">
               <div className="flex justify-end mb-8"><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2"><Plus size={20} /> Novo Aluno</button></div>
@@ -597,13 +501,13 @@ export default function App() {
                <p className="font-bold text-sm mt-4 uppercase border p-2 inline-block">Serviço de Orientação Educacional - SOE</p>
             </div>
 
-            <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50 no-print">
+            <div className="px-4 md:px-8 py-4 md:py-6 border-b flex justify-between items-center bg-slate-50 no-print flex-shrink-0">
               <div className="flex items-center gap-4">
-                <div className="relative group">
+                <div className="relative group hidden md:block">
                   <Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="lg" />
                   <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"><Camera size={20} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload}/></label>
                 </div>
-                <div><h2 className="text-2xl font-bold text-slate-800">{selectedStudent.name}</h2><p className="text-sm text-slate-500 font-bold uppercase">Turma {selectedStudent.class_id}</p></div>
+                <div><h2 className="text-lg md:text-2xl font-bold text-slate-800 line-clamp-1">{selectedStudent.name}</h2><p className="text-xs md:text-sm text-slate-500 font-bold uppercase">Turma {selectedStudent.class_id}</p></div>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={generatePDF} className="p-2 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200" title="Gerar PDF Oficial"><FileDown size={18} /></button>
@@ -613,13 +517,13 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex border-b px-8 bg-white overflow-x-auto no-print">
-              <button onClick={() => setActiveTab('perfil')} className={`px-6 py-4 font-bold text-sm border-b-2 whitespace-nowrap ${activeTab === 'perfil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>DADOS PESSOAIS</button>
-              <button onClick={() => setActiveTab('academico')} className={`px-6 py-4 font-bold text-sm border-b-2 whitespace-nowrap ${activeTab === 'academico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>BOLETIM iEDUCAR</button>
-              <button onClick={() => setActiveTab('historico')} className={`px-6 py-4 font-bold text-sm border-b-2 whitespace-nowrap ${activeTab === 'historico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>ATENDIMENTOS SOE</button>
+            <div className="flex border-b px-4 md:px-8 bg-white overflow-x-auto no-print flex-shrink-0">
+              <button onClick={() => setActiveTab('perfil')} className={`px-4 md:px-6 py-4 font-bold text-xs md:text-sm border-b-2 whitespace-nowrap ${activeTab === 'perfil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>DADOS PESSOAIS</button>
+              <button onClick={() => setActiveTab('academico')} className={`px-4 md:px-6 py-4 font-bold text-xs md:text-sm border-b-2 whitespace-nowrap ${activeTab === 'academico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>BOLETIM iEDUCAR</button>
+              <button onClick={() => setActiveTab('historico')} className={`px-4 md:px-6 py-4 font-bold text-xs md:text-sm border-b-2 whitespace-nowrap ${activeTab === 'historico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>ATENDIMENTOS SOE</button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
               
               {activeTab === 'perfil' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 tab-content">
@@ -660,8 +564,8 @@ export default function App() {
               )}
 
               {activeTab === 'academico' && (
-                <div className="bg-white rounded-xl border shadow-sm overflow-hidden tab-content">
-                  <table className="w-full text-sm text-left">
+                <div className="bg-white rounded-xl border shadow-sm overflow-x-auto tab-content">
+                  <table className="w-full text-sm text-left min-w-[600px]">
                     <thead className="bg-slate-50 text-[10px] font-bold uppercase text-slate-500">
                       <tr>
                         <th className="px-6 py-3">Bimestre</th>
@@ -693,7 +597,7 @@ export default function App() {
                   <div className="lg:col-span-7 space-y-6 no-print">
                     <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm new-log-area">
                        <h3 className="font-bold text-indigo-800 mb-6 border-b pb-2 uppercase text-sm flex items-center gap-2"><FileText size={18}/> Novo Registro de Atendimento</h3>
-                       <div className="grid grid-cols-2 gap-6 mb-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                          <div><label className="text-xs font-bold text-slate-500 uppercase">Solicitante</label>
                            <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option><option>Próprio Aluno</option><option>Direção</option></select>
                          </div>
@@ -702,7 +606,6 @@ export default function App() {
                          </div>
                        </div>
                        
-                       {/* CAMPO DE DATA */}
                        <div className="mb-6">
                          <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1"><CalendarDays size={14}/> Data do Atendimento</label>
                          <input type="date" className="w-full p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
