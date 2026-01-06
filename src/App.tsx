@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History
 } from 'lucide-react';
 
 // ==============================================================================
@@ -22,7 +22,7 @@ const supabaseUrl = "https://zfryhzmujfaqqzybjuhb.supabase.co";
 const supabaseKey = "sb_publishable_oJqCCMfnBlbQWGMP4Wj3rQ_YqogatOo";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- CONFIGURAÇÕES DO PROFISSIONAL ---
+// --- CONFIGURAÇÕES ---
 const SYSTEM_USER_NAME = "Daniel Alves da Silva";
 const SYSTEM_ROLE = "Orientador Educacional - SOE";
 const SYSTEM_MATRICULA = "212.235-9";
@@ -30,12 +30,18 @@ const SYSTEM_ORG = "SEEDF";
 const ACCESS_PASSWORD = "Ced@1rf1";
 const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
-// --- LISTAS ---
+// --- LISTAS COMPLETAS ---
 const MOTIVOS_COMPORTAMENTO = ["Conversa excessiva", "Desacato", "Agressividade verbal", "Agressividade física", "Uso de celular", "Saída s/ autorização", "Bullying", "Desobediência", "Uniforme", "Outros"];
 const MOTIVOS_PEDAGOGICO = ["Sem tarefa", "Dificuldade aprend.", "Sem material", "Desatenção", "Baixo desempenho", "Faltas excessivas", "Sono em sala", "Outros"];
 const MOTIVOS_SOCIAL = ["Ansiedade", "Problemas familiares", "Isolamento", "Conflito colegas", "Saúde/Laudo", "Vulnerabilidade", "Outros"];
 const ENCAMINHAMENTOS = ["Coordenação", "Psicologia", "Família", "Direção", "Conselho Tutelar", "Sala Recursos", "Apoio Aprendizagem", "Disciplinar", "Saúde"];
-const FLASH_REASONS = ["Uniforme", "Atraso", "Celular", "Sem Material", "Saída de Sala", "Conversa", "Conflito", "Sono"];
+
+// LISTA FLASH RESTAURADA (12 ITENS)
+const FLASH_REASONS = [
+  "Uniforme Inadequado", "Atraso / Chegada Tardia", "Uso de Celular", "Sem Material", 
+  "Saída de Sala", "Conversa / Bagunça", "Conflito entre Colegas", "Sono em Sala",
+  "Falta de Atividade", "Elogio / Destaque", "Encaminhamento Saúde", "Outros"
+];
 
 // --- COMPONENTES ---
 function Avatar({ name, src, size = "md" }: { name: string, src?: string | null, size?: "sm" | "md" | "lg" | "xl" }) {
@@ -304,14 +310,18 @@ export default function App() {
         columnStyles: { 2: { cellWidth: 100 } } 
     });
 
+    // RODAPÉ AJUSTADO (DATA ABAIXO)
     const pageHeight = doc.internal.pageSize.height;
-    doc.line(60, pageHeight - 30, 150, pageHeight - 30);
+    doc.line(60, pageHeight - 35, 150, pageHeight - 35);
     doc.setFont("helvetica", "bold");
-    doc.text(`${SYSTEM_USER_NAME}`, 105, pageHeight - 25, { align: "center" });
+    doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 105, pageHeight - 30, { align: "center" });
+    
     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 20, { align: "center" });
-    doc.setFontSize(8);
-    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 105, pageHeight - 15, { align: "center" });
+    doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 25, { align: "center" });
+    
+    doc.setFontSize(8); doc.setTextColor(100);
+    const timeNow = new Date().toLocaleString('pt-BR');
+    doc.text(`Emitido em: ${timeNow}`, 105, pageHeight - 15, { align: "center" });
 
     doc.save(`Ficha_${selectedStudent.name}.pdf`); 
   }; 
@@ -341,6 +351,7 @@ export default function App() {
                     <PieChart>
                         <Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie>
                         <Tooltip />
+                        {/* AUMENTO DE FONTE E AJUSTE DE MARGEM */}
                         <Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                     </PieChart>
                 </ResponsiveContainer>
@@ -407,12 +418,12 @@ export default function App() {
             <button onClick={() => { setView('dashboard'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
             <button onClick={() => { setView('students'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
         </nav>
-        {/* RODAPÉ DO SISTEMA COM SEUS DADOS */}
+        {/* RODAPÉ LATERAL COM DADOS DO PROFISSIONAL */}
         <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400">
-            <p className="font-bold text-white">{SYSTEM_USER_NAME}</p>
+            <p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p>
             <p>{SYSTEM_ROLE}</p>
             <p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p>
-            <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white"><LogOut size={12} /> Sair</button>
+            <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white transition-colors"><LogOut size={12} /> Sair do Sistema</button>
         </div>
       </aside>
 
@@ -442,7 +453,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* MODAL DETALHES */}
+      {/* MODAL DETALHES COM NOVO LAYOUT DE REGISTRO */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -516,10 +527,12 @@ export default function App() {
                                     <div><p className="text-[10px] font-bold text-purple-600 uppercase mb-2">Social/Outros</p><div className="flex flex-col gap-1">{MOTIVOS_SOCIAL.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
                                   </div>
                               </div>
+                              
                               <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex-1 flex flex-col">
                                 <label className="text-center block text-sm font-bold text-slate-600 uppercase mb-2 tracking-widest bg-slate-200 py-1 rounded">RELATÓRIO DE ATENDIMENTO</label>
                                 <textarea className="w-full p-4 border rounded-xl flex-1 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none" rows={12} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
                               </div>
+
                               <div className="flex justify-between items-center pt-4 border-t border-slate-200">
                                 <div className="text-xs text-slate-400 font-mono">
                                     <p>Registrado por: <span className="font-bold text-slate-600">{SYSTEM_USER_NAME}</span></p>
@@ -532,6 +545,7 @@ export default function App() {
                               </div>
                           </div>
                       </div>
+
                       <div className="lg:col-span-4 space-y-4 max-h-[800px] overflow-y-auto pr-2 bg-slate-100 p-4 rounded-2xl h-full">
                          <h3 className="text-xs font-bold text-slate-500 uppercase sticky top-0 bg-slate-100 py-2 z-10 flex items-center gap-2"><History size={14}/> Histórico Completo</h3>
                          {selectedStudent.logs?.map((log: any) => {
@@ -543,7 +557,9 @@ export default function App() {
                                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${isFamily ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>{isFamily ? 'FAMÍLIA' : 'ESTUDANTE'}</span>
                                          <span className="text-[10px] text-slate-400">{new Date(log.created_at).toLocaleDateString()}</span>
                                      </div>
-                                     <div className="mb-2"><span className="text-[10px] font-bold uppercase text-slate-500 block">Solicitante: {p.solicitante}</span></div>
+                                     <div className="mb-2">
+                                         <span className="text-[10px] font-bold uppercase text-slate-500 block">Solicitante: {p.solicitante}</span>
+                                     </div>
                                      <p className="text-xs text-slate-600 line-clamp-3 mb-2 italic">"{p.obs}"</p>
                                      <div className="flex justify-between items-center mt-2">
                                         <button className="text-[10px] text-indigo-600 font-bold underline flex items-center gap-1" onClick={() => { setObsLivre(p.obs); setMotivosSelecionados(p.motivos || []); }}><Copy size={10}/> Copiar</button>
