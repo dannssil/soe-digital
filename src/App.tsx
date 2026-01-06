@@ -9,7 +9,7 @@ import {
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Printer, Lock,
   GraduationCap, FileText, History, Upload, FileSpreadsheet,
   TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, 
-  UserCircle, FileDown, CalendarDays, Download, Menu, Search, Clock, Calendar
+  UserCircle, FileDown, CalendarDays, Download, Menu, Search, Clock, Users2
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -62,7 +62,7 @@ interface Log {
   category: string; 
   description: string;
   referral?: string;
-  return_date?: string; // DATA DE RETORNO (FOLLOW-UP)
+  return_date?: string; 
   resolved?: boolean;
 }
 
@@ -88,7 +88,7 @@ export default function App() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [adminPhoto, setAdminPhoto] = useState<string | null>(localStorage.getItem('adminPhoto'));
   
-  // -- ESTADOS GLOBAIS NOVOS --
+  // -- ESTADOS GLOBAIS --
   const [globalSearch, setGlobalSearch] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -101,9 +101,10 @@ export default function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   
-  // -- EDICAO --
+  // -- EDICAO E ABAS --
   const [selectedBimestre, setSelectedBimestre] = useState('1º Bimestre');
-  const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico'>('perfil');
+  // Agora temos 4 abas: perfil, academico, historico (aluno), familia (pais)
+  const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil');
   const [isEditing, setIsEditing] = useState(false);
   const [selectedClassFilter, setSelectedClassFilter] = useState<string | null>(null);
   
@@ -130,9 +131,9 @@ export default function App() {
   const [encaminhamento, setEncaminhamento] = useState('');
   const [resolvido, setResolvido] = useState(false);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]); 
-  const [returnDate, setReturnDate] = useState(''); // NOVO: Data de Retorno
+  const [returnDate, setReturnDate] = useState(''); 
   
-  const DEFAULT_OBS = "Relatório de Atendimento:\n\n- Relato do estudante:\n\n- Mediação realizada:\n\n- Combinados:";
+  const DEFAULT_OBS = "Relatório de Atendimento:\n\n- Relato:\n\n- Mediação realizada:\n\n- Combinados:";
   const [obsLivre, setObsLivre] = useState(DEFAULT_OBS);
 
   useEffect(() => {
@@ -142,7 +143,6 @@ export default function App() {
 
   async function fetchStudents() {
     setLoading(true);
-    // Incluímos return_date na busca
     const { data, error } = await supabase.from('students')
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`)
       .eq('status', 'ATIVO').order('name'); 
@@ -221,11 +221,20 @@ export default function App() {
         if (currentY > 260) { doc.addPage(); currentY = 20; } 
         let parsed = { obs: log.description, solicitante: 'SOE', motivos: [] }; try { parsed = JSON.parse(log.description); } catch (e) {}
         const dataAtendimento = new Date(log.created_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
-        doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`${dataAtendimento} - Solicitante: ${parsed.solicitante || 'SOE'}`, 20, currentY);
+        
+        // COR DO TÍTULO CONFORME CATEGORIA
+        if(log.category === 'Família') {
+            doc.setTextColor(234, 88, 12); // Laranja para Família
+            doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`[FAMÍLIA] ${dataAtendimento} - Solicitante: ${parsed.solicitante || 'SOE'}`, 20, currentY);
+        } else {
+            doc.setTextColor(0, 0, 0); // Preto para Aluno
+            doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`${dataAtendimento} - Solicitante: ${parsed.solicitante || 'SOE'}`, 20, currentY);
+        }
+        
+        doc.setTextColor(0);
         doc.setFont("helvetica", "normal"); const splitObs = doc.splitTextToSize(`Relato: ${parsed.obs}`, 170); doc.text(splitObs, 20, currentY + 5);
         currentY += 10 + (splitObs.length * 4);
         if (log.referral) { doc.setFont("helvetica", "bold"); doc.setTextColor(100); doc.text(`Encaminhamento: ${log.referral}`, 20, currentY - 2); doc.setTextColor(0); }
-        // Se houver retorno agendado
         if (log.return_date) { 
             const dataRetorno = new Date(log.return_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
             doc.setFont("helvetica", "bold"); doc.setTextColor(220, 38, 38); 
@@ -253,15 +262,12 @@ export default function App() {
     if (selectedClassFilter) studentsInRisk = studentsInRisk.filter(s => s.class_id === selectedClassFilter);
     const turmas = [...new Set(students.map(s => s.class_id))].sort();
 
-    // FILTRO DE RETORNOS PENDENTES (FOLLOW-UP)
     const today = new Date().toISOString().split('T')[0];
     const pendingReturns = students.flatMap(s => s.logs || []).filter(l => l.return_date && !l.resolved).map(l => ({...l, student_name: students.find(s => s.id === (l as any).student_id)?.name || 'Aluno', student_class: students.find(s => s.id === (l as any).student_id)?.class_id }));
-    // Ordenar por data
     const sortedReturns = pendingReturns.sort((a,b) => new Date(a.return_date!).getTime() - new Date(b.return_date!).getTime());
 
     return (
       <div className="space-y-6 h-full flex flex-col">
-        {/* CABEÇALHO DO DASHBOARD */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 flex-shrink-0">
           <div><h3 className="text-2xl font-bold">Painel de Controle SOE</h3><p className="opacity-90">Gestão Pedagógica e Disciplinar</p></div>
           <div className="flex gap-2 flex-wrap justify-center">
@@ -270,7 +276,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* NOVA SEÇÃO: ALERTA DE RETORNOS (FOLLOW-UP) */}
         {sortedReturns.length > 0 && (
            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3">
              <div className="flex items-center gap-2 text-amber-800 font-bold uppercase text-sm">
@@ -386,28 +391,32 @@ export default function App() {
     else { alert('Sucesso!'); setIsEditing(false); fetchStudents(); setIsModalOpen(false); }
   }
 
-  // --- FUNÇÃO DE SALVAR LOG COM FOLLOW-UP ---
+  // --- FUNÇÃO DE SALVAR LOG (COM CATEGORIA AUTOMATICA) ---
   async function handleSaveLog() {
     if (!selectedStudent) return;
+    
+    // DEFINIR CATEGORIA BASEADA NA ABA ATIVA
+    const currentCategory = activeTab === 'familia' ? 'Família' : 'Atendimento SOE';
+
     const desc = JSON.stringify({ solicitante, motivos: motivosSelecionados, acoes: acoesSelecionadas, obs: obsLivre });
     const selectedDateISO = new Date(attendanceDate).toISOString();
-    // Inclui return_date se houver
+    
     const { error } = await supabase.from('logs').insert([{ 
         student_id: selectedStudent.id, 
-        category: "Atendimento SOE", 
+        category: currentCategory, // Usa a categoria correta
         description: desc, 
         referral: encaminhamento, 
         resolved: resolvido, 
         created_at: selectedDateISO,
-        return_date: returnDate || null // Salva data de retorno ou null
+        return_date: returnDate || null 
     }]);
     if (error) alert('Erro: ' + error.message);
     else { 
-        alert('Salvo com sucesso!'); 
+        alert(`Salvo em ${currentCategory}!`); 
         setMotivosSelecionados([]); 
         setObsLivre(DEFAULT_OBS); 
         setAttendanceDate(new Date().toISOString().split('T')[0]); 
-        setReturnDate(''); // Limpa campo
+        setReturnDate(''); 
         fetchStudents(); 
         setIsModalOpen(false); 
     }
@@ -519,7 +528,6 @@ export default function App() {
         .print-header { display: none; }
       `}</style>
       
-      {/* MOBILE MENU OVERLAY */}
       {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
 
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -535,13 +543,11 @@ export default function App() {
       </aside>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden w-full">
-        {/* HEADER COM BUSCA GLOBAL */}
         <header className="bg-white border-b px-4 md:px-8 py-3 flex justify-between items-center shadow-sm z-10 flex-shrink-0 gap-4">
           <div className="flex items-center gap-3 flex-1">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden text-slate-600"><Menu size={24}/></button>
             <h2 className="text-lg md:text-xl font-bold text-slate-800 uppercase hidden md:block">{view === 'dashboard' ? 'Painel de Controle' : 'Gerenciamento'}</h2>
             
-            {/* BARRA DE BUSCA GLOBAL */}
             <div className="flex-1 max-w-md relative">
                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
                <input 
@@ -551,7 +557,7 @@ export default function App() {
                   value={globalSearch}
                   onChange={(e) => {
                       setGlobalSearch(e.target.value);
-                      if(e.target.value.length > 0) setView('students'); // Força ida para a lista se digitar
+                      if(e.target.value.length > 0) setView('students'); 
                   }}
                />
             </div>
@@ -563,14 +569,12 @@ export default function App() {
           {view === 'dashboard' ? renderDashboard() : (
             <div className="max-w-6xl mx-auto">
               <div className="flex justify-end mb-8"><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2"><Plus size={20} /> Novo Aluno</button></div>
-              {/* LISTA RECEBE O TERMO DE BUSCA GLOBAL */}
               <StudentList students={students} onSelectStudent={(s) => { setSelectedStudent(s); setIsModalOpen(true); }} searchTerm={globalSearch} onSearchChange={setGlobalSearch} />
             </div>
           )}
         </div>
       </main>
 
-      {/* MODAL DETALHES ALUNO (COM CAMPO DE DATA DE RETORNO) */}
       {isModalOpen && selectedStudent && (
         <div className="modal-overlay fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden">
@@ -599,8 +603,15 @@ export default function App() {
 
             <div className="flex border-b px-4 md:px-8 bg-white overflow-x-auto no-print flex-shrink-0">
               <button onClick={() => setActiveTab('perfil')} className={`px-4 md:px-6 py-4 font-bold text-xs md:text-sm border-b-2 whitespace-nowrap ${activeTab === 'perfil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>DADOS PESSOAIS</button>
-              <button onClick={() => setActiveTab('academico')} className={`px-4 md:px-6 py-4 font-bold text-xs md:text-sm border-b-2 whitespace-nowrap ${activeTab === 'academico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>BOLETIM iEDUCAR</button>
-              <button onClick={() => setActiveTab('historico')} className={`px-4 md:px-6 py-4 font-bold text-xs md:text-sm border-b-2 whitespace-nowrap ${activeTab === 'historico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>ATENDIMENTOS SOE</button>
+              <button onClick={() => setActiveTab('academico')} className={`px-4 md:px-6 py-4 font-bold text-xs md:text-sm border-b-2 whitespace-nowrap ${activeTab === 'academico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>BOLETIM</button>
+              
+              {/* NOVAS ABAS SEPARADAS */}
+              <button onClick={() => setActiveTab('historico')} className={`px-4 md:px-6 py-4 font-bold text-xs md:text-sm border-b-2 whitespace-nowrap flex items-center gap-2 ${activeTab === 'historico' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>
+                <UserCircle size={16}/> ATENDIMENTOS ESTUDANTE
+              </button>
+              <button onClick={() => setActiveTab('familia')} className={`px-4 md:px-6 py-4 font-bold text-xs md:text-sm border-b-2 whitespace-nowrap flex items-center gap-2 ${activeTab === 'familia' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-500'}`}>
+                <Users2 size={16}/> FAMÍLIA / RESPONSÁVEIS
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
@@ -672,34 +683,38 @@ export default function App() {
                 </div>
               )}
 
-              {activeTab === 'historico' && (
+              {/* LÓGICA UNIFICADA PARA ABAS DE HISTÓRICO E FAMÍLIA */}
+              {(activeTab === 'historico' || activeTab === 'familia') && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 tab-content">
                   <div className="lg:col-span-7 space-y-6 no-print">
-                    <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm new-log-area">
-                       <h3 className="font-bold text-indigo-800 mb-6 border-b pb-2 uppercase text-sm flex items-center gap-2"><FileText size={18}/> Novo Registro de Atendimento</h3>
+                    <div className={`p-6 rounded-xl border shadow-sm new-log-area ${activeTab === 'familia' ? 'bg-orange-50 border-orange-200' : 'bg-white border-indigo-100'}`}>
+                       
+                       <h3 className={`font-bold mb-6 border-b pb-2 uppercase text-sm flex items-center gap-2 ${activeTab === 'familia' ? 'text-orange-800 border-orange-200' : 'text-indigo-800 border-indigo-100'}`}>
+                         {activeTab === 'familia' ? <><Users2 size={18}/> Novo Atendimento à Família</> : <><FileText size={18}/> Novo Atendimento ao Estudante</>}
+                       </h3>
+                       
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                          <div><label className="text-xs font-bold text-slate-500 uppercase">Solicitante</label>
-                           <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option><option>Próprio Aluno</option><option>Direção</option></select>
+                           <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-white focus:ring-2 transition-colors" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option><option>Próprio Aluno</option><option>Direção</option></select>
                          </div>
                          <div><label className="text-xs font-bold text-slate-500 uppercase">Encaminhar Para</label>
-                           <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{ENCAMINHAMENTOS.map(e => <option key={e}>{e}</option>)}</select>
+                           <select className="w-full mt-1 p-3 border rounded-lg text-sm bg-white focus:ring-2 transition-colors" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{ENCAMINHAMENTOS.map(e => <option key={e}>{e}</option>)}</select>
                          </div>
                        </div>
                        
-                       {/* DATA ATENDIMENTO E FOLLOW-UP */}
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                            <div>
                              <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1"><CalendarDays size={14}/> Data do Atendimento</label>
-                             <input type="date" className="w-full p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
+                             <input type="date" className="w-full p-3 border rounded-lg text-sm bg-white focus:ring-2" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
                            </div>
                            <div>
                              <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1 text-indigo-600"><Clock size={14}/> Agendar Retorno (Opcional)</label>
-                             <input type="date" className="w-full p-3 border border-indigo-200 rounded-lg text-sm bg-indigo-50 focus:bg-white focus:ring-2 focus:ring-indigo-200" value={returnDate} onChange={e => setReturnDate(e.target.value)} />
+                             <input type="date" className="w-full p-3 border border-indigo-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-200" value={returnDate} onChange={e => setReturnDate(e.target.value)} />
                            </div>
                        </div>
 
                        <label className="text-xs font-bold text-slate-500 uppercase block mb-3">Motivo do Atendimento</label>
-                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-white/50 rounded-xl border border-slate-200">
                          <div>
                             <p className="text-[10px] font-bold text-orange-600 uppercase mb-2">Comportamental</p>
                             {MOTIVOS_COMPORTAMENTO.map(m => (<label key={m} className="flex gap-2 text-xs text-slate-600 cursor-pointer mb-1 hover:text-slate-900"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}
@@ -714,26 +729,35 @@ export default function App() {
                          </div>
                        </div>
                        <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Relatório Detalhado</label>
-                       <textarea className="w-full p-4 border rounded-xl bg-slate-50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all shadow-inner" rows={10} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
-                       <div className="flex justify-between items-center mt-6 pt-4 border-t">
+                       <textarea className="w-full p-4 border rounded-xl bg-white text-sm focus:ring-2 focus:ring-indigo-100 transition-all shadow-inner" rows={10} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
+                       <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
                          <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-green-700 select-none p-2 hover:bg-green-50 rounded-lg transition-colors"><input type="checkbox" className="w-5 h-5 rounded text-green-600 focus:ring-green-500" checked={resolvido} onChange={e => setResolvido(e.target.checked)}/> Caso Resolvido / Finalizado</label>
-                         <button onClick={handleSaveLog} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-transform active:scale-95 flex items-center gap-2"><Save size={18}/> Salvar Atendimento</button>
+                         
+                         <button onClick={handleSaveLog} className={`text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${activeTab === 'familia' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                           <Save size={18}/> {activeTab === 'familia' ? 'Salvar Contato Família' : 'Salvar Atendimento'}
+                         </button>
                        </div>
                     </div>
                   </div>
+                  
+                  {/* LISTA LATERAL FILTRADA */}
                   <div className="lg:col-span-5 bg-slate-100 rounded-xl p-4 overflow-y-auto max-h-[800px] print:col-span-12 print:bg-white print:border print:border-black">
-                    <h3 className="text-xs font-bold text-slate-500 uppercase mb-4 print:text-black sticky top-0 bg-slate-100 py-2 z-10">Histórico de Registros</h3>
-                    {selectedStudent.logs?.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum registro encontrado.</p>}
-                    {selectedStudent.logs?.map(log => {
+                    <h3 className="text-xs font-bold text-slate-500 uppercase mb-4 print:text-black sticky top-0 bg-slate-100 py-2 z-10">
+                      Histórico: {activeTab === 'familia' ? 'Família & Responsáveis' : 'Estudante'}
+                    </h3>
+                    
+                    {selectedStudent.logs?.filter(l => activeTab === 'familia' ? l.category === 'Família' : l.category !== 'Família').length === 0 && <p className="text-center text-slate-400 py-10">Nenhum registro nesta categoria.</p>}
+                    
+                    {selectedStudent.logs?.filter(l => activeTab === 'familia' ? l.category === 'Família' : l.category !== 'Família').map(log => {
                         let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {}
                         const dataVisual = new Date(log.created_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
                         const dataRetorno = log.return_date ? new Date(log.return_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : null;
                         
                         return (
-                          <div key={log.id} className="bg-white p-5 rounded-xl border shadow-sm mb-4 hover:shadow-md transition-shadow">
+                          <div key={log.id} className={`p-5 rounded-xl border shadow-sm mb-4 hover:shadow-md transition-shadow bg-white ${log.category === 'Família' ? 'border-l-4 border-l-orange-400' : 'border-l-4 border-l-indigo-400'}`}>
                             <div className="flex justify-between items-start mb-3 border-b pb-2">
                               <div>
-                                <span className="font-bold text-indigo-700 text-sm block">{dataVisual}</span>
+                                <span className={`font-bold text-sm block ${log.category === 'Família' ? 'text-orange-700' : 'text-indigo-700'}`}>{dataVisual}</span>
                                 <span className="text-[10px] text-slate-400 uppercase font-bold">{p.solicitante || 'SOE'}</span>
                               </div>
                               {log.resolved ? <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-green-200">Resolvido</span> : <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-amber-200">Em Aberto</span>}
@@ -752,64 +776,6 @@ export default function App() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL IMPORTAÇÃO */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold mb-4 text-indigo-600 flex items-center gap-2"><FileSpreadsheet size={24}/> Importar Excel</h3>
-            <div className="space-y-4">
-               <div><label className="block text-sm font-bold text-slate-700 mb-1 font-bold">Bimestre de Referência</label>
-                 <select className="w-full p-3 border rounded-xl" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}>
-                   <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
-                 </select>
-               </div>
-               <div className="border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center bg-indigo-50">
-                  {importing ? <p className="animate-pulse font-bold text-indigo-600">Sincronizando iEducar...</p> : <input type="file" accept=".xlsx, .xls" title="Arquivo" onChange={handleFileUpload} className="w-full text-sm"/>}
-               </div>
-               <div className="flex justify-end"><button onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold">Fechar</button></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL REGISTRO DE SAÍDA */}
-      {isExitModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold mb-4 text-red-600">Registrar Saída</h3>
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 font-bold text-sm"><input type="radio" checked={exitType === 'TRANSFERIDO'} onChange={() => setExitType('TRANSFERIDO')} /> TRANSFERÊNCIA</label>
-                <label className="flex items-center gap-2 font-bold text-sm text-red-600"><input type="radio" checked={exitType === 'ABANDONO'} onChange={() => setExitType('ABANDONO')} /> ABANDONO</label>
-              </div>
-              <textarea className="w-full p-3 border rounded-xl" placeholder="Motivo da saída..." value={exitReason} onChange={e => setExitReason(e.target.value)} />
-              <div className="flex justify-end gap-2">
-                <button onClick={() => setIsExitModalOpen(false)} className="px-4 py-2">CANCELAR</button>
-                <button onClick={handleRegisterExit} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold">CONFIRMAR</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* MODAL NOVO ALUNO */}
-      {isNewStudentModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h3 className="text-xl font-bold mb-4">Novo Aluno</h3>
-            <form onSubmit={handleAddStudent} className="space-y-4">
-              <input className="w-full p-3 border rounded-xl" placeholder="Nome Completo" value={newName} onChange={e => setNewName(e.target.value)} />
-              <div className="grid grid-cols-2 gap-4">
-                <input className="w-full p-3 border rounded-xl" placeholder="Turma (ex: 6A)" value={newClass} onChange={e => setNewClass(e.target.value)} />
-                <div className="w-full p-3 border rounded-xl bg-slate-100 text-slate-500 flex items-center p-3 text-sm font-bold">Vespertino</div>
-              </div>
-              <input className="w-full p-3 border rounded-xl" placeholder="Responsável" value={newResponsavel} onChange={e => setNewResponsavel(e.target.value)} />
-              <div className="flex justify-end gap-2 mt-4"><button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="px-4 py-2">Cancelar</button><button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">Salvar</button></div>
-            </form>
           </div>
         </div>
       )}
