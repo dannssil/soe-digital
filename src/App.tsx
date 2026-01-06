@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History
 } from 'lucide-react';
 
 // ==============================================================================
@@ -26,7 +26,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const SYSTEM_USER_NAME = "Daniel Alves";
 const SYSTEM_ROLE = "Orientador Educacional - SOE";
 const ACCESS_PASSWORD = "Ced@1rf1";
-const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899']; // Indigo, Amber, Red, Emerald, Violet, Pink
+const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
 // --- LISTAS ---
 const MOTIVOS_COMPORTAMENTO = ["Conversa excessiva", "Desacato", "Agressividade verbal", "Agressividade física", "Uso de celular", "Saída s/ autorização", "Bullying", "Desobediência", "Uniforme", "Outros"];
@@ -110,7 +110,7 @@ export default function App() {
   const [resolvido, setResolvido] = useState(false);
   const [attendanceDate, setAttendanceDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
-  const [obsLivre, setObsLivre] = useState("- Relato:\n\n- Mediação realizada:\n\n- Combinados:");
+  const [obsLivre, setObsLivre] = useState(""); 
   
   // Flash & Saída
   const [quickSearchTerm, setQuickSearchTerm] = useState('');
@@ -126,6 +126,21 @@ export default function App() {
     if (savedPhoto) setAdminPhoto(savedPhoto);
     setAttendanceDate(new Date().toISOString().split('T')[0]);
   }, []);
+
+  useEffect(() => {
+    if (selectedStudent) {
+        const updated = students.find(s => s.id === selectedStudent.id);
+        if (updated) setSelectedStudent(updated);
+    }
+  }, [students]);
+
+  useEffect(() => {
+    setObsLivre("");
+    setMotivosSelecionados([]);
+    setResolvido(false);
+    setSolicitante('Professor');
+    setEncaminhamento('');
+  }, [selectedStudent]);
 
   async function fetchStudents() {
     setLoading(true);
@@ -188,7 +203,11 @@ export default function App() {
       const desc = JSON.stringify({ solicitante, motivos: motivosSelecionados, obs: obsLivre }); 
       const { error } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: currentCategory, description: desc, referral: encaminhamento, resolved: resolvido, created_at: new Date(attendanceDate).toISOString(), return_date: returnDate || null }]); 
       if(!error) { 
-          alert('Registro Salvo!'); setMotivosSelecionados([]); setIsModalOpen(false); fetchStudents(); 
+          alert('Salvo!'); 
+          setMotivosSelecionados([]); 
+          setObsLivre(""); 
+          setResolvido(false);
+          fetchStudents(); 
       } else alert(error.message); 
   };
   
@@ -248,14 +267,12 @@ export default function App() {
     doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${selectedStudent.name}`, 35, 35);
     doc.setFont("helvetica", "normal"); doc.text(`Turma: ${selectedStudent.class_id}`, 160, 35);
     
-    // Layout corrigido para Responsável e Telefone
     doc.text(`Responsável:`, 14, 43); doc.text(`${selectedStudent.guardian_name || 'Não informado'}`, 40, 43);
     doc.text(`Telefone:`, 14, 50); doc.text(`${selectedStudent.guardian_phone || '-'}`, 40, 50);
     
-    doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 62);
+    doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60);
     const acadData = selectedStudent.desempenho?.map((d:any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || [];
     
-    // Tabela 1: Notas (Indigo)
     autoTable(doc, { 
         startY: 65, 
         head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], 
@@ -265,25 +282,24 @@ export default function App() {
         styles: { fontSize: 8, halign: 'center' } 
     });
     
-    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 90;
+    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85;
     doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY);
     
     const logsData = selectedStudent.logs?.map((l:any) => {
         let desc = { motivos: [], obs: '', solicitante: '' };
         try { desc = JSON.parse(l.description); } catch(e) {}
         const conteudo = `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`;
-        return [new Date(l.created_at).toLocaleDateString('pt-BR'), conteudo, l.resolved ? 'Resolvido' : 'Pendente'];
+        return [new Date(l.created_at).toLocaleDateString('pt-BR'), l.category, conteudo, l.resolved ? 'Resolvido' : 'Pendente'];
     }) || [];
 
-    // Tabela 2: Atendimentos (Mesma cor Indigo)
     autoTable(doc, { 
         startY: finalY + 5, 
-        head: [['Data', 'Detalhes do Atendimento', 'Status']], 
+        head: [['Data', 'Tipo', 'Detalhes do Atendimento', 'Status']], 
         body: logsData, 
         theme: 'grid', 
         headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, 
         styles: { fontSize: 9, cellPadding: 3 }, 
-        columnStyles: { 1: { cellWidth: 130 } } 
+        columnStyles: { 2: { cellWidth: 100 } } 
     });
 
     const pageHeight = doc.internal.pageSize.height;
@@ -317,7 +333,8 @@ export default function App() {
                     <PieChart>
                         <Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie>
                         <Tooltip />
-                        <Legend verticalAlign="bottom" height={24} iconType="circle" wrapperStyle={{fontSize: '10px'}}/>
+                        {/* AUMENTO DE FONTE E AJUSTE DE MARGEM */}
+                        <Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                     </PieChart>
                 </ResponsiveContainer>
             </div>
@@ -351,6 +368,7 @@ export default function App() {
                                         <div className="flex justify-between text-[10px] mb-1 font-bold"><span className={isSelected ? 'text-indigo-200' : 'text-slate-400'}>{total} Alunos</span><span className={isSelected ? 'text-white' : 'text-red-500'}>{Math.round(percent)}% Risco</span></div>
                                         <div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? 'bg-black/20' : 'bg-slate-100'}`}><div className={`h-full transition-all duration-500 ${percent > 30 ? 'bg-red-500' : 'bg-emerald-400'}`} style={{width: `${percent}%`}}></div></div>
                                     </div>
+                                    <p className="text-[10px] mt-1 text-right font-bold opacity-80">{risco} em risco</p>
                                 </div>
                             )
                         })}
@@ -487,7 +505,7 @@ export default function App() {
                               
                               <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex-1 flex flex-col">
                                 <label className="text-center block text-sm font-bold text-slate-600 uppercase mb-2 tracking-widest bg-slate-200 py-1 rounded">RELATÓRIO DE ATENDIMENTO</label>
-                                <textarea className="w-full p-4 border rounded-xl flex-1 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none" value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
+                                <textarea className="w-full p-4 border rounded-xl flex-1 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none" rows={12} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
                               </div>
 
                               <div className="flex justify-between items-center pt-4 border-t border-slate-200">
@@ -504,17 +522,25 @@ export default function App() {
                       </div>
 
                       <div className="lg:col-span-4 space-y-4 max-h-[800px] overflow-y-auto pr-2 bg-slate-100 p-4 rounded-2xl h-full">
-                         <h3 className="text-xs font-bold text-slate-500 uppercase sticky top-0 bg-slate-100 py-2 z-10">Histórico Recente</h3>
-                         {selectedStudent.logs?.filter((l: any) => activeTab === 'familia' ? l.category === 'Família' : l.category !== 'Família').map((log: any) => {
+                         <h3 className="text-xs font-bold text-slate-500 uppercase sticky top-0 bg-slate-100 py-2 z-10 flex items-center gap-2"><History size={14}/> Histórico Completo</h3>
+                         {/* HISTÓRICO UNIFICADO COM TAGS VISUAIS */}
+                         {selectedStudent.logs?.map((log: any) => {
                              let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {}
+                             const isFamily = log.category === 'Família';
                              return (
-                                 <div key={log.id} className={`p-4 rounded-xl border shadow-sm bg-white hover:shadow-md transition-shadow relative ${log.category === 'Família' ? 'border-l-4 border-l-orange-400' : 'border-l-4 border-l-indigo-400'}`}>
-                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
-                                         <div><span className="font-bold text-xs block text-slate-800">{new Date(log.created_at).toLocaleDateString()}</span><span className="text-[10px] font-bold uppercase text-slate-400">{p.solicitante}</span></div>
-                                         {log.resolved && <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Resolvido</span>}
+                                 <div key={log.id} className={`p-4 rounded-xl border shadow-sm bg-white hover:shadow-md transition-shadow relative ${isFamily ? 'border-l-4 border-l-orange-400' : 'border-l-4 border-l-indigo-400'}`}>
+                                     <div className="flex justify-between items-center mb-2 border-b pb-2">
+                                         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${isFamily ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>{isFamily ? 'FAMÍLIA' : 'ESTUDANTE'}</span>
+                                         <span className="text-[10px] text-slate-400">{new Date(log.created_at).toLocaleDateString()}</span>
                                      </div>
-                                     <p className="text-xs text-slate-600 line-clamp-3 mb-2">{p.obs}</p>
-                                     <button className="text-[10px] text-indigo-600 font-bold underline" onClick={() => { setObsLivre(p.obs); setMotivosSelecionados(p.motivos || []); }}>Ver/Copiar</button>
+                                     <div className="mb-2">
+                                         <span className="text-[10px] font-bold uppercase text-slate-500 block">Solicitante: {p.solicitante}</span>
+                                     </div>
+                                     <p className="text-xs text-slate-600 line-clamp-3 mb-2 italic">"{p.obs}"</p>
+                                     <div className="flex justify-between items-center mt-2">
+                                        <button className="text-[10px] text-indigo-600 font-bold underline flex items-center gap-1" onClick={() => { setObsLivre(p.obs); setMotivosSelecionados(p.motivos || []); }}><Copy size={10}/> Copiar</button>
+                                        {log.resolved && <span className="text-[10px] font-bold text-green-600 flex items-center gap-1"><ShieldCheck size={10}/> Resolvido</span>}
+                                     </div>
                                  </div>
                              )
                          })}
@@ -526,7 +552,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL ZAP */}
+      {/* MODAIS SECUNDÁRIOS (ZAP, SAÍDA, IMPORTAÇÃO, ETC) MANTIDOS */}
       {isQuickModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
              <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200">
@@ -581,6 +607,20 @@ export default function App() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MODAL NOVO ALUNO */}
+      {isNewStudentModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+             <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
+                 <h3 className="font-bold text-xl mb-6 text-indigo-900">Cadastrar Novo Aluno</h3>
+                 <form onSubmit={handleAddStudent} className="space-y-4">
+                     <div><label className="text-xs font-bold uppercase text-slate-400">Nome Completo</label><input value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div>
+                     <div><label className="text-xs font-bold uppercase text-slate-400">Turma</label><input value={newClass} onChange={e => setNewClass(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div>
+                     <div className="flex gap-3 mt-6"><button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl">Cancelar</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg">Salvar</button></div>
+                 </form>
+             </div>
         </div>
       )}
 
