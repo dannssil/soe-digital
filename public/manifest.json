@@ -3,17 +3,17 @@
   "name": "SOE Digital - CED 4 Guará",
   "icons": [
     {
-      "src": "/icon-192-v4.png",
+      "src": "/logo.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "/icon-512-v4.png",
+      "src": "/logo.png",
       "type": "image/png",
       "sizes": "512x512"
     },
     {
-      "src": "/icon-maskable-512-v4.png",
+      "src": "/logo.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "maskable"
