@@ -96,7 +96,7 @@ export default function App() {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [isQuickModalOpen, setIsQuickModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false); // NOVO
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false); // NOVO MODAL RELATORIO
   const [importing, setImporting] = useState(false);
   
   // Tabs & Forms
@@ -677,7 +677,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAIS SECUNDÁRIOS (ZAP, SAÍDA, IMPORTAÇÃO, ETC) MANTIDOS */}
+      {/* MODAL FLASH (TYPEAHEAD GOOGLE STYLE) */}
       {isQuickModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
              <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200">
