@@ -378,7 +378,7 @@ export default function App() {
         {/* BOTÃO FLUTUANTE (FAB) - REGISTRO RÁPIDO */}
         <button 
            onClick={() => { setQuickSearchTerm(''); setQuickSelectedStudent(null); setQuickReason(''); setIsQuickModalOpen(true); }}
-           className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 border-4 border-white md:hidden"
+           className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 border-4 border-white"
         >
           <Zap size={24} fill="white" />
         </button>
@@ -852,7 +852,7 @@ export default function App() {
         </div>
       )}
       
-      {/* MODAL REGISTRO RÁPIDO (FLASH) */}
+      {/* NOVO: MODAL REGISTRO RÁPIDO (FLASH) */}
       {isQuickModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative animate-in fade-in zoom-in duration-200">
@@ -867,7 +867,6 @@ export default function App() {
             </div>
 
             <div className="space-y-4">
-               {/* 1. BUSCA DE ALUNO SIMPLIFICADA */}
                <div>
                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Quem é o estudante?</label>
                  <div className="relative">
@@ -878,12 +877,11 @@ export default function App() {
                       value={quickSearchTerm}
                       onChange={e => {
                         setQuickSearchTerm(e.target.value);
-                        setQuickSelectedStudent(null); // Reseta se mudar o texto
+                        setQuickSelectedStudent(null); 
                       }}
                    />
                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
                    
-                   {/* SUGESTÕES DE ALUNOS */}
                    {quickSearchTerm.length > 2 && !quickSelectedStudent && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-xl shadow-xl max-h-48 overflow-y-auto z-50">
                         {students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0, 5).map(s => (
@@ -898,7 +896,6 @@ export default function App() {
                  {quickSelectedStudent && <p className="text-xs text-green-600 font-bold mt-1 text-center">✅ {quickSelectedStudent.name} selecionado</p>}
                </div>
 
-               {/* 2. BOTÕES DE MOTIVO RÁPIDO */}
                <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Qual o motivo?</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -917,7 +914,7 @@ export default function App() {
                <button 
                  onClick={handleQuickSave}
                  disabled={!quickSelectedStudent || !quickReason}
-                 className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-4 flex items-center justify-center gap-2"
+                 className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 disabled:opacity-50 transition-all mt-4 flex items-center justify-center gap-2"
                >
                  <Save size={20}/> SALVAR REGISTRO
                </button>
