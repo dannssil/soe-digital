@@ -11,24 +11,22 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight
 } from 'lucide-react';
 
 // ==============================================================================
-// 🚨 ÁREA DE CONEXÃO 🚨
+// 🚨 CONEXÃO 🚨
 // ==============================================================================
 
 const supabaseUrl = "https://zfryhzmujfaqqzybjuhb.supabase.co";
 const supabaseKey = "sb_publishable_oJqCCMfnBlbQWGMP4Wj3rQ_YqogatOo";
-
-// ==============================================================================
-
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // --- CONFIGURAÇÕES ---
 const SYSTEM_USER_NAME = "Daniel Alves";
+const SYSTEM_ROLE = "Orientador Educacional - SOE";
 const ACCESS_PASSWORD = "Ced@1rf1";
-const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
+const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899']; // Indigo, Amber, Red, Emerald, Violet, Pink
 
 // --- LISTAS ---
 const MOTIVOS_COMPORTAMENTO = ["Conversa excessiva", "Desacato", "Agressividade verbal", "Agressividade física", "Uso de celular", "Saída s/ autorização", "Bullying", "Desobediência", "Uniforme", "Outros"];
@@ -50,10 +48,10 @@ function Avatar({ name, src, size = "md" }: { name: string, src?: string | null,
 const StudentList = ({ students, onSelectStudent, searchTerm }: any) => {
   const filtered = students.filter((s: any) => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-full flex flex-col">
+      <div className="overflow-x-auto flex-1">
         <table className="w-full text-sm text-left">
-          <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b">
+          <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b sticky top-0 bg-slate-50 z-10">
             <tr><th className="px-6 py-4">Estudante</th><th className="px-6 py-4">Turma</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Ações</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -62,7 +60,7 @@ const StudentList = ({ students, onSelectStudent, searchTerm }: any) => {
                 <td className="px-6 py-4 flex items-center gap-4"><Avatar name={s.name} src={s.photo_url} size="md"/><div className="font-bold text-slate-700 text-base">{s.name}</div></td>
                 <td className="px-6 py-4 text-slate-500 font-bold">{s.class_id}</td>
                 <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${s.status === 'ATIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.status}</span></td>
-                <td className="px-6 py-4 text-right"><button className="text-slate-400 hover:text-indigo-600 p-2"><MoreHorizontal size={20}/></button></td>
+                <td className="px-6 py-4 text-right"><button className="text-slate-400 hover:text-indigo-600 p-2"><ChevronRight size={20}/></button></td>
               </tr>
             ))}
           </tbody>
@@ -112,7 +110,7 @@ export default function App() {
   const [resolvido, setResolvido] = useState(false);
   const [attendanceDate, setAttendanceDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
-  const [obsLivre, setObsLivre] = useState("Relatório de Atendimento:\n\n- Relato:\n\n- Mediação realizada:\n\n- Combinados:");
+  const [obsLivre, setObsLivre] = useState("- Relato:\n\n- Mediação realizada:\n\n- Combinados:");
   
   // Flash & Saída
   const [quickSearchTerm, setQuickSearchTerm] = useState('');
@@ -190,7 +188,7 @@ export default function App() {
       const desc = JSON.stringify({ solicitante, motivos: motivosSelecionados, obs: obsLivre }); 
       const { error } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: currentCategory, description: desc, referral: encaminhamento, resolved: resolvido, created_at: new Date(attendanceDate).toISOString(), return_date: returnDate || null }]); 
       if(!error) { 
-          alert('Salvo!'); setMotivosSelecionados([]); setIsModalOpen(false); fetchStudents(); 
+          alert('Registro Salvo!'); setMotivosSelecionados([]); setIsModalOpen(false); fetchStudents(); 
       } else alert(error.message); 
   };
   
@@ -237,39 +235,27 @@ export default function App() {
     reader.readAsBinaryString(file); 
   }
 
-  // --- PDF PREMIUM CORRIGIDO ---
   const generatePDF = () => { 
     if(!selectedStudent) return; 
     const doc = new jsPDF(); 
-    
-    // Cabeçalho
     doc.setFontSize(14); doc.setFont("helvetica", "bold");
     doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
     doc.setFontSize(12);
     doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" });
-    
     doc.setLineWidth(0.5); doc.line(14, 25, 196, 25);
 
-    // Dados do Aluno (Organizados para não truncar)
     doc.setFontSize(10); doc.setFont("helvetica", "normal");
     doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${selectedStudent.name}`, 35, 35);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Turma: ${selectedStudent.class_id}`, 160, 35);
+    doc.setFont("helvetica", "normal"); doc.text(`Turma: ${selectedStudent.class_id}`, 160, 35);
     
-    // Responsável em uma linha
-    doc.text(`Responsável:`, 14, 42); 
-    doc.text(`${selectedStudent.guardian_name || 'Não informado'}`, 40, 42);
+    // Layout corrigido para Responsável e Telefone
+    doc.text(`Responsável:`, 14, 43); doc.text(`${selectedStudent.guardian_name || 'Não informado'}`, 40, 43);
+    doc.text(`Telefone:`, 14, 50); doc.text(`${selectedStudent.guardian_phone || '-'}`, 40, 50);
     
-    // Telefone em outra linha (Para não truncar)
-    doc.text(`Telefone:`, 14, 49); 
-    doc.text(`${selectedStudent.guardian_phone || '-'}`, 40, 49);
+    doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 62);
+    const acadData = selectedStudent.desempenho?.map((d:any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || [];
     
-    // Tabela Acadêmica (Cor Unificada: Indigo)
-    doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60);
-    const acadData = selectedStudent.desempenho?.map((d:any) => [
-        d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre
-    ]) || [];
-    
+    // Tabela 1: Notas (Indigo)
     autoTable(doc, { 
         startY: 65, 
         head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], 
@@ -279,32 +265,23 @@ export default function App() {
         styles: { fontSize: 8, halign: 'center' } 
     });
     
-    // Histórico (Cor Unificada e Detalhes)
-    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85;
+    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 90;
     doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY);
     
     const logsData = selectedStudent.logs?.map((l:any) => {
         let desc = { motivos: [], obs: '', solicitante: '' };
         try { desc = JSON.parse(l.description); } catch(e) {}
-        
-        const conteudo = `SOLICITANTE: ${desc.solicitante || 'SOE'}\n` +
-                         `MOTIVOS: ${desc.motivos?.join(', ') || '-'}\n` +
-                         `RELATO: ${desc.obs}\n` +
-                         `ENCAMINHAMENTO: ${l.referral || '-'}`;
-                         
-        return [
-            new Date(l.created_at).toLocaleDateString('pt-BR'),
-            conteudo,
-            l.resolved ? 'Resolvido' : 'Pendente'
-        ];
+        const conteudo = `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`;
+        return [new Date(l.created_at).toLocaleDateString('pt-BR'), conteudo, l.resolved ? 'Resolvido' : 'Pendente'];
     }) || [];
 
+    // Tabela 2: Atendimentos (Mesma cor Indigo)
     autoTable(doc, { 
         startY: finalY + 5, 
         head: [['Data', 'Detalhes do Atendimento', 'Status']], 
         body: logsData, 
         theme: 'grid', 
-        headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, // Mesma cor da tabela de notas
+        headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, 
         styles: { fontSize: 9, cellPadding: 3 }, 
         columnStyles: { 1: { cellWidth: 130 } } 
     });
@@ -312,7 +289,6 @@ export default function App() {
     const pageHeight = doc.internal.pageSize.height;
     doc.line(60, pageHeight - 30, 150, pageHeight - 30);
     doc.setFontSize(8); doc.text("Assinatura do Responsável SOE", 105, pageHeight - 25, { align: "center" });
-
     doc.save(`Ficha_${selectedStudent.name}.pdf`); 
   }; 
 
@@ -322,16 +298,15 @@ export default function App() {
     const turmas = [...new Set(students.map(s => s.class_id))].sort();
     
     return (
-      <div className="space-y-8 pb-20">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Alunos</p><h3 className="text-3xl font-black text-indigo-600">{students.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Em Alerta</p><h3 className="text-3xl font-black text-red-500">{studentsInRisk.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Turmas</p><h3 className="text-3xl font-black text-emerald-500">{turmas.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Atendimentos</p><h3 className="text-3xl font-black text-amber-500">{students.flatMap(s=>s.logs||[]).length}</h3></div>
+      <div className="space-y-8 pb-20 w-full max-w-[1600px] mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Alunos</p><h3 className="text-4xl font-black text-indigo-600">{students.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Em Alerta</p><h3 className="text-4xl font-black text-red-500">{studentsInRisk.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Turmas</p><h3 className="text-4xl font-black text-emerald-500">{turmas.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Atendimentos</p><h3 className="text-4xl font-black text-amber-500">{students.flatMap(s=>s.logs||[]).length}</h3></div>
         </div>
 
-        {/* GRÁFICOS AJUSTADOS (MENORES E LEGENDA PEQUENA) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-80"> 
                 <h4 className="text-sm font-bold text-slate-700 mb-4 uppercase">Volume de Atendimentos</h4>
                 <ResponsiveContainer width="100%" height="100%"><LineChart data={stats.last7Days}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" /><XAxis dataKey="name" axisLine={false} tickLine={false} /><YAxis axisLine={false} tickLine={false} /><Tooltip /><Line type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={4} dot={{r:6, fill:'#6366f1'}} /></LineChart></ResponsiveContainer>
@@ -340,9 +315,7 @@ export default function App() {
                 <h4 className="text-sm font-bold text-slate-700 mb-4 uppercase flex items-center gap-2"><BarChart3 size={16}/> Motivos Recorrentes</h4>
                 <ResponsiveContainer width="100%" height="80%">
                     <PieChart>
-                        <Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
-                            {stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
-                        </Pie>
+                        <Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie>
                         <Tooltip />
                         <Legend verticalAlign="bottom" height={24} iconType="circle" wrapperStyle={{fontSize: '10px'}}/>
                     </PieChart>
@@ -350,7 +323,7 @@ export default function App() {
             </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px] mt-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[600px]">
             <div className="lg:col-span-1 bg-white rounded-2xl border border-red-100 shadow-sm flex flex-col overflow-hidden">
                 <div className="bg-red-50 px-6 py-4 border-b border-red-100"><h3 className="font-bold text-red-800 uppercase text-sm">Alunos em Risco {selectedClassFilter && `(${selectedClassFilter})`}</h3></div>
                 <div className="flex-1 overflow-y-auto p-2">
@@ -362,26 +335,22 @@ export default function App() {
                 </div>
             </div>
             
-            {/* CARDS DE TURMAS COM BARRA DE RISCO */}
             <div className="lg:col-span-2 bg-white rounded-2xl border border-indigo-100 shadow-sm flex flex-col overflow-hidden">
-                <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100"><h3 className="font-bold text-indigo-800 uppercase">Pastas de Turmas (Filtro)</h3></div>
-                <div className="flex-1 overflow-y-auto p-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center"><h3 className="font-bold text-indigo-800 uppercase">Pastas de Turmas</h3><span className="text-[10px] text-indigo-500 bg-white px-2 py-1 rounded border border-indigo-200">Clique para filtrar</span></div>
+                <div className="flex-1 overflow-y-auto p-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {turmas.map(t => {
                             const total = students.filter(s => s.class_id === t).length;
                             const risco = students.filter(s => s.class_id === t && (checkRisk(s).reprovadoFalta || checkRisk(s).criticoNotas)).length;
                             const percent = total > 0 ? (risco / total) * 100 : 0;
-                            
+                            const isSelected = selectedClassFilter === t;
                             return (
-                                <div key={t} onClick={() => setSelectedClassFilter(selectedClassFilter === t ? null : t)} className={`p-4 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-md ${selectedClassFilter === t ? 'bg-indigo-600 text-white transform scale-105' : 'bg-slate-50 hover:bg-white hover:border-indigo-300'}`}>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h4 className="font-bold text-xl">{t}</h4>
-                                        <span className="text-[10px] font-bold opacity-70">{total} Alunos</span>
+                                <div key={t} onClick={() => setSelectedClassFilter(isSelected ? null : t)} className={`p-5 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-md flex flex-col justify-between h-32 ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100' : 'bg-white border-slate-100 hover:border-indigo-300'}`}>
+                                    <div className="flex justify-between items-start"><h4 className="font-bold text-2xl">{t}</h4><Folder size={20} className={isSelected ? 'text-indigo-200' : 'text-slate-300'}/></div>
+                                    <div>
+                                        <div className="flex justify-between text-[10px] mb-1 font-bold"><span className={isSelected ? 'text-indigo-200' : 'text-slate-400'}>{total} Alunos</span><span className={isSelected ? 'text-white' : 'text-red-500'}>{Math.round(percent)}% Risco</span></div>
+                                        <div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? 'bg-black/20' : 'bg-slate-100'}`}><div className={`h-full transition-all duration-500 ${percent > 30 ? 'bg-red-500' : 'bg-emerald-400'}`} style={{width: `${percent}%`}}></div></div>
                                     </div>
-                                    <div className="w-full bg-black/10 h-2 rounded-full overflow-hidden">
-                                        <div className={`h-full ${percent > 30 ? 'bg-red-500' : 'bg-green-400'}`} style={{width: `${percent}%`}}></div>
-                                    </div>
-                                    <p className="text-[10px] mt-1 text-right font-bold opacity-80">{risco} em risco</p>
                                 </div>
                             )
                         })}
@@ -423,7 +392,7 @@ export default function App() {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {view === 'dashboard' ? renderDashboard() : (
-            <div className="max-w-6xl mx-auto pb-20">
+            <div className="max-w-[1600px] mx-auto pb-20 w-full h-full flex flex-col">
               <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-slate-800">Estudantes</h2>
                   <div className="flex gap-2">
@@ -435,16 +404,16 @@ export default function App() {
                   <button onClick={() => setListClassFilter(null)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border ${!listClassFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'}`}>Todos</button>
                   {turmasList.map(t => (<button key={t} onClick={() => setListClassFilter(t)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border flex items-center gap-2 ${listClassFilter === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}><Folder size={14} /> {t}</button>))}
               </div>
-              <StudentList students={students.filter(s => !listClassFilter || s.class_id === listClassFilter)} onSelectStudent={(s: any) => { setSelectedStudent(s); setIsModalOpen(true); }} searchTerm={globalSearch} />
+              <div className="flex-1 min-h-0"><StudentList students={students.filter(s => !listClassFilter || s.class_id === listClassFilter)} onSelectStudent={(s: any) => { setSelectedStudent(s); setIsModalOpen(true); }} searchTerm={globalSearch} /></div>
             </div>
           )}
         </div>
       </main>
 
-      {/* MODAL DETALHES (LAYOUT DESKTOP LIBERADO) */}
+      {/* MODAL DETALHES COM NOVO LAYOUT DE REGISTRO */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50 flex-shrink-0">
                <div className="flex items-center gap-6">
                  <div className="relative group">
@@ -496,35 +465,56 @@ export default function App() {
                )}
 
                {(activeTab === 'historico' || activeTab === 'familia') && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
-                      <div className={`lg:col-span-5 p-6 rounded-2xl border shadow-sm h-fit ${activeTab === 'familia' ? 'bg-orange-50 border-orange-200' : 'bg-white border-indigo-100'}`}>
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full h-full">
+                      <div className={`lg:col-span-8 p-8 rounded-2xl border shadow-sm h-full flex flex-col ${activeTab === 'familia' ? 'bg-orange-50 border-orange-200' : 'bg-white border-indigo-100'}`}>
                           <h3 className="font-bold mb-6 uppercase text-sm flex items-center gap-2 pb-4 border-b border-black/5">{activeTab === 'familia' ? <><Users2/> Novo Contato Família</> : <><FileText/> Novo Atendimento</>}</h3>
-                          <div className="space-y-4">
+                          <div className="space-y-6 flex-1 flex flex-col">
                               <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-slate-400 uppercase">Solicitante</label><select className="w-full mt-1 p-2 border rounded-lg bg-white" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option></select></div>
-                                <div><label className="text-xs font-bold text-slate-400 uppercase">Encaminhar</label><select className="w-full mt-1 p-2 border rounded-lg bg-white" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{ENCAMINHAMENTOS.map(e=><option key={e}>{e}</option>)}</select></div>
+                                <div><label className="text-xs font-bold text-slate-400 uppercase">Solicitante</label><select className="w-full mt-1 p-3 border rounded-lg bg-white" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option></select></div>
+                                <div><label className="text-xs font-bold text-slate-400 uppercase">Encaminhar</label><select className="w-full mt-1 p-3 border rounded-lg bg-white" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{ENCAMINHAMENTOS.map(e=><option key={e}>{e}</option>)}</select></div>
                               </div>
                               <div className="flex gap-4">
-                                  <div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Data</label><input type="date" className="w-full mt-1 p-2 border rounded-lg bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} /></div>
-                                  <div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Retorno</label><input type="date" className="w-full mt-1 p-2 border rounded-lg bg-white" placeholder="Retorno" value={returnDate} onChange={e => setReturnDate(e.target.value)} /></div>
+                                  <div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Data</label><input type="date" className="w-full mt-1 p-3 border rounded-lg bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} /></div>
+                                  <div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Retorno</label><input type="date" className="w-full mt-1 p-3 border rounded-lg bg-white" placeholder="Retorno" value={returnDate} onChange={e => setReturnDate(e.target.value)} /></div>
                               </div>
-                              <div className="border p-3 rounded-xl bg-white/50 space-y-3 h-48 overflow-y-auto">
-                                  <div><p className="text-[10px] font-bold text-orange-600 uppercase mb-1">Comportamental</p><div className="grid grid-cols-1 gap-1">{MOTIVOS_COMPORTAMENTO.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
-                                  <div><p className="text-[10px] font-bold text-blue-600 uppercase mb-1">Pedagógico</p><div className="grid grid-cols-1 gap-1">{MOTIVOS_PEDAGOGICO.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
+                              <div className="border p-4 rounded-xl bg-white/50 space-y-4">
+                                  <div className="grid grid-cols-3 gap-4">
+                                    <div><p className="text-[10px] font-bold text-orange-600 uppercase mb-2">Comportamental</p><div className="flex flex-col gap-1">{MOTIVOS_COMPORTAMENTO.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
+                                    <div><p className="text-[10px] font-bold text-blue-600 uppercase mb-2">Pedagógico</p><div className="flex flex-col gap-1">{MOTIVOS_PEDAGOGICO.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
+                                    <div><p className="text-[10px] font-bold text-purple-600 uppercase mb-2">Social/Outros</p><div className="flex flex-col gap-1">{MOTIVOS_SOCIAL.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
+                                  </div>
                               </div>
-                              <textarea className="w-full p-4 border rounded-xl h-32 text-sm bg-white" value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
-                              <div className="flex justify-between items-center pt-2"><label className="text-sm font-bold text-green-700 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="w-5 h-5 rounded" checked={resolvido} onChange={e => setResolvido(e.target.checked)}/> Resolvido</label><button onClick={handleSaveLog} className={`text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${activeTab === 'familia' ? 'bg-orange-600' : 'bg-indigo-600'}`}><Save size={18}/> Salvar</button></div>
+                              
+                              <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex-1 flex flex-col">
+                                <label className="text-center block text-sm font-bold text-slate-600 uppercase mb-2 tracking-widest bg-slate-200 py-1 rounded">RELATÓRIO DE ATENDIMENTO</label>
+                                <textarea className="w-full p-4 border rounded-xl flex-1 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none" value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
+                              </div>
+
+                              <div className="flex justify-between items-center pt-4 border-t border-slate-200">
+                                <div className="text-xs text-slate-400 font-mono">
+                                    <p>Registrado por: <span className="font-bold text-slate-600">{SYSTEM_USER_NAME}</span></p>
+                                    <p>{SYSTEM_ROLE} | {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <label className="text-sm font-bold text-green-700 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="w-5 h-5 rounded" checked={resolvido} onChange={e => setResolvido(e.target.checked)}/> <ShieldCheck size={18}/> Caso Resolvido</label>
+                                    <button onClick={handleSaveLog} className={`text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${activeTab === 'familia' ? 'bg-orange-600' : 'bg-indigo-600'}`}><Save size={18}/> SALVAR REGISTRO</button>
+                                </div>
+                              </div>
                           </div>
                       </div>
-                      <div className="lg:col-span-7 space-y-4 max-h-[600px] overflow-y-auto pr-2">
+
+                      <div className="lg:col-span-4 space-y-4 max-h-[800px] overflow-y-auto pr-2 bg-slate-100 p-4 rounded-2xl h-full">
+                         <h3 className="text-xs font-bold text-slate-500 uppercase sticky top-0 bg-slate-100 py-2 z-10">Histórico Recente</h3>
                          {selectedStudent.logs?.filter((l: any) => activeTab === 'familia' ? l.category === 'Família' : l.category !== 'Família').map((log: any) => {
                              let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {}
                              return (
-                                 <div key={log.id} className={`p-6 rounded-2xl border shadow-sm bg-white hover:shadow-md transition-shadow relative ${log.category === 'Família' ? 'border-l-4 border-l-orange-400' : 'border-l-4 border-l-indigo-400'}`}>
-                                     <div className="flex justify-between items-start mb-3 border-b pb-3"><div><span className="font-bold text-sm block text-slate-800">{new Date(log.created_at).toLocaleDateString()}</span><span className="text-xs font-bold uppercase text-slate-400">{p.solicitante}</span></div>{log.resolved ? <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Resolvido</span> : <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Em Aberto</span>}</div>
-                                     {p.motivos && p.motivos.length > 0 && <div className="flex flex-wrap gap-2 mb-3">{p.motivos.map((m:any)=><span key={m} className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase">{m}</span>)}</div>}
-                                     <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{p.obs}</p>
-                                     {log.referral && <div className="mt-4 pt-3 border-t border-dashed flex items-center gap-2 text-xs font-bold text-purple-600 uppercase"><span className="bg-purple-50 px-2 py-1 rounded">➔ Encaminhado:</span> {log.referral}</div>}
+                                 <div key={log.id} className={`p-4 rounded-xl border shadow-sm bg-white hover:shadow-md transition-shadow relative ${log.category === 'Família' ? 'border-l-4 border-l-orange-400' : 'border-l-4 border-l-indigo-400'}`}>
+                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
+                                         <div><span className="font-bold text-xs block text-slate-800">{new Date(log.created_at).toLocaleDateString()}</span><span className="text-[10px] font-bold uppercase text-slate-400">{p.solicitante}</span></div>
+                                         {log.resolved && <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Resolvido</span>}
+                                     </div>
+                                     <p className="text-xs text-slate-600 line-clamp-3 mb-2">{p.obs}</p>
+                                     <button className="text-[10px] text-indigo-600 font-bold underline" onClick={() => { setObsLivre(p.obs); setMotivosSelecionados(p.motivos || []); }}>Ver/Copiar</button>
                                  </div>
                              )
                          })}
@@ -536,7 +526,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL ZAP, SAÍDA E IMPORTAÇÃO MANTIDOS (IGUAL ANTES) */}
+      {/* MODAL ZAP */}
       {isQuickModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
              <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200">
