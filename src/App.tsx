@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer
 } from 'lucide-react';
 
 // ==============================================================================
@@ -22,7 +22,7 @@ const supabaseUrl = "https://zfryhzmujfaqqzybjuhb.supabase.co";
 const supabaseKey = "sb_publishable_oJqCCMfnBlbQWGMP4Wj3rQ_YqogatOo";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- CONFIGURAÇÕES DO PROFISSIONAL ---
+// --- CONFIGURAÇÕES ---
 const SYSTEM_USER_NAME = "Daniel Alves da Silva";
 const SYSTEM_ROLE = "Orientador Educacional - SOE";
 const SYSTEM_MATRICULA = "212.235-9";
@@ -30,7 +30,7 @@ const SYSTEM_ORG = "SEEDF";
 const ACCESS_PASSWORD = "Ced@1rf1";
 const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
-// --- LISTAS COMPLETAS ---
+// --- LISTAS ---
 const MOTIVOS_COMPORTAMENTO = ["Conversa excessiva", "Desacato", "Agressividade verbal", "Agressividade física", "Uso de celular", "Saída s/ autorização", "Bullying", "Desobediência", "Uniforme", "Outros"];
 const MOTIVOS_PEDAGOGICO = ["Sem tarefa", "Dificuldade aprend.", "Sem material", "Desatenção", "Baixo desempenho", "Faltas excessivas", "Sono em sala", "Outros"];
 const MOTIVOS_SOCIAL = ["Ansiedade", "Problemas familiares", "Isolamento", "Conflito colegas", "Saúde/Laudo", "Vulnerabilidade", "Outros"];
@@ -209,11 +209,7 @@ export default function App() {
       const desc = JSON.stringify({ solicitante, motivos: motivosSelecionados, obs: obsLivre }); 
       const { error } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: currentCategory, description: desc, referral: encaminhamento, resolved: resolvido, created_at: new Date(attendanceDate).toISOString(), return_date: returnDate || null }]); 
       if(!error) { 
-          alert('Salvo!'); 
-          setMotivosSelecionados([]); 
-          setObsLivre(""); 
-          setResolvido(false);
-          fetchStudents(); 
+          alert('Salvo!'); setMotivosSelecionados([]); setObsLivre(""); setResolvido(false); fetchStudents(); 
       } else alert(error.message); 
   };
   
@@ -260,24 +256,25 @@ export default function App() {
     reader.readAsBinaryString(file); 
   }
 
-  const generatePDF = () => { 
-    if(!selectedStudent) return; 
-    const doc = new jsPDF(); 
+  // --- FUNÇÃO AUXILIAR PARA IMPRESSÃO ---
+  const printStudentData = (doc: jsPDF, student: any) => {
+    // Cabeçalho
     doc.setFontSize(14); doc.setFont("helvetica", "bold");
     doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
     doc.setFontSize(12);
     doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" });
     doc.setLineWidth(0.5); doc.line(14, 25, 196, 25);
 
+    // Dados
     doc.setFontSize(10); doc.setFont("helvetica", "normal");
-    doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${selectedStudent.name}`, 35, 35);
-    doc.setFont("helvetica", "normal"); doc.text(`Turma: ${selectedStudent.class_id}`, 160, 35);
+    doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${student.name}`, 35, 35);
+    doc.setFont("helvetica", "normal"); doc.text(`Turma: ${student.class_id}`, 160, 35);
+    doc.text(`Responsável:`, 14, 43); doc.text(`${student.guardian_name || 'Não informado'}`, 40, 43);
+    doc.text(`Telefone:`, 14, 50); doc.text(`${student.guardian_phone || '-'}`, 40, 50);
     
-    doc.text(`Responsável:`, 14, 43); doc.text(`${selectedStudent.guardian_name || 'Não informado'}`, 40, 43);
-    doc.text(`Telefone:`, 14, 50); doc.text(`${selectedStudent.guardian_phone || '-'}`, 40, 50);
-    
+    // Tabela Notas
     doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60);
-    const acadData = selectedStudent.desempenho?.map((d:any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || [];
+    const acadData = student.desempenho?.map((d:any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || [];
     
     autoTable(doc, { 
         startY: 65, 
@@ -291,7 +288,7 @@ export default function App() {
     const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85;
     doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY);
     
-    const logsData = selectedStudent.logs?.map((l:any) => {
+    const logsData = student.logs?.map((l:any) => {
         let desc = { motivos: [], obs: '', solicitante: '' };
         try { desc = JSON.parse(l.description); } catch(e) {}
         const conteudo = `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`;
@@ -308,21 +305,39 @@ export default function App() {
         columnStyles: { 2: { cellWidth: 100 } } 
     });
 
-    // RODAPÉ AJUSTADO (DATA ABAIXO)
     const pageHeight = doc.internal.pageSize.height;
     doc.line(60, pageHeight - 35, 150, pageHeight - 35);
     doc.setFont("helvetica", "bold");
     doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 105, pageHeight - 30, { align: "center" });
-    
     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
     doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 25, { align: "center" });
-    
     doc.setFontSize(8); doc.setTextColor(100);
     const timeNow = new Date().toLocaleString('pt-BR');
     doc.text(`Emitido em: ${timeNow}`, 105, pageHeight - 15, { align: "center" });
+  };
 
+  const generatePDF = () => { 
+    if(!selectedStudent) return; 
+    const doc = new jsPDF(); 
+    printStudentData(doc, selectedStudent);
     doc.save(`Ficha_${selectedStudent.name}.pdf`); 
   }; 
+
+  // --- NOVA FUNÇÃO: IMPRESSÃO EM LOTE ---
+  const generateBatchPDF = (classId: string, e?: React.MouseEvent) => {
+    if(e) e.stopPropagation();
+    const classStudents = students.filter(s => s.class_id === classId);
+    if (classStudents.length === 0) return alert("Turma vazia.");
+    
+    if(!window.confirm(`Deseja gerar um arquivo com TODAS as ${classStudents.length} fichas da turma ${classId}? Isso pode levar alguns segundos.`)) return;
+
+    const doc = new jsPDF();
+    classStudents.forEach((student, index) => {
+        if (index > 0) doc.addPage();
+        printStudentData(doc, student);
+    });
+    doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`);
+  };
 
   const renderDashboard = () => {
     let studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
@@ -368,7 +383,7 @@ export default function App() {
             </div>
             
             <div className="lg:col-span-2 bg-white rounded-2xl border border-indigo-100 shadow-sm flex flex-col overflow-hidden">
-                <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center"><h3 className="font-bold text-indigo-800 uppercase">Pastas de Turmas</h3><span className="text-[10px] text-indigo-500 bg-white px-2 py-1 rounded border border-indigo-200">Clique para filtrar</span></div>
+                <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center"><h3 className="font-bold text-indigo-800 uppercase">Pastas de Turmas</h3><span className="text-[10px] text-indigo-500 bg-white px-2 py-1 rounded border border-indigo-200">Clique na impressora para baixar lote</span></div>
                 <div className="flex-1 overflow-y-auto p-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {turmas.map(t => {
@@ -377,8 +392,17 @@ export default function App() {
                             const percent = total > 0 ? (risco / total) * 100 : 0;
                             const isSelected = selectedClassFilter === t;
                             return (
-                                <div key={t} onClick={() => setSelectedClassFilter(isSelected ? null : t)} className={`p-5 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-lg flex flex-col justify-between h-32 hover:-translate-y-1 duration-300 ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100' : 'bg-white border-slate-100 hover:border-indigo-300'}`}>
-                                    <div className="flex justify-between items-start"><h4 className="font-bold text-2xl">{t}</h4><Folder size={20} className={isSelected ? 'text-indigo-200' : 'text-slate-300'}/></div>
+                                <div key={t} onClick={() => setSelectedClassFilter(isSelected ? null : t)} className={`p-5 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-lg flex flex-col justify-between h-36 hover:-translate-y-1 duration-300 ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100' : 'bg-white border-slate-100 hover:border-indigo-300'}`}>
+                                    <div className="flex justify-between items-start">
+                                        <h4 className="font-bold text-2xl">{t}</h4>
+                                        <div className="flex gap-2">
+                                            {/* BOTÃO IMPRESSÃO EM LOTE */}
+                                            <button onClick={(e) => generateBatchPDF(t, e)} className={`p-2 rounded-full transition-colors ${isSelected ? 'text-indigo-200 hover:bg-indigo-500 hover:text-white' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600'}`} title="Imprimir Turma Completa">
+                                                <Printer size={18} />
+                                            </button>
+                                            <Folder size={20} className={isSelected ? 'text-indigo-200' : 'text-slate-300'}/>
+                                        </div>
+                                    </div>
                                     <div>
                                         <div className="flex justify-between text-[10px] mb-1 font-bold"><span className={isSelected ? 'text-indigo-200' : 'text-slate-400'}>{total} Alunos</span><span className={isSelected ? 'text-white' : 'text-red-500'}>{Math.round(percent)}% Risco</span></div>
                                         <div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? 'bg-black/20' : 'bg-slate-100'}`}><div className={`h-full transition-all duration-500 ${percent > 30 ? 'bg-red-500' : 'bg-emerald-400'}`} style={{width: `${percent}%`}}></div></div>
@@ -415,7 +439,6 @@ export default function App() {
             <button onClick={() => { setView('dashboard'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
             <button onClick={() => { setView('students'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
         </nav>
-        {/* RODAPÉ LATERAL */}
         <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400">
             <p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p>
             <p>{SYSTEM_ROLE}</p>
@@ -450,7 +473,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* MODAL DETALHES COM ASSINATURA NA TELA DO SISTEMA */}
+      {/* MODAL DETALHES (MANTIDO IGUAL - CÓDIGO V8) */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -533,7 +556,6 @@ export default function App() {
                               <div className="flex justify-between items-center pt-4 border-t border-slate-200">
                                 <div className="text-xs text-slate-400 font-mono">
                                     <p>Registrado por: <span className="font-bold text-slate-600">{SYSTEM_USER_NAME}</span></p>
-                                    {/* CORREÇÃO DO RODAPÉ NA TELA DO SISTEMA */}
                                     <p>{SYSTEM_ROLE} | {SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA} | {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
                                 </div>
                                 <div className="flex items-center gap-4">
@@ -574,7 +596,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL FLASH (TYPEAHEAD GOOGLE STYLE) */}
+      {/* MODAL FLASH (MANTIDO) */}
       {isQuickModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
              <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200">
