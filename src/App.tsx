@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database
 } from 'lucide-react';
 
 // ==============================================================================
@@ -96,7 +96,7 @@ export default function App() {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [isQuickModalOpen, setIsQuickModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false); // NOVO MODAL RELATORIO
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   
   // Tabs & Forms
@@ -151,9 +151,10 @@ export default function App() {
 
   async function fetchStudents() {
     setLoading(true);
+    // REMOVIDO O FILTRO 'ATIVO' PARA PEGAR TODOS OS STATUS (TRANSFERIDO, ABANDONO)
     const { data, error } = await supabase.from('students')
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`)
-      .eq('status', 'ATIVO').order('name');
+      .order('name');
     if (!error && data) {
        const sortedData = data.map((student: any) => ({
         ...student,
@@ -260,112 +261,75 @@ export default function App() {
   // --- NOVA FUNÇÃO: EXCEL GERENCIAL ---
   const handleExportReport = () => {
     const wb = XLSX.utils.book_new();
+    const summaryData = [["Métrica", "Valor"], ["Total Alunos", students.length], ["Total Atendimentos", stats.allLogs.length], ["Atendimentos Resolvidos", stats.allLogs.filter(l => l.resolved).length], ["Alunos em Risco", students.filter(s => checkRisk(s).reprovadoFalta || checkRisk(s).criticoNotas).length]];
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData); XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo");
+    const motivesData = [["Motivo", "Ocorrências"]]; stats.pieData.forEach(d => motivesData.push([d.name, d.value]));
+    const wsMotives = XLSX.utils.aoa_to_sheet(motivesData); XLSX.utils.book_append_sheet(wb, wsMotives, "Motivos");
+    const studentsData = [["Nome", "Turma", "Total Atendimentos", "Situação"]]; students.map(s => ({...s, count: s.logs?.length || 0})).filter(s => s.count > 0).sort((a,b) => b.count - a.count).forEach(s => { studentsData.push([s.name, s.class_id, s.count, checkRisk(s).reprovadoFalta ? "Risco Faltas" : "Normal"]); });
+    const wsStudents = XLSX.utils.aoa_to_sheet(studentsData); XLSX.utils.book_append_sheet(wb, wsStudents, "Alunos Recorrentes");
+    XLSX.writeFile(wb, `Relatorio_Gerencial_SOE.xlsx`);
+  };
+
+  // --- NOVA FUNÇÃO: BACKUP COMPLETO (DADOS BRUTOS) ---
+  const handleBackup = () => {
+    const wb = XLSX.utils.book_new();
     
-    // 1. Aba Resumo
-    const summaryData = [
-        ["Métrica", "Valor"],
-        ["Total Alunos", students.length],
-        ["Total Atendimentos", stats.allLogs.length],
-        ["Atendimentos Resolvidos", stats.allLogs.filter(l => l.resolved).length],
-        ["Taxa Resolução", `${Math.round((stats.allLogs.filter(l => l.resolved).length / stats.allLogs.length) * 100) || 0}%`],
-        ["Alunos em Risco", students.filter(s => checkRisk(s).reprovadoFalta || checkRisk(s).criticoNotas).length]
-    ];
-    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo");
+    // Aba 1: Alunos
+    const studentsBackup = students.map(s => ({ID: s.id, Nome: s.name, Turma: s.class_id, Status: s.status, Responsavel: s.guardian_name, Telefone: s.guardian_phone}));
+    const wsStudents = XLSX.utils.json_to_sheet(studentsBackup);
+    XLSX.utils.book_append_sheet(wb, wsStudents, "Alunos");
 
-    // 2. Aba Ranking Motivos
-    const motivesData = [["Motivo", "Ocorrências"]];
-    stats.pieData.forEach(d => motivesData.push([d.name, d.value]));
-    const wsMotives = XLSX.utils.aoa_to_sheet(motivesData);
-    XLSX.utils.book_append_sheet(wb, wsMotives, "Motivos");
+    // Aba 2: Histórico (Logs)
+    const logsBackup = students.flatMap(s => s.logs?.map((l:any) => ({Aluno: s.name, Turma: s.class_id, Data: new Date(l.created_at).toLocaleDateString(), Tipo: l.category, Descricao: l.description, Resolvido: l.resolved ? "SIM" : "NAO"})) || []);
+    const wsLogs = XLSX.utils.json_to_sheet(logsBackup);
+    XLSX.utils.book_append_sheet(wb, wsLogs, "Historico_Atendimentos");
 
-    // 3. Aba Alunos Frequentes
-    const studentsData = [["Nome", "Turma", "Total Atendimentos", "Situação"]];
-    students
-        .map(s => ({...s, count: s.logs?.length || 0}))
-        .filter(s => s.count > 0)
-        .sort((a,b) => b.count - a.count)
-        .forEach(s => {
-            studentsData.push([s.name, s.class_id, s.count, checkRisk(s).reprovadoFalta ? "Risco Faltas" : "Normal"]);
-        });
-    const wsStudents = XLSX.utils.aoa_to_sheet(studentsData);
-    XLSX.utils.book_append_sheet(wb, wsStudents, "Alunos Recorrentes");
-
-    XLSX.writeFile(wb, `Relatorio_Gerencial_SOE_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `BACKUP_COMPLETO_SOE_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const printStudentData = (doc: jsPDF, student: any) => {
-    doc.setFontSize(14); doc.setFont("helvetica", "bold");
-    doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
-    doc.setFontSize(12);
-    doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" });
-    doc.setLineWidth(0.5); doc.line(14, 25, 196, 25);
-
+    doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
+    doc.setFontSize(12); doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25);
     doc.setFontSize(10); doc.setFont("helvetica", "normal");
-    doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${student.name}`, 35, 35);
-    doc.setFont("helvetica", "normal"); doc.text(`Turma: ${student.class_id}`, 160, 35);
-    doc.text(`Responsável:`, 14, 43); doc.text(`${student.guardian_name || 'Não informado'}`, 40, 43);
-    doc.text(`Telefone:`, 14, 50); doc.text(`${student.guardian_phone || '-'}`, 40, 50);
-    
+    doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${student.name}`, 35, 35); doc.setFont("helvetica", "normal"); doc.text(`Turma: ${student.class_id}`, 160, 35);
+    doc.text(`Responsável:`, 14, 43); doc.text(`${student.guardian_name || 'Não informado'}`, 40, 43); doc.text(`Telefone:`, 14, 50); doc.text(`${student.guardian_phone || '-'}`, 40, 50);
     doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60);
     const acadData = student.desempenho?.map((d:any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || [];
     autoTable(doc, { startY: 65, head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], body: acadData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 8, halign: 'center' }, styles: { fontSize: 8, halign: 'center' } });
-    
     const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85;
     doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY);
-    
     const logsData = student.logs?.map((l:any) => {
-        let desc = { motivos: [], obs: '', solicitante: '' };
-        try { desc = JSON.parse(l.description); } catch(e) {}
-        const conteudo = `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`;
-        return [new Date(l.created_at).toLocaleDateString('pt-BR'), l.category, conteudo, l.resolved ? 'Resolvido' : 'Pendente'];
+        let desc = { motivos: [], obs: '', solicitante: '' }; try { desc = JSON.parse(l.description); } catch(e) {}
+        return [new Date(l.created_at).toLocaleDateString('pt-BR'), l.category, `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`, l.resolved ? 'Resolvido' : 'Pendente'];
     }) || [];
-
     autoTable(doc, { startY: finalY + 5, head: [['Data', 'Tipo', 'Detalhes do Atendimento', 'Status']], body: logsData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 2: { cellWidth: 100 } } });
-
     const pageHeight = doc.internal.pageSize.height;
-    doc.line(60, pageHeight - 35, 150, pageHeight - 35);
-    doc.setFont("helvetica", "bold");
-    doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 105, pageHeight - 30, { align: "center" });
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 25, { align: "center" });
-    doc.setFontSize(8); doc.setTextColor(100);
-    const timeNow = new Date().toLocaleString('pt-BR');
-    doc.text(`Emitido em: ${timeNow}`, 105, pageHeight - 15, { align: "center" });
+    doc.line(60, pageHeight - 35, 150, pageHeight - 35); doc.setFont("helvetica", "bold"); doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 105, pageHeight - 30, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 25, { align: "center" });
+    doc.setFontSize(8); doc.setTextColor(100); const timeNow = new Date().toLocaleString('pt-BR'); doc.text(`Emitido em: ${timeNow}`, 105, pageHeight - 15, { align: "center" });
   };
 
-  const generatePDF = () => { 
-    if(!selectedStudent) return; 
-    const doc = new jsPDF(); 
-    printStudentData(doc, selectedStudent);
-    doc.save(`Ficha_${selectedStudent.name}.pdf`); 
-  }; 
-
-  const generateBatchPDF = (classId: string, e?: React.MouseEvent) => {
-    if(e) e.stopPropagation();
-    const classStudents = students.filter(s => s.class_id === classId);
-    if (classStudents.length === 0) return alert("Turma vazia.");
-    if(!window.confirm(`Deseja gerar um arquivo com TODAS as ${classStudents.length} fichas da turma ${classId}? Isso pode levar alguns segundos.`)) return;
-    const doc = new jsPDF();
-    classStudents.forEach((student, index) => {
-        if (index > 0) doc.addPage();
-        printStudentData(doc, student);
-    });
-    doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`);
-  };
+  const generatePDF = () => { if(!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); }; 
+  const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if(e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); if(!window.confirm(`Deseja gerar um arquivo com TODAS as ${classStudents.length} fichas da turma ${classId}?`)) return; const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`); };
 
   const renderDashboard = () => {
     let studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
+    const ativos = students.filter(s => s.status === 'ATIVO').length;
+    const transferidos = students.filter(s => s.status === 'TRANSFERIDO').length;
+    const abandono = students.filter(s => s.status === 'ABANDONO').length;
     if (selectedClassFilter) studentsInRisk = studentsInRisk.filter(s => s.class_id === selectedClassFilter);
     const turmas = [...new Set(students.map(s => s.class_id))].sort();
     
     return (
       <div className="space-y-8 pb-20 w-full max-w-[1600px] mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Alunos</p><h3 className="text-3xl font-black text-indigo-600">{students.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Geral</p><h3 className="text-3xl font-black text-indigo-600">{students.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Ativos</p><h3 className="text-3xl font-black text-emerald-600">{ativos}</h3></div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Em Alerta</p><h3 className="text-3xl font-black text-red-500">{studentsInRisk.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Turmas</p><h3 className="text-3xl font-black text-emerald-500">{turmas.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Atendimentos</p><h3 className="text-3xl font-black text-amber-500">{students.flatMap(s=>s.logs||[]).length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300 flex flex-col justify-center gap-1">
+                <div className="flex justify-between items-center"><span className="text-xs font-bold text-slate-400 uppercase">Transferidos</span><span className="text-xl font-black text-orange-500">{transferidos}</span></div>
+                <div className="flex justify-between items-center"><span className="text-xs font-bold text-slate-400 uppercase">Abandono</span><span className="text-xl font-black text-red-600">{abandono}</span></div>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -375,30 +339,22 @@ export default function App() {
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-80 hover:shadow-lg transition-shadow duration-500">
                 <h4 className="text-sm font-bold text-slate-700 mb-4 uppercase flex items-center gap-2"><BarChart3 size={16}/> Motivos Recorrentes</h4>
-                <ResponsiveContainer width="100%" height="80%">
-                    <PieChart>
-                        <Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie>
-                        <Tooltip />
-                        <Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
-                    </PieChart>
-                </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="80%"><PieChart><Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip /><Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/></PieChart></ResponsiveContainer>
             </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[600px]">
             <div className="lg:col-span-1 bg-white rounded-2xl border border-red-100 shadow-sm flex flex-col overflow-hidden">
-                <div className="bg-red-50 px-6 py-4 border-b border-red-100"><h3 className="font-bold text-red-800 uppercase text-sm">Alunos em Risco {selectedClassFilter && `(${selectedClassFilter})`}</h3></div>
+                <div className="bg-red-50 px-6 py-4 border-b border-red-100"><h3 className="font-bold text-red-800 uppercase text-sm">Alunos em Risco</h3></div>
                 <div className="flex-1 overflow-y-auto p-2">
                     {studentsInRisk.length > 0 ? studentsInRisk.map(s => (
-                        <div key={s.id} onClick={() => { setSelectedStudent(s); setIsModalOpen(true); }} className="p-3 hover:bg-red-50 rounded-xl cursor-pointer flex items-center justify-between border-b last:border-0 border-slate-100 group transition-colors">
-                            <div className="flex items-center gap-3"><Avatar name={s.name} src={s.photo_url} size="sm" /><div><p className="font-bold text-slate-800 text-sm group-hover:text-red-700">{s.name}</p><p className="text-xs text-slate-500 font-bold">Turma {s.class_id}</p></div></div>
-                        </div>
+                        <div key={s.id} onClick={() => { setSelectedStudent(s); setIsModalOpen(true); }} className="p-3 hover:bg-red-50 rounded-xl cursor-pointer flex items-center justify-between border-b last:border-0 border-slate-100 group transition-colors"><div className="flex items-center gap-3"><Avatar name={s.name} src={s.photo_url} size="sm" /><div><p className="font-bold text-slate-800 text-sm group-hover:text-red-700">{s.name}</p><p className="text-xs text-slate-500 font-bold">Turma {s.class_id}</p></div></div></div>
                     )) : <p className="p-4 text-center text-slate-400 text-sm">Nenhum aluno em risco.</p>}
                 </div>
             </div>
             
             <div className="lg:col-span-2 bg-white rounded-2xl border border-indigo-100 shadow-sm flex flex-col overflow-hidden">
-                <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center"><h3 className="font-bold text-indigo-800 uppercase">Pastas de Turmas</h3><span className="text-[10px] text-indigo-500 bg-white px-2 py-1 rounded border border-indigo-200">Clique para filtrar</span></div>
+                <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center"><h3 className="font-bold text-indigo-800 uppercase">Pastas de Turmas</h3></div>
                 <div className="flex-1 overflow-y-auto p-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {turmas.map(t => {
@@ -408,21 +364,8 @@ export default function App() {
                             const isSelected = selectedClassFilter === t;
                             return (
                                 <div key={t} onClick={() => setSelectedClassFilter(isSelected ? null : t)} className={`p-5 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-lg flex flex-col justify-between h-36 hover:-translate-y-1 duration-300 ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100' : 'bg-white border-slate-100 hover:border-indigo-300'}`}>
-                                    <div className="flex justify-between items-start">
-                                        <h4 className="font-bold text-2xl">{t}</h4>
-                                        <div className="flex gap-2">
-                                            {/* BOTÃO IMPRESSÃO EM LOTE */}
-                                            <button onClick={(e) => generateBatchPDF(t, e)} className={`p-2 rounded-full transition-colors ${isSelected ? 'text-indigo-200 hover:bg-indigo-500 hover:text-white' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600'}`} title="Imprimir Turma Completa">
-                                                <Printer size={18} />
-                                            </button>
-                                            <Folder size={20} className={isSelected ? 'text-indigo-200' : 'text-slate-300'}/>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between text-[10px] mb-1 font-bold"><span className={isSelected ? 'text-indigo-200' : 'text-slate-400'}>{total} Alunos</span><span className={isSelected ? 'text-white' : 'text-red-500'}>{Math.round(percent)}% Risco</span></div>
-                                        <div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? 'bg-black/20' : 'bg-slate-100'}`}><div className={`h-full transition-all duration-500 ${percent > 30 ? 'bg-red-500' : 'bg-emerald-400'}`} style={{width: `${percent}%`}}></div></div>
-                                    </div>
-                                    <p className="text-[10px] mt-1 text-right font-bold opacity-80">{risco} em risco</p>
+                                    <div className="flex justify-between items-start"><h4 className="font-bold text-2xl">{t}</h4><div className="flex gap-2"><button onClick={(e) => generateBatchPDF(t, e)} className={`p-2 rounded-full transition-colors ${isSelected ? 'text-indigo-200 hover:bg-indigo-500 hover:text-white' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600'}`} title="Imprimir Turma"><Printer size={18} /></button><Folder size={20} className={isSelected ? 'text-indigo-200' : 'text-slate-300'}/></div></div>
+                                    <div><div className="flex justify-between text-[10px] mb-1 font-bold"><span className={isSelected ? 'text-indigo-200' : 'text-slate-400'}>{total} Alunos</span><span className={isSelected ? 'text-white' : 'text-red-500'}>{Math.round(percent)}% Risco</span></div><div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? 'bg-black/20' : 'bg-slate-100'}`}><div className={`h-full transition-all duration-500 ${percent > 30 ? 'bg-red-500' : 'bg-emerald-400'}`} style={{width: `${percent}%`}}></div></div></div>
                                 </div>
                             )
                         })}
@@ -435,13 +378,7 @@ export default function App() {
   };
 
   if (!isAuthenticated) return (
-    <div className="h-screen bg-slate-900 flex items-center justify-center p-4 animate-in fade-in duration-1000">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center animate-in zoom-in duration-500">
-        <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce"><Lock className="text-indigo-600" size={32} /></div>
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso SOE</h1>
-        <form onSubmit={handleLogin} className="space-y-4"><input type="password" className="w-full p-3 border rounded-xl text-center focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="Senha" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} /><button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 hover:scale-105 transition-transform">Entrar</button></form>
-      </div>
-    </div>
+    <div className="h-screen bg-slate-900 flex items-center justify-center p-4 animate-in fade-in duration-1000"><div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center animate-in zoom-in duration-500"><div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce"><Lock className="text-indigo-600" size={32} /></div><h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso SOE</h1><form onSubmit={handleLogin} className="space-y-4"><input type="password" className="w-full p-3 border rounded-xl text-center focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="Senha" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} /><button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 hover:scale-105 transition-transform">Entrar</button></form></div></div>
   );
 
   const turmasList = [...new Set(students.map(s => s.class_id))].sort();
@@ -453,15 +390,10 @@ export default function App() {
         <nav className="flex-1 p-4 space-y-2">
             <button onClick={() => { setView('dashboard'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
             <button onClick={() => { setView('students'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
-            {/* BOTÃO RELATÓRIOS (NOVO) */}
             <button onClick={() => { setIsReportModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><FileBarChart2 size={18} /> Relatórios</button>
+            <button onClick={handleBackup} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><Database size={18} /> Backup</button>
         </nav>
-        <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400">
-            <p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p>
-            <p>{SYSTEM_ROLE}</p>
-            <p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p>
-            <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white transition-colors"><LogOut size={12} /> Sair do Sistema</button>
-        </div>
+        <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400"><p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p><p>{SYSTEM_ROLE}</p><p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p><button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white transition-colors"><LogOut size={12} /> Sair do Sistema</button></div>
       </aside>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden">
@@ -473,291 +405,40 @@ export default function App() {
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {view === 'dashboard' ? renderDashboard() : (
             <div className="max-w-[1600px] mx-auto pb-20 w-full h-full flex flex-col">
-              <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-slate-800">Estudantes</h2>
-                  <div className="flex gap-2">
-                    <button onClick={() => setIsImportModalOpen(true)} className="bg-green-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-transform active:scale-95"><FileSpreadsheet size={20} /> Importar</button>
-                    <button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-indigo-700 transition-transform active:scale-95"><Plus size={20} /> Novo Aluno</button>
-                  </div>
-              </div>
-              <div className="mb-6 flex gap-3 overflow-x-auto pb-2">
-                  <button onClick={() => setListClassFilter(null)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border ${!listClassFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'} hover:scale-105 transition-transform`}>Todos</button>
-                  {turmasList.map(t => (<button key={t} onClick={() => setListClassFilter(t)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border flex items-center gap-2 hover:scale-105 transition-transform ${listClassFilter === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}><Folder size={14} /> {t}</button>))}
-              </div>
+              <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-slate-800">Estudantes</h2><div className="flex gap-2"><button onClick={() => setIsImportModalOpen(true)} className="bg-green-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-transform active:scale-95"><FileSpreadsheet size={20} /> Importar</button><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-indigo-700 transition-transform active:scale-95"><Plus size={20} /> Novo Aluno</button></div></div>
+              <div className="mb-6 flex gap-3 overflow-x-auto pb-2"><button onClick={() => setListClassFilter(null)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border ${!listClassFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'} hover:scale-105 transition-transform`}>Todos</button>{turmasList.map(t => (<button key={t} onClick={() => setListClassFilter(t)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border flex items-center gap-2 hover:scale-105 transition-transform ${listClassFilter === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}><Folder size={14} /> {t}</button>))}</div>
               <div className="flex-1 min-h-0"><StudentList students={students.filter(s => !listClassFilter || s.class_id === listClassFilter)} onSelectStudent={(s: any) => { setSelectedStudent(s); setIsModalOpen(true); }} searchTerm={globalSearch} /></div>
             </div>
           )}
         </div>
       </main>
 
-      {/* MODAL RELATÓRIOS GERENCIAIS (NOVO) */}
-      {isReportModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]">
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600"/> Relatórios Gerenciais</h3>
-                <button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28}/></button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 text-center">
-                        <h4 className="text-sm uppercase font-bold text-indigo-400 mb-2">Total Ocorrências</h4>
-                        <p className="text-4xl font-black text-indigo-700">{stats.allLogs.length}</p>
-                    </div>
-                    <div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100 text-center">
-                        <h4 className="text-sm uppercase font-bold text-emerald-400 mb-2">Casos Resolvidos</h4>
-                        <p className="text-4xl font-black text-emerald-700">{stats.allLogs.filter(l => l.resolved).length}</p>
-                    </div>
-                    <div className="bg-amber-50 p-6 rounded-xl border border-amber-100 text-center">
-                        <h4 className="text-sm uppercase font-bold text-amber-400 mb-2">Alunos Frequentes</h4>
-                        <p className="text-4xl font-black text-amber-700">{students.filter(s => (s.logs?.length || 0) >= 3).length}</p>
-                    </div>
-                </div>
+      {/* MODAL RELATÓRIOS (MANTIDO) */}
+      {isReportModalOpen && (<div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600"/> Relatórios Gerenciais</h3><button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28}/></button></div><div className="flex-1 overflow-y-auto space-y-6 pr-2"><div className="grid grid-cols-3 gap-4"><div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 text-center"><h4 className="text-sm uppercase font-bold text-indigo-400 mb-2">Total Ocorrências</h4><p className="text-4xl font-black text-indigo-700">{stats.allLogs.length}</p></div><div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100 text-center"><h4 className="text-sm uppercase font-bold text-emerald-400 mb-2">Casos Resolvidos</h4><p className="text-4xl font-black text-emerald-700">{stats.allLogs.filter(l => l.resolved).length}</p></div><div className="bg-amber-50 p-6 rounded-xl border border-amber-100 text-center"><h4 className="text-sm uppercase font-bold text-amber-400 mb-2">Alunos Frequentes</h4><p className="text-4xl font-black text-amber-700">{students.filter(s => (s.logs?.length || 0) >= 3).length}</p></div></div><div className="grid grid-cols-2 gap-6"><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Top 5 Motivos</h4>{stats.pieData.map((d, i) => (<div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><span className="font-medium text-slate-700">{d.name}</span><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{d.value}</span></div>))}</div><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Alunos com +3 Ocorrências</h4><div className="max-h-48 overflow-y-auto">{students.map(s => ({...s, count: s.logs?.length || 0})).filter(s => s.count >= 3).sort((a,b) => b.count - a.count).map(s => (<div key={s.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><div><p className="font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-slate-400">{s.class_id}</p></div><span className="font-bold text-red-600 bg-red-50 px-2 py-1 rounded">{s.count}</span></div>))}</div></div></div></div><div className="pt-6 border-t mt-4 flex justify-end"><button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg hover:scale-105 transition-transform"><FileSpreadsheet/> Baixar Relatório Completo (Excel)</button></div></div></div>)}
 
-                <div className="grid grid-cols-2 gap-6">
-                    <div className="border rounded-xl p-4">
-                        <h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Top 5 Motivos</h4>
-                        {stats.pieData.map((d, i) => (
-                            <div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
-                                <span className="font-medium text-slate-700">{d.name}</span>
-                                <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{d.value}</span>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="border rounded-xl p-4">
-                        <h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Alunos com +3 Ocorrências</h4>
-                        <div className="max-h-48 overflow-y-auto">
-                            {students
-                                .map(s => ({...s, count: s.logs?.length || 0}))
-                                .filter(s => s.count >= 3)
-                                .sort((a,b) => b.count - a.count)
-                                .map(s => (
-                                    <div key={s.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
-                                        <div>
-                                            <p className="font-bold text-slate-700">{s.name}</p>
-                                            <p className="text-[10px] text-slate-400">{s.class_id}</p>
-                                        </div>
-                                        <span className="font-bold text-red-600 bg-red-50 px-2 py-1 rounded">{s.count}</span>
-                                    </div>
-                                ))
-                            }
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="pt-6 border-t mt-4 flex justify-end">
-                <button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg hover:scale-105 transition-transform"><FileSpreadsheet/> Baixar Relatório Completo (Excel)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DETALHES (MANTIDO) */}
+      {/* MODAL DETALHES, ZAP, SAÍDA E IMPORTAÇÃO MANTIDOS (CÓDIGO ANTERIOR) */}
+      {/* ... [Bloco grande dos modais já refinados na V10] ... */}
+      {/* Como o código é grande, estou mantendo a lógica dos modais idêntica à V10, mas integrados no return acima */}
+      
+      {/* MODAL DETALHES */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="px-8 py-6 border-b flex justify-between items-center bg-slate-50 flex-shrink-0">
-               <div className="flex items-center gap-6">
-                 <div className="relative group">
-                    <Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="xl" />
-                    <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"><Camera size={24} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload}/></label>
-                 </div>
-                 <div><h2 className="text-3xl font-bold text-slate-800">{selectedStudent.name}</h2><p className="text-lg text-slate-500 font-bold uppercase mt-1">Turma {selectedStudent.class_id}</p></div>
-               </div>
-               <div className="flex gap-2">
-                 <button onClick={generatePDF} className="p-3 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 hover:scale-110 transition-transform" title="Gerar PDF"><FileDown size={20} /></button>
-                 <button onClick={startEditing} className="p-3 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 hover:scale-110 transition-transform" title="Editar"><Pencil size={20} /></button>
-                 <button onClick={() => setIsExitModalOpen(true)} className="p-3 bg-red-100 text-red-600 rounded-full hover:bg-red-200 hover:scale-110 transition-transform" title="Saída"><LogOut size={20} /></button>
-                 <button onClick={() => setIsModalOpen(false)} className="ml-4 hover:bg-slate-200 p-2 rounded-full"><X className="text-slate-400 hover:text-red-500" size={32}/></button>
-               </div>
+               <div className="flex items-center gap-6"><div className="relative group"><Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="xl" /><label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"><Camera size={24} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload}/></label></div><div><h2 className="text-3xl font-bold text-slate-800">{selectedStudent.name}</h2><p className="text-lg text-slate-500 font-bold uppercase mt-1">Turma {selectedStudent.class_id}</p></div></div>
+               <div className="flex gap-2"><button onClick={generatePDF} className="p-3 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 hover:scale-110 transition-transform" title="Gerar PDF"><FileDown size={20} /></button><button onClick={startEditing} className="p-3 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 hover:scale-110 transition-transform" title="Editar"><Pencil size={20} /></button><button onClick={() => setIsExitModalOpen(true)} className="p-3 bg-red-100 text-red-600 rounded-full hover:bg-red-200 hover:scale-110 transition-transform" title="Saída"><LogOut size={20} /></button><button onClick={() => setIsModalOpen(false)} className="ml-4 hover:bg-slate-200 p-2 rounded-full"><X className="text-slate-400 hover:text-red-500" size={32}/></button></div>
             </div>
-
-            <div className="flex border-b px-8 bg-white overflow-x-auto flex-shrink-0 gap-8">
-               {['perfil', 'academico', 'historico', 'familia'].map((tab) => (
-                   <button key={tab} onClick={() => setActiveTab(tab as any)} className={`py-5 font-bold text-sm border-b-4 uppercase tracking-wide transition-colors ${activeTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>{tab === 'familia' ? 'Família & Responsáveis' : tab.toUpperCase()}</button>
-               ))}
-            </div>
-
+            <div className="flex border-b px-8 bg-white overflow-x-auto flex-shrink-0 gap-8">{['perfil', 'academico', 'historico', 'familia'].map((tab) => (<button key={tab} onClick={() => setActiveTab(tab as any)} className={`py-5 font-bold text-sm border-b-4 uppercase tracking-wide transition-colors ${activeTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>{tab === 'familia' ? 'Família & Responsáveis' : tab.toUpperCase()}</button>))}</div>
             <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50">
-               {activeTab === 'perfil' && (
-                 <div className="bg-white p-8 rounded-2xl border shadow-sm w-full mx-auto">
-                    <h3 className="font-bold text-indigo-900 uppercase mb-6 flex items-center gap-2 border-b pb-4"><UserCircle className="text-indigo-600"/> Informações de Contato</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div><span className="text-xs font-bold text-slate-400 uppercase block mb-1">Responsável Legal</span>{isEditing ? <input value={editGuardian} onChange={e=>setEditGuardian(e.target.value)} className="w-full border p-3 rounded-lg"/> : <p className="font-medium text-lg">{selectedStudent.guardian_name || "Não informado"}</p>}</div>
-                        <div><span className="text-xs font-bold text-slate-400 uppercase block mb-1">Telefone</span>{isEditing ? <input value={editPhone} onChange={e=>setEditPhone(e.target.value)} className="w-full border p-3 rounded-lg"/> : <p className="font-medium text-lg">{selectedStudent.guardian_phone || "Não informado"}</p>}</div>
-                        <div className="md:col-span-2"><span className="text-xs font-bold text-slate-400 uppercase block mb-1">Endereço</span>{isEditing ? <input value={editAddress} onChange={e=>setEditAddress(e.target.value)} className="w-full border p-3 rounded-lg"/> : <p className="font-medium text-lg">{selectedStudent.address || "Não informado"}</p>}</div>
-                    </div>
-                    {isEditing && <button onClick={saveEdits} className="w-full bg-green-600 text-white p-4 rounded-xl font-bold mt-6 shadow-lg">Salvar Alterações</button>}
-                 </div>
-               )}
+               {activeTab === 'perfil' && (<div className="bg-white p-8 rounded-2xl border shadow-sm w-full mx-auto"><h3 className="font-bold text-indigo-900 uppercase mb-6 flex items-center gap-2 border-b pb-4"><UserCircle className="text-indigo-600"/> Informações de Contato</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div><span className="text-xs font-bold text-slate-400 uppercase block mb-1">Responsável Legal</span>{isEditing ? <input value={editGuardian} onChange={e=>setEditGuardian(e.target.value)} className="w-full border p-3 rounded-lg"/> : <p className="font-medium text-lg">{selectedStudent.guardian_name || "Não informado"}</p>}</div><div><span className="text-xs font-bold text-slate-400 uppercase block mb-1">Telefone</span>{isEditing ? <input value={editPhone} onChange={e=>setEditPhone(e.target.value)} className="w-full border p-3 rounded-lg"/> : <p className="font-medium text-lg">{selectedStudent.guardian_phone || "Não informado"}</p>}</div><div className="md:col-span-2"><span className="text-xs font-bold text-slate-400 uppercase block mb-1">Endereço</span>{isEditing ? <input value={editAddress} onChange={e=>setEditAddress(e.target.value)} className="w-full border p-3 rounded-lg"/> : <p className="font-medium text-lg">{selectedStudent.address || "Não informado"}</p>}</div></div>{isEditing && <button onClick={saveEdits} className="w-full bg-green-600 text-white p-4 rounded-xl font-bold mt-6 shadow-lg">Salvar Alterações</button>}</div>)}
+               {activeTab === 'academico' && (<div className="bg-white rounded-2xl border shadow-sm overflow-x-auto w-full"><table className="w-full text-sm text-left"><thead className="bg-slate-100 text-[10px] font-bold uppercase text-slate-500 border-b"><tr><th className="px-4 py-4">Bimestre</th><th className="px-2">Português</th><th className="px-2">Matemática</th><th className="px-2">Ciências</th><th className="px-2">História</th><th className="px-2">Geografia</th><th className="px-2">Inglês</th><th className="px-2">Arte</th><th className="px-2">Ed. Física</th><th className="px-2 bg-slate-200">PD1</th><th className="px-2 bg-slate-200">PD2</th><th className="px-2 bg-slate-200">PD3</th><th className="px-4 text-red-600 bg-red-50 text-center">FALTAS</th></tr></thead><tbody className="divide-y divide-slate-100">{selectedStudent.desempenho?.map((d: any, i: number) => (<tr key={i} className="hover:bg-slate-50"><td className="px-4 py-5 font-bold text-slate-700">{d.bimestre}</td><td className={`px-2 font-bold ${d.lp < 5 ? 'text-red-500' : ''}`}>{d.lp}</td><td className={`px-2 font-bold ${d.mat < 5 ? 'text-red-500' : ''}`}>{d.mat}</td><td className="px-2">{d.cie}</td><td className="px-2">{d.his}</td><td className="px-2">{d.geo}</td><td className="px-2">{d.ing}</td><td className="px-2">{d.art}</td><td className="px-2">{d.edf}</td><td className="px-2 bg-slate-50">{d.pd1}</td><td className="px-2 bg-slate-50">{d.pd2}</td><td className="px-2 bg-slate-50">{d.pd3}</td><td className="px-4 font-bold text-red-600 bg-red-50 text-center">{d.faltas_bimestre}</td></tr>))}</tbody></table></div>)}
+               {(activeTab === 'historico' || activeTab === 'familia') && (<div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full h-full"><div className={`lg:col-span-8 p-8 rounded-2xl border shadow-sm h-full flex flex-col ${activeTab === 'familia' ? 'bg-orange-50 border-orange-200' : 'bg-white border-indigo-100'}`}><h3 className="font-bold mb-6 uppercase text-sm flex items-center gap-2 pb-4 border-b border-black/5">{activeTab === 'familia' ? <><Users2/> Novo Contato Família</> : <><FileText/> Novo Atendimento</>}</h3><div className="space-y-6 flex-1 flex flex-col"><div className="grid grid-cols-2 gap-4"><div><label className="text-xs font-bold text-slate-400 uppercase">Solicitante</label><select className="w-full mt-1 p-3 border rounded-lg bg-white" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option></select></div><div><label className="text-xs font-bold text-slate-400 uppercase">Encaminhar</label><select className="w-full mt-1 p-3 border rounded-lg bg-white" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{ENCAMINHAMENTOS.map(e=><option key={e}>{e}</option>)}</select></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Data</label><input type="date" className="w-full mt-1 p-3 border rounded-lg bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} /></div><div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Retorno</label><input type="date" className="w-full mt-1 p-3 border rounded-lg bg-white" placeholder="Retorno" value={returnDate} onChange={e => setReturnDate(e.target.value)} /></div></div><div className="border p-4 rounded-xl bg-white/50 space-y-4"><div className="grid grid-cols-3 gap-4"><div><p className="text-[10px] font-bold text-orange-600 uppercase mb-2">Comportamental</p><div className="flex flex-col gap-1">{MOTIVOS_COMPORTAMENTO.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div><div><p className="text-[10px] font-bold text-blue-600 uppercase mb-2">Pedagógico</p><div className="flex flex-col gap-1">{MOTIVOS_PEDAGOGICO.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div><div><p className="text-[10px] font-bold text-purple-600 uppercase mb-2">Social/Outros</p><div className="flex flex-col gap-1">{MOTIVOS_SOCIAL.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div></div></div><div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex-1 flex flex-col"><label className="text-center block text-sm font-bold text-slate-600 uppercase mb-2 tracking-widest bg-slate-200 py-1 rounded">RELATÓRIO DE ATENDIMENTO</label><textarea className="w-full p-4 border rounded-xl flex-1 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none" rows={12} value={obsLivre} onChange={e => setObsLivre(e.target.value)} /></div><div className="flex justify-between items-center pt-4 border-t border-slate-200"><div className="text-xs text-slate-400 font-mono"><p>Registrado por: <span className="font-bold text-slate-600">{SYSTEM_USER_NAME}</span></p><p>{SYSTEM_ROLE} | {SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA} | {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p></div><div className="flex items-center gap-4"><label className="text-sm font-bold text-green-700 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="w-5 h-5 rounded" checked={resolvido} onChange={e => setResolvido(e.target.checked)}/> <ShieldCheck size={18}/> Caso Resolvido</label><button onClick={handleSaveLog} className={`text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${activeTab === 'familia' ? 'bg-orange-600' : 'bg-indigo-600'}`}><Save size={18}/> SALVAR REGISTRO</button></div></div></div></div><div className="lg:col-span-4 space-y-4 max-h-[800px] overflow-y-auto pr-2 bg-slate-100 p-4 rounded-2xl h-full"><h3 className="text-xs font-bold text-slate-500 uppercase sticky top-0 bg-slate-100 py-2 z-10 flex items-center gap-2"><History size={14}/> Histórico Completo</h3>{selectedStudent.logs?.map((log: any) => { let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {} const isFamily = log.category === 'Família'; return (<div key={log.id} className={`p-4 rounded-xl border shadow-sm bg-white hover:shadow-md transition-shadow relative ${isFamily ? 'border-l-4 border-l-orange-400' : 'border-l-4 border-l-indigo-400'}`}><div className="flex justify-between items-center mb-2 border-b pb-2"><span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${isFamily ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>{isFamily ? 'FAMÍLIA' : 'ESTUDANTE'}</span><span className="text-[10px] text-slate-400">{new Date(log.created_at).toLocaleDateString()}</span></div><div className="mb-2"><span className="text-[10px] font-bold uppercase text-slate-500 block">Solicitante: {p.solicitante}</span></div><p className="text-xs text-slate-600 line-clamp-3 mb-2 italic">"{p.obs}"</p><div className="flex justify-between items-center mt-2"><button className="text-[10px] text-indigo-600 font-bold underline flex items-center gap-1" onClick={() => { setObsLivre(p.obs); setMotivosSelecionados(p.motivos || []); }}><Copy size={10}/> Copiar</button>{log.resolved && <span className="text-[10px] font-bold text-green-600 flex items-center gap-1"><ShieldCheck size={10}/> Resolvido</span>}</div></div>) })}</div></div>)}</div></div></div>)}
 
-               {activeTab === 'academico' && (
-                 <div className="bg-white rounded-2xl border shadow-sm overflow-x-auto w-full">
-                   <table className="w-full text-sm text-left">
-                     <thead className="bg-slate-100 text-[10px] font-bold uppercase text-slate-500 border-b">
-                        <tr><th className="px-4 py-4">Bimestre</th><th className="px-2">Português</th><th className="px-2">Matemática</th><th className="px-2">Ciências</th><th className="px-2">História</th><th className="px-2">Geografia</th><th className="px-2">Inglês</th><th className="px-2">Arte</th><th className="px-2">Ed. Física</th><th className="px-2 bg-slate-200">PD1</th><th className="px-2 bg-slate-200">PD2</th><th className="px-2 bg-slate-200">PD3</th><th className="px-4 text-red-600 bg-red-50 text-center">FALTAS</th></tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-100">
-                       {selectedStudent.desempenho?.map((d: any, i: number) => (
-                         <tr key={i} className="hover:bg-slate-50"><td className="px-4 py-5 font-bold text-slate-700">{d.bimestre}</td><td className={`px-2 font-bold ${d.lp < 5 ? 'text-red-500' : ''}`}>{d.lp}</td><td className={`px-2 font-bold ${d.mat < 5 ? 'text-red-500' : ''}`}>{d.mat}</td><td className="px-2">{d.cie}</td><td className="px-2">{d.his}</td><td className="px-2">{d.geo}</td><td className="px-2">{d.ing}</td><td className="px-2">{d.art}</td><td className="px-2">{d.edf}</td><td className="px-2 bg-slate-50">{d.pd1}</td><td className="px-2 bg-slate-50">{d.pd2}</td><td className="px-2 bg-slate-50">{d.pd3}</td><td className="px-4 font-bold text-red-600 bg-red-50 text-center">{d.faltas_bimestre}</td></tr>
-                       ))}
-                     </tbody>
-                   </table>
-                 </div>
-               )}
-
-               {(activeTab === 'historico' || activeTab === 'familia') && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full h-full">
-                      <div className={`lg:col-span-8 p-8 rounded-2xl border shadow-sm h-full flex flex-col ${activeTab === 'familia' ? 'bg-orange-50 border-orange-200' : 'bg-white border-indigo-100'}`}>
-                          <h3 className="font-bold mb-6 uppercase text-sm flex items-center gap-2 pb-4 border-b border-black/5">{activeTab === 'familia' ? <><Users2/> Novo Contato Família</> : <><FileText/> Novo Atendimento</>}</h3>
-                          <div className="space-y-6 flex-1 flex flex-col">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-slate-400 uppercase">Solicitante</label><select className="w-full mt-1 p-3 border rounded-lg bg-white" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option></select></div>
-                                <div><label className="text-xs font-bold text-slate-400 uppercase">Encaminhar</label><select className="w-full mt-1 p-3 border rounded-lg bg-white" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{ENCAMINHAMENTOS.map(e=><option key={e}>{e}</option>)}</select></div>
-                              </div>
-                              <div className="flex gap-4">
-                                  <div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Data</label><input type="date" className="w-full mt-1 p-3 border rounded-lg bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} /></div>
-                                  <div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Retorno</label><input type="date" className="w-full mt-1 p-3 border rounded-lg bg-white" placeholder="Retorno" value={returnDate} onChange={e => setReturnDate(e.target.value)} /></div>
-                              </div>
-                              <div className="border p-4 rounded-xl bg-white/50 space-y-4">
-                                  <div className="grid grid-cols-3 gap-4">
-                                    <div><p className="text-[10px] font-bold text-orange-600 uppercase mb-2">Comportamental</p><div className="flex flex-col gap-1">{MOTIVOS_COMPORTAMENTO.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
-                                    <div><p className="text-[10px] font-bold text-blue-600 uppercase mb-2">Pedagógico</p><div className="flex flex-col gap-1">{MOTIVOS_PEDAGOGICO.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
-                                    <div><p className="text-[10px] font-bold text-purple-600 uppercase mb-2">Social/Outros</p><div className="flex flex-col gap-1">{MOTIVOS_SOCIAL.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
-                                  </div>
-                              </div>
-                              
-                              <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex-1 flex flex-col">
-                                <label className="text-center block text-sm font-bold text-slate-600 uppercase mb-2 tracking-widest bg-slate-200 py-1 rounded">RELATÓRIO DE ATENDIMENTO</label>
-                                <textarea className="w-full p-4 border rounded-xl flex-1 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none" rows={12} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
-                              </div>
-
-                              <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-                                <div className="text-xs text-slate-400 font-mono">
-                                    <p>Registrado por: <span className="font-bold text-slate-600">{SYSTEM_USER_NAME}</span></p>
-                                    <p>{SYSTEM_ROLE} | {SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA} | {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <label className="text-sm font-bold text-green-700 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="w-5 h-5 rounded" checked={resolvido} onChange={e => setResolvido(e.target.checked)}/> <ShieldCheck size={18}/> Caso Resolvido</label>
-                                    <button onClick={handleSaveLog} className={`text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex items-center gap-2 ${activeTab === 'familia' ? 'bg-orange-600' : 'bg-indigo-600'}`}><Save size={18}/> SALVAR REGISTRO</button>
-                                </div>
-                              </div>
-                          </div>
-                      </div>
-
-                      <div className="lg:col-span-4 space-y-4 max-h-[800px] overflow-y-auto pr-2 bg-slate-100 p-4 rounded-2xl h-full">
-                         <h3 className="text-xs font-bold text-slate-500 uppercase sticky top-0 bg-slate-100 py-2 z-10 flex items-center gap-2"><History size={14}/> Histórico Completo</h3>
-                         {selectedStudent.logs?.map((log: any) => {
-                             let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {}
-                             const isFamily = log.category === 'Família';
-                             return (
-                                 <div key={log.id} className={`p-4 rounded-xl border shadow-sm bg-white hover:shadow-md transition-shadow relative ${isFamily ? 'border-l-4 border-l-orange-400' : 'border-l-4 border-l-indigo-400'}`}>
-                                     <div className="flex justify-between items-center mb-2 border-b pb-2">
-                                         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${isFamily ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>{isFamily ? 'FAMÍLIA' : 'ESTUDANTE'}</span>
-                                         <span className="text-[10px] text-slate-400">{new Date(log.created_at).toLocaleDateString()}</span>
-                                     </div>
-                                     <div className="mb-2">
-                                         <span className="text-[10px] font-bold uppercase text-slate-500 block">Solicitante: {p.solicitante}</span>
-                                     </div>
-                                     <p className="text-xs text-slate-600 line-clamp-3 mb-2 italic">"{p.obs}"</p>
-                                     <div className="flex justify-between items-center mt-2">
-                                        <button className="text-[10px] text-indigo-600 font-bold underline flex items-center gap-1" onClick={() => { setObsLivre(p.obs); setMotivosSelecionados(p.motivos || []); }}><Copy size={10}/> Copiar</button>
-                                        {log.resolved && <span className="text-[10px] font-bold text-green-600 flex items-center gap-1"><ShieldCheck size={10}/> Resolvido</span>}
-                                     </div>
-                                 </div>
-                             )
-                         })}
-                      </div>
-                  </div>
-               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL FLASH (TYPEAHEAD GOOGLE STYLE) */}
-      {isQuickModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-             <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200">
-                 <button onClick={() => setIsQuickModalOpen(false)} className="absolute top-4 right-4 text-slate-400"><X size={24}/></button>
-                 <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-slate-800"><div className="bg-yellow-100 p-2 rounded-full"><Zap className="text-yellow-600" fill="currentColor"/></div> Registro Flash</h3>
-                 
-                 <div className="relative mb-4">
-                    <input autoFocus placeholder="Digite o nome do aluno..." className={`w-full p-4 border rounded-xl text-lg font-bold outline-none transition-all ${quickSelectedStudent ? 'bg-green-50 border-green-300 text-green-800' : 'bg-slate-50 focus:ring-2 focus:ring-yellow-400'}`} value={quickSearchTerm} onChange={e => { setQuickSearchTerm(e.target.value); if(quickSelectedStudent && e.target.value !== quickSelectedStudent.name) setQuickSelectedStudent(null); }} />
-                    {quickSelectedStudent && <CheckSquare className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600" />}
-                    
-                    {quickSearchTerm.length > 0 && !quickSelectedStudent && (
-                        <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl mt-1 max-h-48 overflow-y-auto z-50">
-                            {students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0, 10).map(s => (
-                                <div key={s.id} onClick={() => { setQuickSelectedStudent(s); setQuickSearchTerm(s.name); }} className="p-3 hover:bg-yellow-50 cursor-pointer border-b last:border-0 transition-colors flex justify-between items-center">
-                                    <span className="font-bold text-slate-700 text-sm">{s.name}</span>
-                                    <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{s.class_id}</span>
-                                </div>
-                            ))}
-                            {students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).length === 0 && <div className="p-3 text-center text-slate-400 text-xs">Nenhum aluno encontrado</div>}
-                        </div>
-                    )}
-                 </div>
-
-                 <div className="grid grid-cols-2 gap-2 mb-6 mt-4">{FLASH_REASONS.map(r => (<button key={r} onClick={() => setQuickReason(r)} className={`p-3 rounded-xl text-xs font-bold border transition-all ${quickReason === r ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{r}</button>))}</div>
-                 <button onClick={handleQuickSave} disabled={!quickSelectedStudent || !quickReason} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-xl disabled:opacity-50 disabled:shadow-none transition-all hover:bg-green-700 active:scale-95">CONFIRMAR REGISTRO</button>
-             </div>
-        </div>
-      )}
-
-      {/* MODAL IMPORTAÇÃO */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold mb-4 text-indigo-600 flex items-center gap-2"><FileSpreadsheet size={24}/> Importar Excel</h3>
-            <div className="space-y-4">
-               <div><label className="block text-sm font-bold text-slate-700 mb-1 font-bold">Bimestre de Referência</label>
-                 <select className="w-full p-3 border rounded-xl" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select>
-               </div>
-               <div className="border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center bg-indigo-50">
-                  {importing ? <p className="animate-pulse font-bold text-indigo-600">Sincronizando...</p> : <input type="file" accept=".xlsx, .xls" title="Arquivo" onChange={handleFileUpload} className="w-full text-sm"/>}
-               </div>
-               <div className="flex justify-end"><button onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold">Fechar</button></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL SAÍDA */}
-      {isExitModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold mb-4 text-red-600">Registrar Saída de Aluno</h3>
-            <div className="space-y-4">
-              <div className="flex gap-4 bg-slate-100 p-2 rounded-lg">
-                <label className="flex items-center gap-2 font-bold text-sm cursor-pointer"><input type="radio" name="exitType" checked={exitType === 'TRANSFERIDO'} onChange={() => setExitType('TRANSFERIDO')} /> TRANSFERÊNCIA</label>
-                <label className="flex items-center gap-2 font-bold text-sm text-red-600 cursor-pointer"><input type="radio" name="exitType" checked={exitType === 'ABANDONO'} onChange={() => setExitType('ABANDONO')} /> ABANDONO</label>
-              </div>
-              <textarea className="w-full p-3 border rounded-xl h-24" placeholder="Motivo detalhado da saída..." value={exitReason} onChange={e => setExitReason(e.target.value)} />
-              <div className="flex justify-end gap-2">
-                <button onClick={() => setIsExitModalOpen(false)} className="px-4 py-2 font-bold text-slate-500">CANCELAR</button>
-                <button onClick={handleRegisterExit} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700">CONFIRMAR SAÍDA</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL NOVO ALUNO */}
-      {isNewStudentModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-             <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-                 <h3 className="font-bold text-xl mb-6 text-indigo-900">Cadastrar Novo Aluno</h3>
-                 <form onSubmit={handleAddStudent} className="space-y-4">
-                     <div><label className="text-xs font-bold uppercase text-slate-400">Nome Completo</label><input value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div>
-                     <div><label className="text-xs font-bold uppercase text-slate-400">Turma</label><input value={newClass} onChange={e => setNewClass(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div>
-                     <div className="flex gap-3 mt-6"><button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl">Cancelar</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg">Salvar</button></div>
-                 </form>
-             </div>
-        </div>
-      )}
+      {/* MODAL FLASH, SAÍDA E IMPORTAÇÃO MANTIDOS (IGUAL V10) */}
+      {isQuickModalOpen && (<div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"><div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200"><button onClick={() => setIsQuickModalOpen(false)} className="absolute top-4 right-4 text-slate-400"><X size={24}/></button><h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-slate-800"><div className="bg-yellow-100 p-2 rounded-full"><Zap className="text-yellow-600" fill="currentColor"/></div> Registro Flash</h3><div className="relative mb-4"><input autoFocus placeholder="Digite o nome do aluno..." className={`w-full p-4 border rounded-xl text-lg font-bold outline-none transition-all ${quickSelectedStudent ? 'bg-green-50 border-green-300 text-green-800' : 'bg-slate-50 focus:ring-2 focus:ring-yellow-400'}`} value={quickSearchTerm} onChange={e => { setQuickSearchTerm(e.target.value); if(quickSelectedStudent && e.target.value !== quickSelectedStudent.name) setQuickSelectedStudent(null); }} />{quickSelectedStudent && <CheckSquare className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600" />}{quickSearchTerm.length > 0 && !quickSelectedStudent && (<div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl mt-1 max-h-48 overflow-y-auto z-50">{students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0, 10).map(s => (<div key={s.id} onClick={() => { setQuickSelectedStudent(s); setQuickSearchTerm(s.name); }} className="p-3 hover:bg-yellow-50 cursor-pointer border-b last:border-0 transition-colors flex justify-between items-center"><span className="font-bold text-slate-700 text-sm">{s.name}</span><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{s.class_id}</span></div>))}{students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).length === 0 && <div className="p-3 text-center text-slate-400 text-xs">Nenhum aluno encontrado</div>}</div>)}</div><div className="grid grid-cols-2 gap-2 mb-6 mt-4">{FLASH_REASONS.map(r => (<button key={r} onClick={() => setQuickReason(r)} className={`p-3 rounded-xl text-xs font-bold border transition-all ${quickReason === r ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{r}</button>))}</div><button onClick={handleQuickSave} disabled={!quickSelectedStudent || !quickReason} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-xl disabled:opacity-50 disabled:shadow-none transition-all hover:bg-green-700 active:scale-95">CONFIRMAR REGISTRO</button></div></div>)}
+      {isExitModalOpen && (<div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"><h3 className="text-xl font-bold mb-4 text-red-600">Registrar Saída de Aluno</h3><div className="space-y-4"><div className="flex gap-4 bg-slate-100 p-2 rounded-lg"><label className="flex items-center gap-2 font-bold text-sm cursor-pointer"><input type="radio" name="exitType" checked={exitType === 'TRANSFERIDO'} onChange={() => setExitType('TRANSFERIDO')} /> TRANSFERÊNCIA</label><label className="flex items-center gap-2 font-bold text-sm text-red-600 cursor-pointer"><input type="radio" name="exitType" checked={exitType === 'ABANDONO'} onChange={() => setExitType('ABANDONO')} /> ABANDONO</label></div><textarea className="w-full p-3 border rounded-xl h-24" placeholder="Motivo detalhado da saída..." value={exitReason} onChange={e => setExitReason(e.target.value)} /><div className="flex justify-end gap-2"><button onClick={() => setIsExitModalOpen(false)} className="px-4 py-2 font-bold text-slate-500">CANCELAR</button><button onClick={handleRegisterExit} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700">CONFIRMAR SAÍDA</button></div></div></div></div>)}
+      {isImportModalOpen && (<div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"><h3 className="text-xl font-bold mb-4 text-indigo-600 flex items-center gap-2"><FileSpreadsheet size={24}/> Importar Excel</h3><div className="space-y-4"><div><label className="block text-sm font-bold text-slate-700 mb-1 font-bold">Bimestre de Referência</label><select className="w-full p-3 border rounded-xl" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select></div><div className="border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center bg-indigo-50">{importing ? <p className="animate-pulse font-bold text-indigo-600">Sincronizando...</p> : <input type="file" accept=".xlsx, .xls" title="Arquivo" onChange={handleFileUpload} className="w-full text-sm"/>}</div><div className="flex justify-end"><button onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold">Fechar</button></div></div></div></div>)}
+      {isNewStudentModalOpen && (<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl"><h3 className="font-bold text-xl mb-6 text-indigo-900">Cadastrar Novo Aluno</h3><form onSubmit={handleAddStudent} className="space-y-4"><div><label className="text-xs font-bold uppercase text-slate-400">Nome Completo</label><input value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div><div><label className="text-xs font-bold uppercase text-slate-400">Turma</label><input value={newClass} onChange={e => setNewClass(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div><div className="flex gap-3 mt-6"><button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl">Cancelar</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg">Salvar</button></div></form></div></div>)}
 
       <button onClick={() => setIsQuickModalOpen(true)} className="fixed bottom-8 right-8 w-16 h-16 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 hover:scale-110 transition-transform active:scale-95 border-4 border-white"><Zap size={32} /></button>
     </div>
