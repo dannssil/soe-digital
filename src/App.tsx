@@ -23,8 +23,9 @@ const supabaseKey = "sb_publishable_oJqCCMfnBlbQWGMP4Wj3rQ_YqogatOo";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // --- CONFIGURAÇÕES ---
-const SYSTEM_USER_NAME = "Daniel Alves";
+const SYSTEM_USER_NAME = "Daniel Alves da Silva";
 const SYSTEM_ROLE = "Orientador Educacional - SOE";
+const SYSTEM_MATRICULA = "212.235-9";
 const ACCESS_PASSWORD = "Ced@1rf1";
 const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
@@ -302,14 +303,14 @@ export default function App() {
         columnStyles: { 2: { cellWidth: 100 } } 
     });
 
-    // RODAPÉ DO PDF (ASSINATURA AUTOMÁTICA)
+    // RODAPÉ COM ASSINATURA E MATRÍCULA
     const pageHeight = doc.internal.pageSize.height;
     doc.line(60, pageHeight - 30, 150, pageHeight - 30);
     doc.setFont("helvetica", "bold");
     doc.text(`${SYSTEM_USER_NAME}`, 105, pageHeight - 25, { align: "center" });
     doc.setFont("helvetica", "normal"); doc.setFontSize(8);
     const timeNow = new Date().toLocaleString('pt-BR');
-    doc.text(`${SYSTEM_ROLE} | ${timeNow}`, 105, pageHeight - 20, { align: "center" });
+    doc.text(`${SYSTEM_ROLE} | Matrícula: ${SYSTEM_MATRICULA} | ${timeNow}`, 105, pageHeight - 20, { align: "center" });
 
     doc.save(`Ficha_${selectedStudent.name}.pdf`); 
   }; 
@@ -322,10 +323,10 @@ export default function App() {
     return (
       <div className="space-y-8 pb-20 w-full max-w-[1600px] mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Alunos</p><h3 className="text-4xl font-black text-indigo-600">{students.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Em Alerta</p><h3 className="text-4xl font-black text-red-500">{studentsInRisk.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Turmas</p><h3 className="text-4xl font-black text-emerald-500">{turmas.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Atendimentos</p><h3 className="text-4xl font-black text-amber-500">{students.flatMap(s=>s.logs||[]).length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Alunos</p><h3 className="text-3xl font-black text-indigo-600">{students.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Em Alerta</p><h3 className="text-3xl font-black text-red-500">{studentsInRisk.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Turmas</p><h3 className="text-3xl font-black text-emerald-500">{turmas.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Atendimentos</p><h3 className="text-3xl font-black text-amber-500">{students.flatMap(s=>s.logs||[]).length}</h3></div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -339,6 +340,7 @@ export default function App() {
                     <PieChart>
                         <Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie>
                         <Tooltip />
+                        {/* AUMENTO DE FONTE E AJUSTE DE MARGEM */}
                         <Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                     </PieChart>
                 </ResponsiveContainer>
@@ -386,11 +388,11 @@ export default function App() {
   };
 
   if (!isAuthenticated) return (
-    <div className="h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
-        <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><Lock className="text-indigo-600" size={32} /></div>
+    <div className="h-screen bg-slate-900 flex items-center justify-center p-4 animate-in fade-in duration-1000">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center animate-in zoom-in duration-500">
+        <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce"><Lock className="text-indigo-600" size={32} /></div>
         <h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso SOE</h1>
-        <form onSubmit={handleLogin} className="space-y-4"><input type="password" className="w-full p-3 border rounded-xl text-center" placeholder="Senha" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} /><button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700">Entrar</button></form>
+        <form onSubmit={handleLogin} className="space-y-4"><input type="password" className="w-full p-3 border rounded-xl text-center focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="Senha" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} /><button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 hover:scale-105 transition-transform">Entrar</button></form>
       </div>
     </div>
   );
