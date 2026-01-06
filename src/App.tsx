@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2
 } from 'lucide-react';
 
 // ==============================================================================
@@ -96,6 +96,7 @@ export default function App() {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [isQuickModalOpen, setIsQuickModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false); // NOVO
   const [importing, setImporting] = useState(false);
   
   // Tabs & Forms
@@ -195,7 +196,7 @@ export default function App() {
         } catch (e) {} 
     });
     const pieData = Object.keys(motivoCount).map(key => ({ name: key, value: motivoCount[key] })).sort((a,b) => b.value - a.value).slice(0, 5);
-    return { last7Days, pieData };
+    return { last7Days, pieData, allLogs };
   }, [students]);
 
   // --- AÇÕES ---
@@ -256,34 +257,59 @@ export default function App() {
     reader.readAsBinaryString(file); 
   }
 
-  // --- FUNÇÃO AUXILIAR PARA IMPRESSÃO ---
+  // --- NOVA FUNÇÃO: EXCEL GERENCIAL ---
+  const handleExportReport = () => {
+    const wb = XLSX.utils.book_new();
+    
+    // 1. Aba Resumo
+    const summaryData = [
+        ["Métrica", "Valor"],
+        ["Total Alunos", students.length],
+        ["Total Atendimentos", stats.allLogs.length],
+        ["Atendimentos Resolvidos", stats.allLogs.filter(l => l.resolved).length],
+        ["Taxa Resolução", `${Math.round((stats.allLogs.filter(l => l.resolved).length / stats.allLogs.length) * 100) || 0}%`],
+        ["Alunos em Risco", students.filter(s => checkRisk(s).reprovadoFalta || checkRisk(s).criticoNotas).length]
+    ];
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo");
+
+    // 2. Aba Ranking Motivos
+    const motivesData = [["Motivo", "Ocorrências"]];
+    stats.pieData.forEach(d => motivesData.push([d.name, d.value]));
+    const wsMotives = XLSX.utils.aoa_to_sheet(motivesData);
+    XLSX.utils.book_append_sheet(wb, wsMotives, "Motivos");
+
+    // 3. Aba Alunos Frequentes
+    const studentsData = [["Nome", "Turma", "Total Atendimentos", "Situação"]];
+    students
+        .map(s => ({...s, count: s.logs?.length || 0}))
+        .filter(s => s.count > 0)
+        .sort((a,b) => b.count - a.count)
+        .forEach(s => {
+            studentsData.push([s.name, s.class_id, s.count, checkRisk(s).reprovadoFalta ? "Risco Faltas" : "Normal"]);
+        });
+    const wsStudents = XLSX.utils.aoa_to_sheet(studentsData);
+    XLSX.utils.book_append_sheet(wb, wsStudents, "Alunos Recorrentes");
+
+    XLSX.writeFile(wb, `Relatorio_Gerencial_SOE_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const printStudentData = (doc: jsPDF, student: any) => {
-    // Cabeçalho
     doc.setFontSize(14); doc.setFont("helvetica", "bold");
     doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
     doc.setFontSize(12);
     doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" });
     doc.setLineWidth(0.5); doc.line(14, 25, 196, 25);
 
-    // Dados
     doc.setFontSize(10); doc.setFont("helvetica", "normal");
     doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${student.name}`, 35, 35);
     doc.setFont("helvetica", "normal"); doc.text(`Turma: ${student.class_id}`, 160, 35);
     doc.text(`Responsável:`, 14, 43); doc.text(`${student.guardian_name || 'Não informado'}`, 40, 43);
     doc.text(`Telefone:`, 14, 50); doc.text(`${student.guardian_phone || '-'}`, 40, 50);
     
-    // Tabela Notas
     doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60);
     const acadData = student.desempenho?.map((d:any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || [];
-    
-    autoTable(doc, { 
-        startY: 65, 
-        head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], 
-        body: acadData, 
-        theme: 'grid', 
-        headStyles: { fillColor: [79, 70, 229], fontSize: 8, halign: 'center' },
-        styles: { fontSize: 8, halign: 'center' } 
-    });
+    autoTable(doc, { startY: 65, head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], body: acadData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 8, halign: 'center' }, styles: { fontSize: 8, halign: 'center' } });
     
     const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85;
     doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY);
@@ -295,15 +321,7 @@ export default function App() {
         return [new Date(l.created_at).toLocaleDateString('pt-BR'), l.category, conteudo, l.resolved ? 'Resolvido' : 'Pendente'];
     }) || [];
 
-    autoTable(doc, { 
-        startY: finalY + 5, 
-        head: [['Data', 'Tipo', 'Detalhes do Atendimento', 'Status']], 
-        body: logsData, 
-        theme: 'grid', 
-        headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, 
-        styles: { fontSize: 9, cellPadding: 3 }, 
-        columnStyles: { 2: { cellWidth: 100 } } 
-    });
+    autoTable(doc, { startY: finalY + 5, head: [['Data', 'Tipo', 'Detalhes do Atendimento', 'Status']], body: logsData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 2: { cellWidth: 100 } } });
 
     const pageHeight = doc.internal.pageSize.height;
     doc.line(60, pageHeight - 35, 150, pageHeight - 35);
@@ -323,14 +341,11 @@ export default function App() {
     doc.save(`Ficha_${selectedStudent.name}.pdf`); 
   }; 
 
-  // --- NOVA FUNÇÃO: IMPRESSÃO EM LOTE ---
   const generateBatchPDF = (classId: string, e?: React.MouseEvent) => {
     if(e) e.stopPropagation();
     const classStudents = students.filter(s => s.class_id === classId);
     if (classStudents.length === 0) return alert("Turma vazia.");
-    
     if(!window.confirm(`Deseja gerar um arquivo com TODAS as ${classStudents.length} fichas da turma ${classId}? Isso pode levar alguns segundos.`)) return;
-
     const doc = new jsPDF();
     classStudents.forEach((student, index) => {
         if (index > 0) doc.addPage();
@@ -383,7 +398,7 @@ export default function App() {
             </div>
             
             <div className="lg:col-span-2 bg-white rounded-2xl border border-indigo-100 shadow-sm flex flex-col overflow-hidden">
-                <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center"><h3 className="font-bold text-indigo-800 uppercase">Pastas de Turmas</h3><span className="text-[10px] text-indigo-500 bg-white px-2 py-1 rounded border border-indigo-200">Clique na impressora para baixar lote</span></div>
+                <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center"><h3 className="font-bold text-indigo-800 uppercase">Pastas de Turmas</h3><span className="text-[10px] text-indigo-500 bg-white px-2 py-1 rounded border border-indigo-200">Clique para filtrar</span></div>
                 <div className="flex-1 overflow-y-auto p-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {turmas.map(t => {
@@ -438,6 +453,8 @@ export default function App() {
         <nav className="flex-1 p-4 space-y-2">
             <button onClick={() => { setView('dashboard'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
             <button onClick={() => { setView('students'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
+            {/* BOTÃO RELATÓRIOS (NOVO) */}
+            <button onClick={() => { setIsReportModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><FileBarChart2 size={18} /> Relatórios</button>
         </nav>
         <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400">
             <p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p>
@@ -473,7 +490,71 @@ export default function App() {
         </div>
       </main>
 
-      {/* MODAL DETALHES (MANTIDO IGUAL - CÓDIGO V8) */}
+      {/* MODAL RELATÓRIOS GERENCIAIS (NOVO) */}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600"/> Relatórios Gerenciais</h3>
+                <button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28}/></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 text-center">
+                        <h4 className="text-sm uppercase font-bold text-indigo-400 mb-2">Total Ocorrências</h4>
+                        <p className="text-4xl font-black text-indigo-700">{stats.allLogs.length}</p>
+                    </div>
+                    <div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100 text-center">
+                        <h4 className="text-sm uppercase font-bold text-emerald-400 mb-2">Casos Resolvidos</h4>
+                        <p className="text-4xl font-black text-emerald-700">{stats.allLogs.filter(l => l.resolved).length}</p>
+                    </div>
+                    <div className="bg-amber-50 p-6 rounded-xl border border-amber-100 text-center">
+                        <h4 className="text-sm uppercase font-bold text-amber-400 mb-2">Alunos Frequentes</h4>
+                        <p className="text-4xl font-black text-amber-700">{students.filter(s => (s.logs?.length || 0) >= 3).length}</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                    <div className="border rounded-xl p-4">
+                        <h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Top 5 Motivos</h4>
+                        {stats.pieData.map((d, i) => (
+                            <div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
+                                <span className="font-medium text-slate-700">{d.name}</span>
+                                <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{d.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="border rounded-xl p-4">
+                        <h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Alunos com +3 Ocorrências</h4>
+                        <div className="max-h-48 overflow-y-auto">
+                            {students
+                                .map(s => ({...s, count: s.logs?.length || 0}))
+                                .filter(s => s.count >= 3)
+                                .sort((a,b) => b.count - a.count)
+                                .map(s => (
+                                    <div key={s.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
+                                        <div>
+                                            <p className="font-bold text-slate-700">{s.name}</p>
+                                            <p className="text-[10px] text-slate-400">{s.class_id}</p>
+                                        </div>
+                                        <span className="font-bold text-red-600 bg-red-50 px-2 py-1 rounded">{s.count}</span>
+                                    </div>
+                                ))
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="pt-6 border-t mt-4 flex justify-end">
+                <button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg hover:scale-105 transition-transform"><FileSpreadsheet/> Baixar Relatório Completo (Excel)</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DETALHES (MANTIDO) */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -596,7 +677,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL FLASH (MANTIDO) */}
+      {/* MODAIS SECUNDÁRIOS (ZAP, SAÍDA, IMPORTAÇÃO, ETC) MANTIDOS */}
       {isQuickModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
              <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200">
