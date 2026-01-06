@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap
 } from 'lucide-react';
 
 // ==============================================================================
@@ -22,7 +22,7 @@ const supabaseUrl = "https://zfryhzmujfaqqzybjuhb.supabase.co";
 const supabaseKey = "sb_publishable_oJqCCMfnBlbQWGMP4Wj3rQ_YqogatOo";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- CONFIGURAÇÕES ---
+// --- CONFIGURAÇÕES DO PROFISSIONAL ---
 const SYSTEM_USER_NAME = "Daniel Alves da Silva";
 const SYSTEM_ROLE = "Orientador Educacional - SOE";
 const SYSTEM_MATRICULA = "212.235-9";
@@ -35,8 +35,6 @@ const MOTIVOS_COMPORTAMENTO = ["Conversa excessiva", "Desacato", "Agressividade 
 const MOTIVOS_PEDAGOGICO = ["Sem tarefa", "Dificuldade aprend.", "Sem material", "Desatenção", "Baixo desempenho", "Faltas excessivas", "Sono em sala", "Outros"];
 const MOTIVOS_SOCIAL = ["Ansiedade", "Problemas familiares", "Isolamento", "Conflito colegas", "Saúde/Laudo", "Vulnerabilidade", "Outros"];
 const ENCAMINHAMENTOS = ["Coordenação", "Psicologia", "Família", "Direção", "Conselho Tutelar", "Sala Recursos", "Apoio Aprendizagem", "Disciplinar", "Saúde"];
-
-// LISTA FLASH RESTAURADA (12 ITENS)
 const FLASH_REASONS = [
   "Uniforme Inadequado", "Atraso / Chegada Tardia", "Uso de Celular", "Sem Material", 
   "Saída de Sala", "Conversa / Bagunça", "Conflito entre Colegas", "Sono em Sala",
@@ -351,7 +349,6 @@ export default function App() {
                     <PieChart>
                         <Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie>
                         <Tooltip />
-                        {/* AUMENTO DE FONTE E AJUSTE DE MARGEM */}
                         <Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                     </PieChart>
                 </ResponsiveContainer>
@@ -418,7 +415,7 @@ export default function App() {
             <button onClick={() => { setView('dashboard'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
             <button onClick={() => { setView('students'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
         </nav>
-        {/* RODAPÉ LATERAL COM DADOS DO PROFISSIONAL */}
+        {/* RODAPÉ LATERAL */}
         <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400">
             <p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p>
             <p>{SYSTEM_ROLE}</p>
@@ -453,7 +450,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* MODAL DETALHES COM NOVO LAYOUT DE REGISTRO */}
+      {/* MODAL DETALHES COM ASSINATURA NA TELA DO SISTEMA */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -536,7 +533,8 @@ export default function App() {
                               <div className="flex justify-between items-center pt-4 border-t border-slate-200">
                                 <div className="text-xs text-slate-400 font-mono">
                                     <p>Registrado por: <span className="font-bold text-slate-600">{SYSTEM_USER_NAME}</span></p>
-                                    <p>{SYSTEM_ROLE} | {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+                                    {/* CORREÇÃO DO RODAPÉ NA TELA DO SISTEMA */}
+                                    <p>{SYSTEM_ROLE} | {SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA} | {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <label className="text-sm font-bold text-green-700 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="w-5 h-5 rounded" checked={resolvido} onChange={e => setResolvido(e.target.checked)}/> <ShieldCheck size={18}/> Caso Resolvido</label>
@@ -583,12 +581,10 @@ export default function App() {
                  <button onClick={() => setIsQuickModalOpen(false)} className="absolute top-4 right-4 text-slate-400"><X size={24}/></button>
                  <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-slate-800"><div className="bg-yellow-100 p-2 rounded-full"><Zap className="text-yellow-600" fill="currentColor"/></div> Registro Flash</h3>
                  
-                 {/* CAMPO DE BUSCA INTELIGENTE */}
                  <div className="relative mb-4">
                     <input autoFocus placeholder="Digite o nome do aluno..." className={`w-full p-4 border rounded-xl text-lg font-bold outline-none transition-all ${quickSelectedStudent ? 'bg-green-50 border-green-300 text-green-800' : 'bg-slate-50 focus:ring-2 focus:ring-yellow-400'}`} value={quickSearchTerm} onChange={e => { setQuickSearchTerm(e.target.value); if(quickSelectedStudent && e.target.value !== quickSelectedStudent.name) setQuickSelectedStudent(null); }} />
                     {quickSelectedStudent && <CheckSquare className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600" />}
                     
-                    {/* LISTA FLUTUANTE (TYPEAHEAD) */}
                     {quickSearchTerm.length > 0 && !quickSelectedStudent && (
                         <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl mt-1 max-h-48 overflow-y-auto z-50">
                             {students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0, 10).map(s => (
