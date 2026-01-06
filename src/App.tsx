@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap
 } from 'lucide-react';
 
 // ==============================================================================
@@ -22,10 +22,11 @@ const supabaseUrl = "https://zfryhzmujfaqqzybjuhb.supabase.co";
 const supabaseKey = "sb_publishable_oJqCCMfnBlbQWGMP4Wj3rQ_YqogatOo";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- CONFIGURAÇÕES ---
+// --- CONFIGURAÇÕES DO PROFISSIONAL ---
 const SYSTEM_USER_NAME = "Daniel Alves da Silva";
 const SYSTEM_ROLE = "Orientador Educacional - SOE";
 const SYSTEM_MATRICULA = "212.235-9";
+const SYSTEM_ORG = "SEEDF";
 const ACCESS_PASSWORD = "Ced@1rf1";
 const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
@@ -303,14 +304,14 @@ export default function App() {
         columnStyles: { 2: { cellWidth: 100 } } 
     });
 
-    // RODAPÉ COM ASSINATURA E MATRÍCULA
     const pageHeight = doc.internal.pageSize.height;
     doc.line(60, pageHeight - 30, 150, pageHeight - 30);
     doc.setFont("helvetica", "bold");
     doc.text(`${SYSTEM_USER_NAME}`, 105, pageHeight - 25, { align: "center" });
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
-    const timeNow = new Date().toLocaleString('pt-BR');
-    doc.text(`${SYSTEM_ROLE} | Matrícula: ${SYSTEM_MATRICULA} | ${timeNow}`, 105, pageHeight - 20, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 20, { align: "center" });
+    doc.setFontSize(8);
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 105, pageHeight - 15, { align: "center" });
 
     doc.save(`Ficha_${selectedStudent.name}.pdf`); 
   }; 
@@ -340,7 +341,6 @@ export default function App() {
                     <PieChart>
                         <Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie>
                         <Tooltip />
-                        {/* AUMENTO DE FONTE E AJUSTE DE MARGEM */}
                         <Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                     </PieChart>
                 </ResponsiveContainer>
@@ -407,6 +407,13 @@ export default function App() {
             <button onClick={() => { setView('dashboard'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
             <button onClick={() => { setView('students'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
         </nav>
+        {/* RODAPÉ DO SISTEMA COM SEUS DADOS */}
+        <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400">
+            <p className="font-bold text-white">{SYSTEM_USER_NAME}</p>
+            <p>{SYSTEM_ROLE}</p>
+            <p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p>
+            <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white"><LogOut size={12} /> Sair</button>
+        </div>
       </aside>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden">
@@ -435,7 +442,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* MODAL DETALHES COM NOVO LAYOUT DE REGISTRO */}
+      {/* MODAL DETALHES */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -509,12 +516,10 @@ export default function App() {
                                     <div><p className="text-[10px] font-bold text-purple-600 uppercase mb-2">Social/Outros</p><div className="flex flex-col gap-1">{MOTIVOS_SOCIAL.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)}/> {m}</label>))}</div></div>
                                   </div>
                               </div>
-                              
                               <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex-1 flex flex-col">
                                 <label className="text-center block text-sm font-bold text-slate-600 uppercase mb-2 tracking-widest bg-slate-200 py-1 rounded">RELATÓRIO DE ATENDIMENTO</label>
                                 <textarea className="w-full p-4 border rounded-xl flex-1 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none" rows={12} value={obsLivre} onChange={e => setObsLivre(e.target.value)} />
                               </div>
-
                               <div className="flex justify-between items-center pt-4 border-t border-slate-200">
                                 <div className="text-xs text-slate-400 font-mono">
                                     <p>Registrado por: <span className="font-bold text-slate-600">{SYSTEM_USER_NAME}</span></p>
@@ -527,7 +532,6 @@ export default function App() {
                               </div>
                           </div>
                       </div>
-
                       <div className="lg:col-span-4 space-y-4 max-h-[800px] overflow-y-auto pr-2 bg-slate-100 p-4 rounded-2xl h-full">
                          <h3 className="text-xs font-bold text-slate-500 uppercase sticky top-0 bg-slate-100 py-2 z-10 flex items-center gap-2"><History size={14}/> Histórico Completo</h3>
                          {selectedStudent.logs?.map((log: any) => {
@@ -539,9 +543,7 @@ export default function App() {
                                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${isFamily ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>{isFamily ? 'FAMÍLIA' : 'ESTUDANTE'}</span>
                                          <span className="text-[10px] text-slate-400">{new Date(log.created_at).toLocaleDateString()}</span>
                                      </div>
-                                     <div className="mb-2">
-                                         <span className="text-[10px] font-bold uppercase text-slate-500 block">Solicitante: {p.solicitante}</span>
-                                     </div>
+                                     <div className="mb-2"><span className="text-[10px] font-bold uppercase text-slate-500 block">Solicitante: {p.solicitante}</span></div>
                                      <p className="text-xs text-slate-600 line-clamp-3 mb-2 italic">"{p.obs}"</p>
                                      <div className="flex justify-between items-center mt-2">
                                         <button className="text-[10px] text-indigo-600 font-bold underline flex items-center gap-1" onClick={() => { setObsLivre(p.obs); setMotivosSelecionados(p.motivos || []); }}><Copy size={10}/> Copiar</button>
@@ -558,26 +560,32 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAIS SECUNDÁRIOS (ZAP, SAÍDA, IMPORTAÇÃO, ETC) MANTIDOS */}
+      {/* MODAL FLASH (TYPEAHEAD GOOGLE STYLE) */}
       {isQuickModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
              <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200">
                  <button onClick={() => setIsQuickModalOpen(false)} className="absolute top-4 right-4 text-slate-400"><X size={24}/></button>
                  <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-slate-800"><div className="bg-yellow-100 p-2 rounded-full"><Zap className="text-yellow-600" fill="currentColor"/></div> Registro Flash</h3>
-                 <input autoFocus placeholder="Nome do aluno..." className="w-full p-4 border rounded-xl mb-2 bg-slate-50 font-bold text-lg" value={quickSearchTerm} onChange={e => { setQuickSearchTerm(e.target.value); setQuickSelectedStudent(null); }} />
-                 {quickSearchTerm.length > 2 && !quickSelectedStudent && (
-                    <div className="bg-white border rounded-xl shadow-xl max-h-40 overflow-y-auto mb-4 absolute w-[85%] z-10">
-                      {students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0, 5).map(s => (
-                        <div key={s.id} onClick={() => { setQuickSelectedStudent(s); setQuickSearchTerm(s.name); }} className="p-3 hover:bg-indigo-50 cursor-pointer text-sm border-b font-bold text-slate-700 hover:bg-indigo-50">{s.name} <span className="text-slate-400 font-normal">({s.class_id})</span></div>
-                      ))}
-                    </div>
-                 )}
-                 {quickSelectedStudent && (
-                    <div className="bg-green-50 p-2 rounded-lg text-center mb-4 border border-green-200">
-                        <p className="text-xs font-bold text-green-800">Aluno Selecionado:</p>
-                        <p className="text-sm font-bold text-green-900">{quickSelectedStudent.name}</p>
-                    </div>
-                 )}
+                 
+                 {/* CAMPO DE BUSCA INTELIGENTE */}
+                 <div className="relative mb-4">
+                    <input autoFocus placeholder="Digite o nome do aluno..." className={`w-full p-4 border rounded-xl text-lg font-bold outline-none transition-all ${quickSelectedStudent ? 'bg-green-50 border-green-300 text-green-800' : 'bg-slate-50 focus:ring-2 focus:ring-yellow-400'}`} value={quickSearchTerm} onChange={e => { setQuickSearchTerm(e.target.value); if(quickSelectedStudent && e.target.value !== quickSelectedStudent.name) setQuickSelectedStudent(null); }} />
+                    {quickSelectedStudent && <CheckSquare className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600" />}
+                    
+                    {/* LISTA FLUTUANTE (TYPEAHEAD) */}
+                    {quickSearchTerm.length > 0 && !quickSelectedStudent && (
+                        <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl mt-1 max-h-48 overflow-y-auto z-50">
+                            {students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0, 10).map(s => (
+                                <div key={s.id} onClick={() => { setQuickSelectedStudent(s); setQuickSearchTerm(s.name); }} className="p-3 hover:bg-yellow-50 cursor-pointer border-b last:border-0 transition-colors flex justify-between items-center">
+                                    <span className="font-bold text-slate-700 text-sm">{s.name}</span>
+                                    <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{s.class_id}</span>
+                                </div>
+                            ))}
+                            {students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).length === 0 && <div className="p-3 text-center text-slate-400 text-xs">Nenhum aluno encontrado</div>}
+                        </div>
+                    )}
+                 </div>
+
                  <div className="grid grid-cols-2 gap-2 mb-6 mt-4">{FLASH_REASONS.map(r => (<button key={r} onClick={() => setQuickReason(r)} className={`p-3 rounded-xl text-xs font-bold border transition-all ${quickReason === r ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{r}</button>))}</div>
                  <button onClick={handleQuickSave} disabled={!quickSelectedStudent || !quickReason} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-xl disabled:opacity-50 disabled:shadow-none transition-all hover:bg-green-700 active:scale-95">CONFIRMAR REGISTRO</button>
              </div>
