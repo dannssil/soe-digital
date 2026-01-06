@@ -9,7 +9,7 @@ import {
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Printer, Lock,
   GraduationCap, FileText, History, Upload, FileSpreadsheet,
   TrendingDown, AlertCircle, BarChart3, CheckSquare, MapPin, Phone, 
-  UserCircle, FileDown, CalendarDays, Download, Menu
+  UserCircle, FileDown, CalendarDays, Download, Menu, Search, Clock, Calendar
 } from 'lucide-react';
 
 // --- CONFIGURAÇÕES ---
@@ -38,7 +38,6 @@ const ENCAMINHAMENTOS = [
   "Coordenação pedagógica", "Psicologia escolar", "Família / responsáveis",
   "Direção", "Conselho Tutelar", "Sala de Recursos", "Equipe de Apoio à Aprendizagem", "Disciplinar", "Saúde"
 ];
-const OPCOES_RENDIMENTO = ["Excelente", "Bom", "Regular", "Baixo", "Crítico"];
 
 // --- INTERFACES ---
 interface Student {
@@ -63,7 +62,7 @@ interface Log {
   category: string; 
   description: string;
   referral?: string;
-  return_date?: string;
+  return_date?: string; // DATA DE RETORNO (FOLLOW-UP)
   resolved?: boolean;
 }
 
@@ -89,6 +88,11 @@ export default function App() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [adminPhoto, setAdminPhoto] = useState<string | null>(localStorage.getItem('adminPhoto'));
   
+  // -- ESTADOS GLOBAIS NOVOS --
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // -- MODAIS --
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
@@ -96,15 +100,14 @@ export default function App() {
   const [exitType, setExitType] = useState<'TRANSFERIDO' | 'ABANDONO'>('TRANSFERIDO');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  
+  // -- EDICAO --
   const [selectedBimestre, setSelectedBimestre] = useState('1º Bimestre');
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico'>('perfil');
   const [isEditing, setIsEditing] = useState(false);
-  
   const [selectedClassFilter, setSelectedClassFilter] = useState<string | null>(null);
   
-  // State para Menu Mobile
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
+  // -- STATES DE FORMULARIO --
   const [editName, setEditName] = useState('');
   const [editClass, setEditClass] = useState('');
   const [editGuardian, setEditGuardian] = useState('');
@@ -120,12 +123,14 @@ export default function App() {
   const [newPhone, setNewPhone] = useState('');   
   const [newAddress, setNewAddress] = useState(''); 
 
+  // -- ATENDIMENTO E FOLLOW-UP --
   const [solicitante, setSolicitante] = useState('Professor');
   const [motivosSelecionados, setMotivosSelecionados] = useState<string[]>([]);
   const [acoesSelecionadas, setAcoesSelecionadas] = useState<string[]>([]);
   const [encaminhamento, setEncaminhamento] = useState('');
   const [resolvido, setResolvido] = useState(false);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]); 
+  const [returnDate, setReturnDate] = useState(''); // NOVO: Data de Retorno
   
   const DEFAULT_OBS = "Relatório de Atendimento:\n\n- Relato do estudante:\n\n- Mediação realizada:\n\n- Combinados:";
   const [obsLivre, setObsLivre] = useState(DEFAULT_OBS);
@@ -137,6 +142,7 @@ export default function App() {
 
   async function fetchStudents() {
     setLoading(true);
+    // Incluímos return_date na busca
     const { data, error } = await supabase.from('students')
       .select(`*, logs(id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`)
       .eq('status', 'ATIVO').order('name'); 
@@ -159,7 +165,6 @@ export default function App() {
 
   const handleLogout = () => { if(confirm("Sair?")) { localStorage.removeItem('soe_auth'); window.location.reload(); } };
 
-  // --- EXPORTAR BACKUP ---
   const handleExportBackup = async () => {
     if(!confirm("Deseja baixar um backup completo de todos os dados?")) return;
     const { data: alunos } = await supabase.from('students').select('*');
@@ -172,7 +177,7 @@ export default function App() {
     if(logs) {
       const logsFormatados = logs.map(l => {
         let parsed = { motivos: [], obs: '' }; try { parsed = JSON.parse(l.description) } catch(e) {}
-        return { id: l.id, aluno_id: l.student_id, data: new Date(l.created_at).toLocaleDateString(), categoria: l.category, detalhes: parsed.obs, motivos: Array.isArray(parsed.motivos) ? parsed.motivos.join(', ') : '', encaminhamento: l.referral, resolvido: l.resolved ? 'SIM' : 'NÃO' };
+        return { id: l.id, aluno_id: l.student_id, data: new Date(l.created_at).toLocaleDateString(), categoria: l.category, detalhes: parsed.obs, motivos: Array.isArray(parsed.motivos) ? parsed.motivos.join(', ') : '', encaminhamento: l.referral, resolvido: l.resolved ? 'SIM' : 'NÃO', data_retorno: l.return_date ? new Date(l.return_date).toLocaleDateString() : '' };
       });
       const wsLogs = XLSX.utils.json_to_sheet(logsFormatados);
       XLSX.utils.book_append_sheet(wb, wsLogs, "Atendimentos");
@@ -220,6 +225,12 @@ export default function App() {
         doc.setFont("helvetica", "normal"); const splitObs = doc.splitTextToSize(`Relato: ${parsed.obs}`, 170); doc.text(splitObs, 20, currentY + 5);
         currentY += 10 + (splitObs.length * 4);
         if (log.referral) { doc.setFont("helvetica", "bold"); doc.setTextColor(100); doc.text(`Encaminhamento: ${log.referral}`, 20, currentY - 2); doc.setTextColor(0); }
+        // Se houver retorno agendado
+        if (log.return_date) { 
+            const dataRetorno = new Date(log.return_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+            doc.setFont("helvetica", "bold"); doc.setTextColor(220, 38, 38); 
+            doc.text(`Retorno Agendado: ${dataRetorno}`, 120, currentY - 6); doc.setTextColor(0); 
+        }
         doc.setDrawColor(200); doc.line(20, currentY, 190, currentY); currentY += 8;
       });
     } else { doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.text("Nenhum atendimento registrado.", 20, finalY + 10); }
@@ -242,8 +253,15 @@ export default function App() {
     if (selectedClassFilter) studentsInRisk = studentsInRisk.filter(s => s.class_id === selectedClassFilter);
     const turmas = [...new Set(students.map(s => s.class_id))].sort();
 
+    // FILTRO DE RETORNOS PENDENTES (FOLLOW-UP)
+    const today = new Date().toISOString().split('T')[0];
+    const pendingReturns = students.flatMap(s => s.logs || []).filter(l => l.return_date && !l.resolved).map(l => ({...l, student_name: students.find(s => s.id === (l as any).student_id)?.name || 'Aluno', student_class: students.find(s => s.id === (l as any).student_id)?.class_id }));
+    // Ordenar por data
+    const sortedReturns = pendingReturns.sort((a,b) => new Date(a.return_date!).getTime() - new Date(b.return_date!).getTime());
+
     return (
       <div className="space-y-6 h-full flex flex-col">
+        {/* CABEÇALHO DO DASHBOARD */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 flex-shrink-0">
           <div><h3 className="text-2xl font-bold">Painel de Controle SOE</h3><p className="opacity-90">Gestão Pedagógica e Disciplinar</p></div>
           <div className="flex gap-2 flex-wrap justify-center">
@@ -251,6 +269,33 @@ export default function App() {
             <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-50 flex items-center gap-2 transition-all"><Upload size={20}/> Importar Notas</button>
           </div>
         </div>
+
+        {/* NOVA SEÇÃO: ALERTA DE RETORNOS (FOLLOW-UP) */}
+        {sortedReturns.length > 0 && (
+           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3">
+             <div className="flex items-center gap-2 text-amber-800 font-bold uppercase text-sm">
+               <Clock size={18} />
+               <h3>Agendamentos de Retorno ({sortedReturns.length})</h3>
+             </div>
+             <div className="flex gap-3 overflow-x-auto pb-2">
+               {sortedReturns.map((ret, idx) => {
+                 const isLate = ret.return_date! < today;
+                 return (
+                   <div key={idx} className={`min-w-[200px] p-3 rounded-xl border shadow-sm bg-white ${isLate ? 'border-red-300' : 'border-amber-200'}`}>
+                      <div className="flex justify-between items-start mb-1">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${isLate ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {new Date(ret.return_date!).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
+                        </span>
+                        {isLate && <span className="text-[10px] text-red-600 font-bold animate-pulse">ATRASADO</span>}
+                      </div>
+                      <p className="font-bold text-slate-800 text-sm truncate">{ret.student_name}</p>
+                      <p className="text-xs text-slate-500">Turma {ret.student_class}</p>
+                   </div>
+                 )
+               })}
+             </div>
+           </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 overflow-hidden min-h-0">
           <div className="bg-white rounded-2xl border border-red-100 shadow-sm flex flex-col h-full overflow-hidden">
@@ -341,13 +386,31 @@ export default function App() {
     else { alert('Sucesso!'); setIsEditing(false); fetchStudents(); setIsModalOpen(false); }
   }
 
+  // --- FUNÇÃO DE SALVAR LOG COM FOLLOW-UP ---
   async function handleSaveLog() {
     if (!selectedStudent) return;
     const desc = JSON.stringify({ solicitante, motivos: motivosSelecionados, acoes: acoesSelecionadas, obs: obsLivre });
     const selectedDateISO = new Date(attendanceDate).toISOString();
-    const { error } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: "Atendimento SOE", description: desc, referral: encaminhamento, resolved: resolvido, created_at: selectedDateISO }]);
+    // Inclui return_date se houver
+    const { error } = await supabase.from('logs').insert([{ 
+        student_id: selectedStudent.id, 
+        category: "Atendimento SOE", 
+        description: desc, 
+        referral: encaminhamento, 
+        resolved: resolvido, 
+        created_at: selectedDateISO,
+        return_date: returnDate || null // Salva data de retorno ou null
+    }]);
     if (error) alert('Erro: ' + error.message);
-    else { alert('Salvo com sucesso!'); setMotivosSelecionados([]); setObsLivre(DEFAULT_OBS); setAttendanceDate(new Date().toISOString().split('T')[0]); fetchStudents(); setIsModalOpen(false); }
+    else { 
+        alert('Salvo com sucesso!'); 
+        setMotivosSelecionados([]); 
+        setObsLivre(DEFAULT_OBS); 
+        setAttendanceDate(new Date().toISOString().split('T')[0]); 
+        setReturnDate(''); // Limpa campo
+        fetchStudents(); 
+        setIsModalOpen(false); 
+    }
   }
 
   async function handleRegisterExit() {
@@ -472,10 +535,26 @@ export default function App() {
       </aside>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden w-full">
-        <header className="bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center shadow-sm z-10 flex-shrink-0">
-          <div className="flex items-center gap-3">
+        {/* HEADER COM BUSCA GLOBAL */}
+        <header className="bg-white border-b px-4 md:px-8 py-3 flex justify-between items-center shadow-sm z-10 flex-shrink-0 gap-4">
+          <div className="flex items-center gap-3 flex-1">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden text-slate-600"><Menu size={24}/></button>
-            <h2 className="text-lg md:text-xl font-bold text-slate-800 uppercase">{view === 'dashboard' ? 'Painel de Controle' : 'Gerenciamento'}</h2>
+            <h2 className="text-lg md:text-xl font-bold text-slate-800 uppercase hidden md:block">{view === 'dashboard' ? 'Painel de Controle' : 'Gerenciamento'}</h2>
+            
+            {/* BARRA DE BUSCA GLOBAL */}
+            <div className="flex-1 max-w-md relative">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+               <input 
+                  type="text" 
+                  placeholder="Buscar aluno em toda a escola..." 
+                  className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded-full text-sm transition-all outline-none"
+                  value={globalSearch}
+                  onChange={(e) => {
+                      setGlobalSearch(e.target.value);
+                      if(e.target.value.length > 0) setView('students'); // Força ida para a lista se digitar
+                  }}
+               />
+            </div>
           </div>
           <Avatar name={SYSTEM_USER_NAME} src={adminPhoto} />
         </header>
@@ -484,13 +563,14 @@ export default function App() {
           {view === 'dashboard' ? renderDashboard() : (
             <div className="max-w-6xl mx-auto">
               <div className="flex justify-end mb-8"><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2"><Plus size={20} /> Novo Aluno</button></div>
-              <StudentList students={students} onSelectStudent={(s) => { setSelectedStudent(s); setIsModalOpen(true); }} />
+              {/* LISTA RECEBE O TERMO DE BUSCA GLOBAL */}
+              <StudentList students={students} onSelectStudent={(s) => { setSelectedStudent(s); setIsModalOpen(true); }} searchTerm={globalSearch} onSearchChange={setGlobalSearch} />
             </div>
           )}
         </div>
       </main>
 
-      {/* MODAL DETALHES ALUNO */}
+      {/* MODAL DETALHES ALUNO (COM CAMPO DE DATA DE RETORNO) */}
       {isModalOpen && selectedStudent && (
         <div className="modal-overlay fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden">
@@ -606,9 +686,16 @@ export default function App() {
                          </div>
                        </div>
                        
-                       <div className="mb-6">
-                         <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1"><CalendarDays size={14}/> Data do Atendimento</label>
-                         <input type="date" className="w-full p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
+                       {/* DATA ATENDIMENTO E FOLLOW-UP */}
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                           <div>
+                             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1"><CalendarDays size={14}/> Data do Atendimento</label>
+                             <input type="date" className="w-full p-3 border rounded-lg text-sm bg-slate-50 focus:bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
+                           </div>
+                           <div>
+                             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1 text-indigo-600"><Clock size={14}/> Agendar Retorno (Opcional)</label>
+                             <input type="date" className="w-full p-3 border border-indigo-200 rounded-lg text-sm bg-indigo-50 focus:bg-white focus:ring-2 focus:ring-indigo-200" value={returnDate} onChange={e => setReturnDate(e.target.value)} />
+                           </div>
                        </div>
 
                        <label className="text-xs font-bold text-slate-500 uppercase block mb-3">Motivo do Atendimento</label>
@@ -638,21 +725,28 @@ export default function App() {
                     <h3 className="text-xs font-bold text-slate-500 uppercase mb-4 print:text-black sticky top-0 bg-slate-100 py-2 z-10">Histórico de Registros</h3>
                     {selectedStudent.logs?.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum registro encontrado.</p>}
                     {selectedStudent.logs?.map(log => {
-                       let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {}
-                       const dataVisual = new Date(log.created_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
-                       return (
-                         <div key={log.id} className="bg-white p-5 rounded-xl border shadow-sm mb-4 hover:shadow-md transition-shadow">
-                           <div className="flex justify-between items-start mb-3 border-b pb-2">
-                             <div>
-                               <span className="font-bold text-indigo-700 text-sm block">{dataVisual}</span>
-                               <span className="text-[10px] text-slate-400 uppercase font-bold">{p.solicitante || 'SOE'}</span>
-                             </div>
-                             {log.resolved ? <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-green-200">Resolvido</span> : <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-amber-200">Em Aberto</span>}
-                           </div>
-                           <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{p.obs}</p>
-                           {log.referral && <div className="mt-3 pt-2 border-t border-slate-50 flex items-center gap-2 text-xs font-bold text-purple-600 uppercase"><span className="bg-purple-50 p-1 rounded">➔ Encaminhado:</span> {log.referral}</div>}
-                         </div>
-                       )
+                        let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {}
+                        const dataVisual = new Date(log.created_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+                        const dataRetorno = log.return_date ? new Date(log.return_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : null;
+                        
+                        return (
+                          <div key={log.id} className="bg-white p-5 rounded-xl border shadow-sm mb-4 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-3 border-b pb-2">
+                              <div>
+                                <span className="font-bold text-indigo-700 text-sm block">{dataVisual}</span>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold">{p.solicitante || 'SOE'}</span>
+                              </div>
+                              {log.resolved ? <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-green-200">Resolvido</span> : <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase border border-amber-200">Em Aberto</span>}
+                            </div>
+                            <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{p.obs}</p>
+                            {log.referral && <div className="mt-3 pt-2 border-t border-slate-50 flex items-center gap-2 text-xs font-bold text-purple-600 uppercase"><span className="bg-purple-50 p-1 rounded">➔ Encaminhado:</span> {log.referral}</div>}
+                            {dataRetorno && !log.resolved && (
+                                <div className="mt-2 flex items-center gap-2 text-xs font-bold text-amber-600 uppercase bg-amber-50 p-2 rounded">
+                                    <Clock size={14}/> Retorno Agendado: {dataRetorno}
+                                </div>
+                            )}
+                          </div>
+                        )
                     })}
                   </div>
                 </div>
