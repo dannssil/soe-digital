@@ -48,7 +48,7 @@ function Avatar({ name, src, size = "md" }: { name: string, src?: string | null,
 const StudentList = ({ students, onSelectStudent, searchTerm }: any) => {
   const filtered = students.filter((s: any) => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-full flex flex-col">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow duration-300">
       <div className="overflow-x-auto flex-1">
         <table className="w-full text-sm text-left">
           <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b sticky top-0 bg-slate-50 z-10">
@@ -57,10 +57,10 @@ const StudentList = ({ students, onSelectStudent, searchTerm }: any) => {
           <tbody className="divide-y divide-slate-100">
             {filtered.map((s: any) => (
               <tr key={s.id} onClick={() => onSelectStudent(s)} className="hover:bg-indigo-50 cursor-pointer transition-colors group">
-                <td className="px-6 py-4 flex items-center gap-4"><Avatar name={s.name} src={s.photo_url} size="md"/><div className="font-bold text-slate-700 text-base">{s.name}</div></td>
+                <td className="px-6 py-4 flex items-center gap-4"><Avatar name={s.name} src={s.photo_url} size="md"/><div className="font-bold text-slate-700 text-base group-hover:text-indigo-700 transition-colors">{s.name}</div></td>
                 <td className="px-6 py-4 text-slate-500 font-bold">{s.class_id}</td>
                 <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${s.status === 'ATIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.status}</span></td>
-                <td className="px-6 py-4 text-right"><button className="text-slate-400 hover:text-indigo-600 p-2"><ChevronRight size={20}/></button></td>
+                <td className="px-6 py-4 text-right"><button className="text-slate-400 hover:text-indigo-600 p-2 transform hover:scale-110 transition-transform"><ChevronRight size={20}/></button></td>
               </tr>
             ))}
           </tbody>
@@ -302,9 +302,15 @@ export default function App() {
         columnStyles: { 2: { cellWidth: 100 } } 
     });
 
+    // RODAPÉ DO PDF (ASSINATURA AUTOMÁTICA)
     const pageHeight = doc.internal.pageSize.height;
     doc.line(60, pageHeight - 30, 150, pageHeight - 30);
-    doc.setFontSize(8); doc.text("Assinatura do Responsável SOE", 105, pageHeight - 25, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.text(`${SYSTEM_USER_NAME}`, 105, pageHeight - 25, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    const timeNow = new Date().toLocaleString('pt-BR');
+    doc.text(`${SYSTEM_ROLE} | ${timeNow}`, 105, pageHeight - 20, { align: "center" });
+
     doc.save(`Ficha_${selectedStudent.name}.pdf`); 
   }; 
 
@@ -316,24 +322,23 @@ export default function App() {
     return (
       <div className="space-y-8 pb-20 w-full max-w-[1600px] mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Alunos</p><h3 className="text-4xl font-black text-indigo-600">{students.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Em Alerta</p><h3 className="text-4xl font-black text-red-500">{studentsInRisk.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Turmas</p><h3 className="text-4xl font-black text-emerald-500">{turmas.length}</h3></div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Atendimentos</p><h3 className="text-4xl font-black text-amber-500">{students.flatMap(s=>s.logs||[]).length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Alunos</p><h3 className="text-4xl font-black text-indigo-600">{students.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Em Alerta</p><h3 className="text-4xl font-black text-red-500">{studentsInRisk.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Turmas</p><h3 className="text-4xl font-black text-emerald-500">{turmas.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Atendimentos</p><h3 className="text-4xl font-black text-amber-500">{students.flatMap(s=>s.logs||[]).length}</h3></div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-80"> 
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-80 hover:shadow-lg transition-shadow duration-500"> 
                 <h4 className="text-sm font-bold text-slate-700 mb-4 uppercase">Volume de Atendimentos</h4>
                 <ResponsiveContainer width="100%" height="100%"><LineChart data={stats.last7Days}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" /><XAxis dataKey="name" axisLine={false} tickLine={false} /><YAxis axisLine={false} tickLine={false} /><Tooltip /><Line type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={4} dot={{r:6, fill:'#6366f1'}} /></LineChart></ResponsiveContainer>
             </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-80">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-80 hover:shadow-lg transition-shadow duration-500">
                 <h4 className="text-sm font-bold text-slate-700 mb-4 uppercase flex items-center gap-2"><BarChart3 size={16}/> Motivos Recorrentes</h4>
                 <ResponsiveContainer width="100%" height="80%">
                     <PieChart>
                         <Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie>
                         <Tooltip />
-                        {/* AUMENTO DE FONTE E AJUSTE DE MARGEM */}
                         <Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                     </PieChart>
                 </ResponsiveContainer>
@@ -362,7 +367,7 @@ export default function App() {
                             const percent = total > 0 ? (risco / total) * 100 : 0;
                             const isSelected = selectedClassFilter === t;
                             return (
-                                <div key={t} onClick={() => setSelectedClassFilter(isSelected ? null : t)} className={`p-5 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-md flex flex-col justify-between h-32 ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100' : 'bg-white border-slate-100 hover:border-indigo-300'}`}>
+                                <div key={t} onClick={() => setSelectedClassFilter(isSelected ? null : t)} className={`p-5 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-lg flex flex-col justify-between h-32 hover:-translate-y-1 duration-300 ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100' : 'bg-white border-slate-100 hover:border-indigo-300'}`}>
                                     <div className="flex justify-between items-start"><h4 className="font-bold text-2xl">{t}</h4><Folder size={20} className={isSelected ? 'text-indigo-200' : 'text-slate-300'}/></div>
                                     <div>
                                         <div className="flex justify-between text-[10px] mb-1 font-bold"><span className={isSelected ? 'text-indigo-200' : 'text-slate-400'}>{total} Alunos</span><span className={isSelected ? 'text-white' : 'text-red-500'}>{Math.round(percent)}% Risco</span></div>
@@ -414,13 +419,13 @@ export default function App() {
               <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-slate-800">Estudantes</h2>
                   <div className="flex gap-2">
-                    <button onClick={() => setIsImportModalOpen(true)} className="bg-green-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-colors"><FileSpreadsheet size={20} /> Importar</button>
-                    <button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors"><Plus size={20} /> Novo Aluno</button>
+                    <button onClick={() => setIsImportModalOpen(true)} className="bg-green-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-transform active:scale-95"><FileSpreadsheet size={20} /> Importar</button>
+                    <button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-indigo-700 transition-transform active:scale-95"><Plus size={20} /> Novo Aluno</button>
                   </div>
               </div>
               <div className="mb-6 flex gap-3 overflow-x-auto pb-2">
-                  <button onClick={() => setListClassFilter(null)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border ${!listClassFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'}`}>Todos</button>
-                  {turmasList.map(t => (<button key={t} onClick={() => setListClassFilter(t)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border flex items-center gap-2 ${listClassFilter === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}><Folder size={14} /> {t}</button>))}
+                  <button onClick={() => setListClassFilter(null)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border ${!listClassFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'} hover:scale-105 transition-transform`}>Todos</button>
+                  {turmasList.map(t => (<button key={t} onClick={() => setListClassFilter(t)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border flex items-center gap-2 hover:scale-105 transition-transform ${listClassFilter === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}><Folder size={14} /> {t}</button>))}
               </div>
               <div className="flex-1 min-h-0"><StudentList students={students.filter(s => !listClassFilter || s.class_id === listClassFilter)} onSelectStudent={(s: any) => { setSelectedStudent(s); setIsModalOpen(true); }} searchTerm={globalSearch} /></div>
             </div>
@@ -441,9 +446,9 @@ export default function App() {
                  <div><h2 className="text-3xl font-bold text-slate-800">{selectedStudent.name}</h2><p className="text-lg text-slate-500 font-bold uppercase mt-1">Turma {selectedStudent.class_id}</p></div>
                </div>
                <div className="flex gap-2">
-                 <button onClick={generatePDF} className="p-3 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200" title="Gerar PDF"><FileDown size={20} /></button>
-                 <button onClick={startEditing} className="p-3 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200" title="Editar"><Pencil size={20} /></button>
-                 <button onClick={() => setIsExitModalOpen(true)} className="p-3 bg-red-100 text-red-600 rounded-full hover:bg-red-200" title="Saída"><LogOut size={20} /></button>
+                 <button onClick={generatePDF} className="p-3 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 hover:scale-110 transition-transform" title="Gerar PDF"><FileDown size={20} /></button>
+                 <button onClick={startEditing} className="p-3 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 hover:scale-110 transition-transform" title="Editar"><Pencil size={20} /></button>
+                 <button onClick={() => setIsExitModalOpen(true)} className="p-3 bg-red-100 text-red-600 rounded-full hover:bg-red-200 hover:scale-110 transition-transform" title="Saída"><LogOut size={20} /></button>
                  <button onClick={() => setIsModalOpen(false)} className="ml-4 hover:bg-slate-200 p-2 rounded-full"><X className="text-slate-400 hover:text-red-500" size={32}/></button>
                </div>
             </div>
@@ -523,7 +528,6 @@ export default function App() {
 
                       <div className="lg:col-span-4 space-y-4 max-h-[800px] overflow-y-auto pr-2 bg-slate-100 p-4 rounded-2xl h-full">
                          <h3 className="text-xs font-bold text-slate-500 uppercase sticky top-0 bg-slate-100 py-2 z-10 flex items-center gap-2"><History size={14}/> Histórico Completo</h3>
-                         {/* HISTÓRICO UNIFICADO COM TAGS VISUAIS */}
                          {selectedStudent.logs?.map((log: any) => {
                              let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch(e) {}
                              const isFamily = log.category === 'Família';
@@ -562,12 +566,18 @@ export default function App() {
                  {quickSearchTerm.length > 2 && !quickSelectedStudent && (
                     <div className="bg-white border rounded-xl shadow-xl max-h-40 overflow-y-auto mb-4 absolute w-[85%] z-10">
                       {students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0, 5).map(s => (
-                        <div key={s.id} onClick={() => { setQuickSelectedStudent(s); setQuickSearchTerm(s.name); }} className="p-3 hover:bg-indigo-50 cursor-pointer text-sm border-b font-bold text-slate-700">{s.name} <span className="text-slate-400 font-normal">({s.class_id})</span></div>
+                        <div key={s.id} onClick={() => { setQuickSelectedStudent(s); setQuickSearchTerm(s.name); }} className="p-3 hover:bg-indigo-50 cursor-pointer text-sm border-b font-bold text-slate-700 hover:bg-indigo-50">{s.name} <span className="text-slate-400 font-normal">({s.class_id})</span></div>
                       ))}
                     </div>
                  )}
-                 <div className="grid grid-cols-2 gap-2 mb-6 mt-4">{FLASH_REASONS.map(r => (<button key={r} onClick={() => setQuickReason(r)} className={`p-3 rounded-xl text-xs font-bold border transition-all ${quickReason === r ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{r}</button>))}</div>
-                 <button onClick={handleQuickSave} disabled={!quickSelectedStudent || !quickReason} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-xl disabled:opacity-50 disabled:shadow-none transition-all hover:bg-green-700">CONFIRMAR REGISTRO</button>
+                 {quickSelectedStudent && (
+                    <div className="bg-green-50 p-2 rounded-lg text-center mb-4 border border-green-200">
+                        <p className="text-xs font-bold text-green-800">Aluno Selecionado:</p>
+                        <p className="text-sm font-bold text-green-900">{quickSelectedStudent.name}</p>
+                    </div>
+                 )}
+                 <div className="grid grid-cols-2 gap-2 mb-6 mt-4">{FLASH_REASONS.map(r => (<button key={r} onClick={() => setQuickReason(r)} className={`p-3 rounded-xl text-xs font-bold border transition-all ${quickReason === r ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{r}</button>))}</div>
+                 <button onClick={handleQuickSave} disabled={!quickSelectedStudent || !quickReason} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-xl disabled:opacity-50 disabled:shadow-none transition-all hover:bg-green-700 active:scale-95">CONFIRMAR REGISTRO</button>
              </div>
         </div>
       )}
