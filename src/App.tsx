@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay
 } from 'lucide-react';
 
 // ==============================================================================
@@ -38,13 +38,13 @@ const DEFAULT_ENCAMINHAMENTOS = ["Coordenação", "Psicologia", "Família", "Dir
 const FLASH_REASONS = ["Uniforme Inadequado", "Atraso / Chegada Tardia", "Uso de Celular", "Sem Material", "Saída de Sala", "Conversa / Bagunça", "Conflito entre Colegas", "Sono em Sala", "Falta de Atividade", "Elogio / Destaque", "Encaminhamento Saúde", "Outros"];
 
 // --- COMPONENTES ---
-function Avatar({ name, src, size = "md" }: { name: string, src?: string | null, size?: "sm" | "md" | "lg" | "xl" }) {
+function Avatar({ name, src, size = "md" }: { name: string, src?: string | null, size?: "sm" | "md" | "lg" | "xl" | "2xl" }) {
   const safeName = name || "Aluno";
   const initials = safeName.substring(0, 2).toUpperCase();
-  const sizeClasses: any = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-16 h-16 text-xl", xl: "w-24 h-24 text-2xl" };
-  const pxSize: any = { sm: 32, md: 40, lg: 64, xl: 96 };
-  if (src) return <img src={src} alt={name} className={`${sizeClasses[size]} rounded-full object-cover shadow-sm ring-2 ring-white bg-gray-100`} style={{ width: pxSize[size], height: pxSize[size] }} />;
-  return <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-white`} style={{ width: pxSize[size], height: pxSize[size] }}>{initials}</div>;
+  const sizeClasses: any = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-16 h-16 text-xl", xl: "w-24 h-24 text-2xl", "2xl": "w-40 h-40 text-4xl" };
+  const pxSize: any = { sm: 32, md: 40, lg: 64, xl: 96, "2xl": 160 };
+  if (src) return <img src={src} alt={name} className={`${sizeClasses[size]} rounded-full object-cover shadow-sm ring-4 ring-white bg-gray-100`} style={{ width: pxSize[size], height: pxSize[size] }} />;
+  return <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-4 ring-white`} style={{ width: pxSize[size], height: pxSize[size] }}>{initials}</div>;
 }
 
 const StudentList = ({ students, onSelectStudent, searchTerm }: any) => {
@@ -79,7 +79,7 @@ export default function App() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // ESTADO 'VIEW' ATUALIZADO PARA INCLUIR 'CONSELHO'
+  // ESTADO 'VIEW'
   const [view, setView] = useState<'dashboard' | 'students' | 'conselho'>('dashboard');
   
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
@@ -96,6 +96,9 @@ export default function App() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+
+  // --- NOVO: MODO PROJEÇÃO DO CONSELHO ---
+  const [projectedStudent, setProjectedStudent] = useState<any | null>(null);
 
   // Tabs & Forms
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil');
@@ -415,6 +418,9 @@ export default function App() {
                                   <th className="px-2 py-3 text-center bg-indigo-700">ING</th>
                                   <th className="px-2 py-3 text-center bg-indigo-700">ART</th>
                                   <th className="px-2 py-3 text-center bg-indigo-700">EDF</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-800 border-l border-white/20">PD1</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-800">PD2</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-800">PD3</th>
                                   <th className="px-4 py-3 text-center bg-red-600">FALTAS</th>
                                   <th className="px-4 py-3">Ocorrências / Perfil</th>
                               </tr>
@@ -433,8 +439,8 @@ export default function App() {
                                   };
 
                                   return (
-                                      <tr key={s.id} className="hover:bg-indigo-50 transition-colors">
-                                          <td className="px-4 py-3 font-bold text-slate-700 flex items-center gap-2 border-r">
+                                      <tr key={s.id} onClick={() => setProjectedStudent(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
+                                          <td className="px-4 py-3 font-bold text-slate-700 flex items-center gap-2 border-r group-hover:text-indigo-700">
                                               <Avatar name={s.name} src={s.photo_url} size="sm"/> <span className="truncate max-w-[200px]">{s.name}</span>
                                           </td>
                                           <td className="px-2 py-3 text-center border-r">{renderNota(notas.lp)}</td>
@@ -445,13 +451,19 @@ export default function App() {
                                           <td className="px-2 py-3 text-center border-r">{renderNota(notas.ing)}</td>
                                           <td className="px-2 py-3 text-center border-r">{renderNota(notas.art)}</td>
                                           <td className="px-2 py-3 text-center border-r">{renderNota(notas.edf)}</td>
+                                          <td className="px-2 py-3 text-center border-r bg-slate-50">{renderNota(notas.pd1)}</td>
+                                          <td className="px-2 py-3 text-center border-r bg-slate-50">{renderNota(notas.pd2)}</td>
+                                          <td className="px-2 py-3 text-center border-r bg-slate-50">{renderNota(notas.pd3)}</td>
                                           <td className="px-4 py-3 text-center border-r font-bold">
                                               {notas.faltas_bimestre > 20 ? <span className="bg-red-600 text-white px-2 py-1 rounded text-[10px] animate-pulse">{notas.faltas_bimestre}</span> : <span className="text-slate-500">{notas.faltas_bimestre || 0}</span>}
                                           </td>
                                           <td className="px-4 py-3">
-                                              <div className="flex flex-col">
-                                                  <span className="text-[10px] uppercase font-bold text-slate-400">{totalLogs} Registros</span>
-                                                  {logsGraves > 0 && <span className="text-[10px] font-bold text-red-600 flex items-center gap-1"><AlertTriangle size={10}/> {logsGraves} Ocorrências Graves</span>}
+                                              <div className="flex justify-between items-center">
+                                                  <div className="flex flex-col">
+                                                      <span className="text-[10px] uppercase font-bold text-slate-400">{totalLogs} Registros</span>
+                                                      {logsGraves > 0 && <span className="text-[10px] font-bold text-red-600 flex items-center gap-1"><AlertTriangle size={10}/> {logsGraves} Ocorrências Graves</span>}
+                                                  </div>
+                                                  <Maximize2 size={14} className="text-slate-300 opacity-0 group-hover:opacity-100" />
                                               </div>
                                           </td>
                                       </tr>
@@ -607,6 +619,105 @@ export default function App() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MODAL DE PROJEÇÃO (NOVO - COM EFEITO CARD E CAMPOS DE CONSELHO) */}
+      {projectedStudent && (
+        <div className="fixed inset-0 bg-slate-950/90 z-[100] flex items-center justify-center p-8 backdrop-blur-md">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-300">
+                {/* CABEÇALHO */}
+                <div className="bg-indigo-900 text-white p-6 flex justify-between items-center shadow-lg">
+                    <div className="flex items-center gap-4">
+                        <MonitorPlay size={32} className="text-indigo-400"/>
+                        <div>
+                            <h2 className="text-3xl font-black uppercase tracking-wider">{projectedStudent.name}</h2>
+                            <p className="text-indigo-300 font-bold text-lg">TURMA {projectedStudent.class_id} | {selectedBimestre}</p>
+                        </div>
+                    </div>
+                    <button onClick={() => setProjectedStudent(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"><X size={32}/></button>
+                </div>
+
+                {/* CORPO DA PROJEÇÃO */}
+                <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
+                    
+                    {/* COLUNA 1: FOTO E RESUMO DE NOTAS */}
+                    <div className="lg:w-1/3 bg-slate-100 p-8 flex flex-col items-center border-r border-slate-200 overflow-y-auto">
+                        <div className="mb-6 transform hover:scale-105 transition-transform duration-500">
+                            <Avatar name={projectedStudent.name} src={projectedStudent.photo_url} size="2xl"/>
+                        </div>
+                        
+                        <div className="w-full bg-white rounded-2xl p-6 shadow-sm mb-6">
+                            <h3 className="text-center font-bold text-slate-400 text-sm uppercase mb-4 tracking-widest">Desempenho Acadêmico</h3>
+                            <div className="grid grid-cols-3 gap-3">
+                                {(() => {
+                                    const notas = projectedStudent.desempenho?.find((d:any) => d.bimestre === selectedBimestre) || {};
+                                    const disciplinas = [
+                                        {n:'LP', v: notas.lp}, {n:'MAT', v: notas.mat}, {n:'CIE', v: notas.cie},
+                                        {n:'HIS', v: notas.his}, {n:'GEO', v: notas.geo}, {n:'ING', v: notas.ing},
+                                        {n:'ART', v: notas.art}, {n:'EDF', v: notas.edf}, {n:'PD1', v: notas.pd1}
+                                    ];
+                                    return disciplinas.map(d => (
+                                        <div key={d.n} className={`flex flex-col items-center p-2 rounded-xl border-2 ${d.v < 5 && d.v !== undefined ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
+                                            <span className="text-[10px] font-bold text-slate-400">{d.n}</span>
+                                            <span className={`text-2xl font-black ${d.v < 5 ? 'text-red-600' : 'text-slate-700'}`}>{d.v ?? '-'}</span>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                            <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                                <span className="text-xs font-bold text-slate-400 uppercase">Faltas no Bimestre</span>
+                                <span className="text-2xl font-black text-slate-700">{(projectedStudent.desempenho?.find((d:any) => d.bimestre === selectedBimestre) || {}).faltas_bimestre || 0}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* COLUNA 2: OCORRÊNCIAS E DELIBERAÇÕES */}
+                    <div className="lg:w-2/3 p-8 bg-white overflow-y-auto flex flex-col gap-8">
+                        
+                        {/* LISTA DE OCORRÊNCIAS */}
+                        <div className="flex-1">
+                            <h3 className="font-bold text-indigo-900 text-lg uppercase mb-4 flex items-center gap-2"><FileText size={20}/> Resumo de Ocorrências</h3>
+                            <div className="space-y-3">
+                                {projectedStudent.logs && projectedStudent.logs.length > 0 ? projectedStudent.logs.map((log: any) => {
+                                    let desc = { motivos: [], obs: '' }; try { desc = JSON.parse(log.description); } catch(e) {}
+                                    return (
+                                        <div key={log.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:shadow-md transition-all">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-xs font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-1 rounded">{new Date(log.created_at).toLocaleDateString()}</span>
+                                                <span className="text-xs font-bold text-slate-400">{log.category}</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 mb-2">
+                                                {desc.motivos?.map((m:string) => <span key={m} className="text-[10px] font-bold bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-600">{m}</span>)}
+                                            </div>
+                                            <p className="text-sm text-slate-600 italic">"{desc.obs}"</p>
+                                        </div>
+                                    )
+                                }) : <p className="text-slate-400 text-center py-8 italic">Nenhuma ocorrência registrada.</p>}
+                            </div>
+                        </div>
+
+                        {/* CAMPOS DE DELIBERAÇÃO (SIMULAÇÃO) */}
+                        <div className="bg-orange-50 p-6 rounded-2xl border border-orange-100">
+                            <h3 className="font-bold text-orange-800 text-lg uppercase mb-4 flex items-center gap-2"><GraduationCap size={20}/> Deliberação do Conselho</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-orange-400 uppercase mb-1 block">Anotações / Observações</label>
+                                    <textarea className="w-full p-3 rounded-xl border border-orange-200 bg-white text-sm h-32 resize-none focus:ring-2 focus:ring-orange-400 outline-none" placeholder="Digite as observações do conselho..."></textarea>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-orange-400 uppercase mb-1 block">Encaminhamentos</label>
+                                    <textarea className="w-full p-3 rounded-xl border border-orange-200 bg-white text-sm h-32 resize-none focus:ring-2 focus:ring-orange-400 outline-none" placeholder="Encaminhar para..."></textarea>
+                                </div>
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                                <button className="bg-orange-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md">Salvar Deliberação (Simulação)</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
         </div>
       )}
 
