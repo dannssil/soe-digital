@@ -3,13 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-// --- IMPORTS GRÁFICOS (RECHARTS) ---
+// --- IMPORTS GRÁFICOS ---
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, BarChart, Bar,
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
-// --- IMPORTS ÍCONES (LUCIDE) - COM ALIAS PARA EVITAR CONFLITOS ---
+// --- IMPORTS ÍCONES ---
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
@@ -21,15 +21,15 @@ import {
   FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, 
   Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, 
   ChevronLeft, Star, Activity, Heart, Brain, PenTool, Copyright, Code,
-  PieChart as PieChartIcon, FileOutput, ThumbsUp
+  PieChart as PieChartIcon, FileOutput, ThumbsUp, Puzzle, Scale, Cake
 } from 'lucide-react';
 
-// --- CONEXÃO SUPABASE ---
+// --- CONEXÃO ---
 const supabaseUrl = "https://zfryhzmujfaqqzybjuhb.supabase.co";
 const supabaseKey = "sb_publishable_oJqCCMfnBlbQWGMP4Wj3rQ_YqogatOo";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- CONFIGURAÇÕES GERAIS ---
+// --- CONFIGURAÇÕES ---
 const SYSTEM_USER_NAME = "Daniel Alves da Silva";
 const SYSTEM_ROLE = "Orientador Educacional";
 const SYSTEM_MATRICULA = "Mat: 212.235-9 | SEEDF";
@@ -60,15 +60,23 @@ const StudentList = ({ students, onSelectStudent }: any) => {
       <div className="overflow-x-auto flex-1">
         <table className="w-full text-sm text-left">
           <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b sticky top-0 bg-slate-50 z-10">
-            <tr><th className="px-6 py-4">Estudante</th><th className="px-6 py-4">Nascimento</th><th className="px-6 py-4">Turma</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Ações</th></tr>
+            <tr><th className="px-6 py-4">Estudante</th><th className="px-6 py-4">Nascimento</th><th className="px-6 py-4">Turma</th><th className="px-6 py-4">Status / Info</th><th className="px-6 py-4 text-right">Ações</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {students.map((s: any) => (
               <tr key={s.id} onClick={() => onSelectStudent(s)} className="hover:bg-indigo-50 cursor-pointer transition-colors group">
                 <td className="px-6 py-4 flex items-center gap-4"><Avatar name={s.name} src={s.photo_url} size="md" /><div className="font-bold text-slate-700 text-base group-hover:text-indigo-700 transition-colors">{s.name}</div></td>
-                <td className="px-6 py-4 text-slate-500 font-mono text-xs">{s.birth_date ? new Date(s.birth_date).toLocaleDateString('pt-BR') : '-'}</td>
+                <td className="px-6 py-4 text-slate-500 font-mono text-xs flex items-center gap-2">
+                  {s.birth_date ? <><Cake size={12} className="text-pink-400"/> {new Date(s.birth_date).toLocaleDateString('pt-BR')}</> : '-'}
+                </td>
                 <td className="px-6 py-4 text-slate-500 font-bold">{s.class_id}</td>
-                <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${s.status === 'ATIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.status}</span></td>
+                <td className="px-6 py-4">
+                  <div className="flex gap-2">
+                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${s.status === 'ATIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.status}</span>
+                     {s.nee_description && <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-purple-100 text-purple-700 flex items-center gap-1" title={s.nee_description}><Puzzle size={10}/> NEE</span>}
+                     {s.ct_referral && <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-orange-100 text-orange-700 flex items-center gap-1" title="Encaminhado ao CT"><Scale size={10}/> CT</span>}
+                  </div>
+                </td>
                 <td className="px-6 py-4 text-right"><button className="text-slate-400 hover:text-indigo-600 p-2 transform hover:scale-110 transition-transform"><ChevronRight size={20} /></button></td>
               </tr>
             ))}
@@ -79,14 +87,13 @@ const StudentList = ({ students, onSelectStudent }: any) => {
   );
 };
 
-// --- APLICAÇÃO PRINCIPAL ---
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<'dashboard' | 'students' | 'conselho'>('dashboard');
-  const [dashboardFilterType, setDashboardFilterType] = useState<'ALL' | 'RISK' | 'ACTIVE' | 'TRANSFER' | 'ABANDON' | 'RESOLVED' | 'RECURRENT' | 'WITH_LOGS'>('ALL');
+  const [dashboardFilterType, setDashboardFilterType] = useState<'ALL' | 'RISK' | 'NEE' | 'CT' | 'ACTIVE' | 'TRANSFER' | 'ABANDON' | 'RESOLVED' | 'RECURRENT' | 'WITH_LOGS'>('ALL');
   const [conselhoFilterType, setConselhoFilterType] = useState<'ALL' | 'RISK' | 'LOGS' | 'GRADES'>('ALL');
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
@@ -114,13 +121,13 @@ export default function App() {
   const [councilObs, setCouncilObs] = useState('');
   const [councilEnc, setCouncilEnc] = useState('');
   
-  // Listas Dinâmicas
+  const [highlightedStudents, setHighlightedStudents] = useState<string[]>([]);
+  const [praisedStudents, setPraisedStudents] = useState<string[]>([]);
+
   const [listComportamento, setListComportamento] = useState<string[]>(DEFAULT_COMPORTAMENTO);
   const [listPedagogico, setListPedagogico] = useState<string[]>(DEFAULT_PEDAGOGICO);
   const [listSocial, setListSocial] = useState<string[]>(DEFAULT_SOCIAL);
   const [listEncaminhamentos, setListEncaminhamentos] = useState<string[]>(DEFAULT_ENCAMINHAMENTOS);
-  
-  // Inputs
   const [newItem, setNewItem] = useState('');
   const [editName, setEditName] = useState(''); const [editClass, setEditClass] = useState(''); const [editGuardian, setEditGuardian] = useState(''); const [editPhone, setEditPhone] = useState(''); const [editAddress, setEditAddress] = useState('');
   const [newName, setNewName] = useState(''); const [newClass, setNewClass] = useState('');
@@ -157,21 +164,8 @@ export default function App() {
   }
 
   const toggleItem = (list: string[], setList: any, item: string) => { if (list.includes(item)) setList(list.filter((i: string) => i !== item)); else setList([...list, item]); };
-  
-  // --- FUNÇÕES DE PERSISTÊNCIA REAL (ESTRELA E JOINHA) ---
-  const toggleHighlight = async (studentId: string, currentVal: boolean, e: React.MouseEvent) => { 
-    e.stopPropagation(); 
-    const updatedStudents = students.map(s => s.id === studentId ? { ...s, is_highlight: !currentVal } : s);
-    setStudents(updatedStudents);
-    await supabase.from('students').update({ is_highlight: !currentVal }).eq('id', studentId);
-  };
-  
-  const togglePraise = async (studentId: string, currentVal: boolean, e: React.MouseEvent) => { 
-    e.stopPropagation(); 
-    const updatedStudents = students.map(s => s.id === studentId ? { ...s, is_praised: !currentVal } : s);
-    setStudents(updatedStudents);
-    await supabase.from('students').update({ is_praised: !currentVal }).eq('id', studentId);
-  };
+  const toggleHighlight = async (studentId: string, currentVal: boolean, e: React.MouseEvent) => { e.stopPropagation(); const updatedStudents = students.map(s => s.id === studentId ? { ...s, is_highlight: !currentVal } : s); setStudents(updatedStudents); await supabase.from('students').update({ is_highlight: !currentVal }).eq('id', studentId); };
+  const togglePraise = async (studentId: string, currentVal: boolean, e: React.MouseEvent) => { e.stopPropagation(); const updatedStudents = students.map(s => s.id === studentId ? { ...s, is_praised: !currentVal } : s); setStudents(updatedStudents); await supabase.from('students').update({ is_praised: !currentVal }).eq('id', studentId); };
 
   const checkRisk = (student: any) => { const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; let notasVermelhas = 0; if (ultDesempenho) { const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; } return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas }; };
   const stats = useMemo(() => { const allLogs = students.flatMap(s => s.logs || []); const last7Days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); const count = allLogs.filter(l => new Date(l.created_at).toDateString() === d.toDateString()).length; return { name: dateStr, total: count }; }).reverse(); const motivoCount: any = {}; allLogs.forEach(l => { try { const desc = JSON.parse(l.description); if (desc.motivos) desc.motivos.forEach((m: string) => { motivoCount[m] = (motivoCount[m] || 0) + 1; }); } catch (e) { } }); const pieData = Object.keys(motivoCount).map(key => ({ name: key, value: motivoCount[key] })).sort((a, b) => b.value - a.value).slice(0, 5); return { last7Days, pieData, allLogs }; }, [students]);
@@ -185,26 +179,62 @@ export default function App() {
   const handleRegisterExit = async () => { if (!selectedStudent) return; const logDesc = JSON.stringify({ solicitante: 'Secretaria/SOE', motivos: [exitType], obs: `SAÍDA REGISTRADA. Motivo detalhado: ${exitReason}` }); const { error: logError } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: 'Situação Escolar', description: logDesc, resolved: true, created_at: new Date().toISOString() }]); if (logError) return alert('Erro ao salvar histórico: ' + logError.message); const { error } = await supabase.from('students').update({ status: exitType, exit_reason: exitReason, exit_date: new Date().toISOString() }).eq('id', selectedStudent.id); if (!error) { alert('Saída registrada!'); setExitReason(''); setIsExitModalOpen(false); setIsModalOpen(false); fetchStudents(); } else alert(error.message); };
   const handleSaveRadar = async () => { const targetClass = conselhoTurma || students[0]?.class_id; if (!targetClass) return; const { error } = await supabase.from('class_radar').upsert({ turma: targetClass, bimestre: selectedBimestre, ...radarData }, { onConflict: 'turma, bimestre' }); if (!error) { alert('Avaliação da Turma Salva!'); setIsEvalModalOpen(false); } else { alert('Erro: ' + error.message); } };
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) { if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return; const file = event.target.files[0]; const fileName = `${selectedStudent.id}-${Math.random()}.${file.name.split('.').pop()}`; const { error } = await supabase.storage.from('photos').upload(fileName, file); if (error) { alert('Erro upload: ' + error.message); return; } const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName); await supabase.from('students').update({ photo_url: publicUrl }).eq('id', selectedStudent.id); setSelectedStudent({ ...selectedStudent, photo_url: publicUrl }); fetchStudents(); }
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) { if (!e.target.files || e.target.files.length === 0) return; setImporting(true); const file = e.target.files[0]; const reader = new FileReader(); reader.onload = async (evt) => { try { const bstr = evt.target?.result; const workbook = XLSX.read(bstr, { type: 'binary' }); const ws = workbook.Sheets[workbook.SheetNames[0]]; const data = XLSX.utils.sheet_to_json(ws); for (const row of (data as any[])) { const nomeExcel = row['ESTUDANTE']?.toString().toUpperCase().trim(); if (!nomeExcel) continue; const aluno = students.find(s => s.name.toUpperCase().trim() === nomeExcel); if (aluno) { const parseNota = (val: any) => val ? parseFloat(val.toString().replace(',', '.')) : null; await supabase.from('desempenho_bimestral').insert([{ aluno_id: aluno.id, bimestre: selectedBimestre, art: parseNota(row['ART']), cie: parseNota(row['CIE']), edf: parseNota(row['EDF']), geo: parseNota(row['GEO']), his: parseNota(row['HIS']), ing: parseNota(row['ING']), lp: parseNota(row['LP']), mat: parseNota(row['MAT']), pd1: parseNota(row['PD1']), pd2: parseNota(row['PD2']), pd3: parseNota(row['PD3']), faltas_bimestre: row['FALTAS'] ? parseInt(row['FALTAS']) : 0 }]); } } alert(`Sucesso!`); setIsImportModalOpen(false); setImporting(false); fetchStudents(); } catch (err) { alert('Erro: ' + err); setImporting(false); } }; reader.readAsBinaryString(file); }
+  
+  // --- IMPORTAÇÃO INTELIGENTE (DT NASCIMENTO + NEE + CT) ---
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) { 
+    if (!e.target.files || e.target.files.length === 0) return; 
+    setImporting(true); 
+    const file = e.target.files[0]; 
+    const reader = new FileReader(); 
+    reader.onload = async (evt) => { 
+      try { 
+        const bstr = evt.target?.result; 
+        const workbook = XLSX.read(bstr, { type: 'binary' }); 
+        const ws = workbook.Sheets[workbook.SheetNames[0]]; 
+        const data = XLSX.utils.sheet_to_json(ws); 
+        
+        for (const row of (data as any[])) { 
+          const nomeExcel = (row['ESTUDANTE'] || row['NOME'] || row['ALUNO'])?.toString().toUpperCase().trim(); 
+          if (!nomeExcel) continue; 
+          
+          const aluno = students.find(s => s.name.toUpperCase().trim() === nomeExcel); 
+          
+          if (aluno) { 
+            const updates: any = {};
+            if (row['DATA DE NASCIMENTO'] || row['NASCIMENTO'] || row['DN']) {
+              const rawDate = row['DATA DE NASCIMENTO'] || row['NASCIMENTO'] || row['DN'];
+              if (rawDate) {
+                  if (typeof rawDate === 'number') { const jsDate = new Date(Math.round((rawDate - 25569)*86400*1000)); updates.birth_date = jsDate.toISOString(); } 
+                  else { const parts = rawDate.split('/'); if(parts.length === 3) updates.birth_date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).toISOString(); }
+              }
+            }
+            if (row['NEE'] || row['DEFICIENCIA']) { updates.nee_description = row['NEE'] || row['DEFICIENCIA']; }
+            if (row['CONSELHO TUTELAR'] || row['CT']) { updates.ct_referral = row['MOTIVO'] || "Encaminhado"; }
+
+            if (Object.keys(updates).length > 0) { await supabase.from('students').update(updates).eq('id', aluno.id); }
+
+            const parseNota = (val: any) => val ? parseFloat(val.toString().replace(',', '.')) : null; 
+            await supabase.from('desempenho_bimestral').insert([{ aluno_id: aluno.id, bimestre: selectedBimestre, art: parseNota(row['ART']), cie: parseNota(row['CIE']), edf: parseNota(row['EDF']), geo: parseNota(row['GEO']), his: parseNota(row['HIS']), ing: parseNota(row['ING']), lp: parseNota(row['LP']), mat: parseNota(row['MAT']), pd1: parseNota(row['PD1']), pd2: parseNota(row['PD2']), pd3: parseNota(row['PD3']), faltas_bimestre: row['FALTAS'] ? parseInt(row['FALTAS']) : 0 }]); 
+          } 
+        } 
+        alert(`Importação Concluída!`); setIsImportModalOpen(false); setImporting(false); fetchStudents(); 
+      } catch (err) { alert('Erro na importação: ' + err); setImporting(false); } 
+    }; 
+    reader.readAsBinaryString(file); 
+  }
+
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
   const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre); if(!desempenhoAtual) return; const { error } = await supabase.from('desempenho_bimestral').update({ lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie, his: desempenhoAtual.his, geo: desempenhoAtual.geo, ing: desempenhoAtual.ing, art: desempenhoAtual.art, edf: desempenhoAtual.edf, pd1: desempenhoAtual.pd1, pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3, faltas_bimestre: desempenhoAtual.faltas_bimestre, obs_conselho: councilObs, encaminhamento_conselho: councilEnc }).eq('id', desempenhoAtual.id); if(!error) { alert('Dados Salvos!'); fetchStudents(); } else alert('Erro: ' + error.message); };
   
-  // --- A "SUPER ATA" UNIFICADA ---
   const generateSuperAta = (targetClass: string) => {
     const councilStudents = students.filter(s => s.class_id === targetClass);
     if(councilStudents.length === 0) return alert('Turma vazia');
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(`ATA DE CONSELHO DE CLASSE - ${targetClass}`, 148, 20, {align: "center"});
     doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`${selectedBimestre} | Data: ${new Date(dataConselho).toLocaleDateString('pt-BR')} | ${SYSTEM_ORG}`, 148, 26, {align: "center"});
-    
-    // RADAR
     autoTable(doc, { startY: 32, head: [['Indicador', 'Assiduidade', 'Participação', 'Relacionamento', 'Rendimento', 'Tarefas']], body: [[ 'Avaliação da Turma (0-5)', radarData.assiduidade, radarData.participacao, radarData.relacionamento, radarData.rendimento, radarData.tarefas ]], theme: 'grid', styles: { fontSize: 8, halign: 'center' }, headStyles: { fillColor: [55, 65, 81] } });
-    
-    // NOTAS
     const rows = councilStudents.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {}; return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.geo||'-', d.ing||'-', d.art||'-', d.edf||'-', d.pd1||'-', d.pd2||'-', d.pd3||'-', d.faltas_bimestre||0, s.logs?.length||0]; });
     autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 10, head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas', 'Ocorr.']], body: rows, styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [30, 41, 59] } });
-
-    // PLANO DE AÇÃO
     doc.addPage(); doc.setFontSize(14); doc.text("PLANO DE AÇÃO E ENCAMINHAMENTOS", 14, 20);
     let currentY = 30;
     const destaques = councilStudents.filter(s => s.is_highlight);
@@ -218,12 +248,12 @@ export default function App() {
     doc.save(`ATA_COMPLETA_${targetClass}.pdf`);
   };
 
-  const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" }); doc.text("CED 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setFontSize(10); doc.text(`Aluno: ${selectedStudent.name}`, 14, 35); const logsData = selectedStudent.logs?.filter((l: any) => l.student_id === selectedStudent.id).map((l: any) => [new Date(l.created_at).toLocaleDateString(), l.category, JSON.parse(l.description).obs]) || []; autoTable(doc, { startY: 45, head: [['Data', 'Tipo', 'Detalhes']], body: logsData }); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
-  const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); doc.text(student.name, 14, 20); }); doc.save(`PASTA_TURMA_${classId}.pdf`); };
+  const printStudentData = (doc: jsPDF, student: any) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" }); doc.text("CED 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25); doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`Aluno: ${student.name}`, 14, 35); const logsData = student.logs?.filter((l: any) => l.student_id === student.id).map((l: any) => [new Date(l.created_at).toLocaleDateString(), l.category, JSON.parse(l.description).obs]) || []; autoTable(doc, { startY: 45, head: [['Data', 'Tipo', 'Detalhes']], body: logsData }); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
+  const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
+  const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}.pdf`); };
   const handleExportReport = () => { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(students); XLSX.utils.book_append_sheet(wb, ws, "Dados"); XLSX.writeFile(wb, `Relatorio_Geral.xlsx`); };
   const handleBackup = () => { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(students); XLSX.utils.book_append_sheet(wb, ws, "Backup"); XLSX.writeFile(wb, `BACKUP_SOE.xlsx`); };
   const changeStudent = (direction: 'prev' | 'next') => { const turmas = [...new Set(students.map(s => s.class_id))].sort(); const currentClass = conselhoTurma || turmas[0]; const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name)); if (!projectedStudent || currentList.length === 0) return; const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id); if (direction === 'next') { if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]); else setProjectedStudent(currentList[0]); } else { if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]); else setProjectedStudent(currentList[currentList.length - 1]); } };
-
   // --- RENDER CONSELHO ---
   const renderConselho = () => {
       const turmas = [...new Set(students.map(s => s.class_id))].sort(); 
@@ -255,22 +285,41 @@ export default function App() {
       );
   };
 
+  // --- RENDER DASHBOARD (CORRIGIDO E ATUALIZADO V6.1) ---
   const renderDashboard = () => {
     let studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
     const ativos = students.filter(s => s.status === 'ATIVO').length;
-    const transferidos = students.filter(s => s.status?.toUpperCase().trim() === 'TRANSFERIDO').length;
-    const abandono = students.filter(s => s.status?.toUpperCase().trim() === 'ABANDONO').length;
+    // CONTAGENS DE ANEE E CT PARA OS CARDS
+    const nees = students.filter(s => s.nee_description).length;
+    const cts = students.filter(s => s.ct_referral).length;
+
     if (selectedClassFilter) studentsInRisk = studentsInRisk.filter(s => s.class_id === selectedClassFilter);
     const turmas = [...new Set(students.map(s => s.class_id))].sort();
 
     return (
       <div className="space-y-6 pb-20 w-full max-w-[1600px] mx-auto">
+        {/* GRID 4x1 CORRIGIDO (Total, Alerta, NEE, CT) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div onClick={() => { setDashboardFilterType('ALL'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group"><div><p className="text-[10px] font-bold text-slate-400 uppercase">Total Alunos</p><p className="text-2xl font-black text-indigo-900">{students.length}</p></div><div className="bg-indigo-50 p-3 rounded-lg text-indigo-600 group-hover:bg-indigo-100 transition-colors"><Users2 size={20}/></div></div>
-          <div onClick={() => { setDashboardFilterType('ACTIVE'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group"><div><p className="text-[10px] font-bold text-slate-400 uppercase">Ativos</p><p className="text-2xl font-black text-emerald-600">{ativos}</p></div><div className="bg-emerald-50 p-3 rounded-lg text-emerald-600 group-hover:bg-emerald-100 transition-colors"><CheckSquare size={20}/></div></div>
-          <div onClick={() => { setDashboardFilterType('RISK'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group"><div><p className="text-[10px] font-bold text-slate-400 uppercase">Em Alerta</p><p className="text-2xl font-black text-red-600">{studentsInRisk.length}</p></div><div className="bg-red-50 p-3 rounded-lg text-red-600 group-hover:bg-red-100 transition-colors"><AlertTriangle size={20}/></div></div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center gap-1"><div className="flex justify-between items-center"><span className="text-[10px] font-bold text-slate-400 uppercase">Transferidos</span><span className="text-sm font-bold text-orange-500 bg-orange-50 px-2 rounded">{transferidos}</span></div><div className="flex justify-between items-center"><span className="text-[10px] font-bold text-slate-400 uppercase">Abandono</span><span className="text-sm font-bold text-red-600 bg-red-50 px-2 rounded">{abandono}</span></div></div>
+          <div onClick={() => { setDashboardFilterType('ALL'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+             <div><p className="text-[10px] font-bold text-slate-400 uppercase">Total Alunos</p><p className="text-2xl font-black text-indigo-900">{students.length}</p></div>
+             <div className="bg-indigo-50 p-3 rounded-lg text-indigo-600 group-hover:bg-indigo-100 transition-colors"><Users2 size={20}/></div>
+          </div>
+          <div onClick={() => { setDashboardFilterType('RISK'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+             <div><p className="text-[10px] font-bold text-slate-400 uppercase">Em Alerta</p><p className="text-2xl font-black text-red-600">{studentsInRisk.length}</p></div>
+             <div className="bg-red-50 p-3 rounded-lg text-red-600 group-hover:bg-red-100 transition-colors"><AlertTriangle size={20}/></div>
+          </div>
+          {/* CARD ANEE (NOVO) */}
+          <div onClick={() => { setDashboardFilterType('NEE'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+             <div><p className="text-[10px] font-bold text-slate-400 uppercase">ANEE / Inclusão</p><p className="text-2xl font-black text-purple-600">{nees}</p></div>
+             <div className="bg-purple-50 p-3 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors"><Puzzle size={20}/></div>
+          </div>
+          {/* CARD CONSELHO TUTELAR (NOVO) */}
+          <div onClick={() => { setDashboardFilterType('CT'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+             <div><p className="text-[10px] font-bold text-slate-400 uppercase">Conselho Tutelar</p><p className="text-2xl font-black text-orange-600">{cts}</p></div>
+             <div className="bg-orange-50 p-3 rounded-lg text-orange-600 group-hover:bg-orange-100 transition-colors"><Scale size={20}/></div>
+          </div>
         </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[256px]">
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><Activity size={16} className="text-indigo-600"/> Volume de Atendimentos</h4><div className="flex-1 min-h-0"><ResponsiveContainer width="100%" height="100%"><LineChart data={stats.last7Days}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}}/><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}}/><Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/><Line type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={3} dot={{r: 4, fill: '#6366f1'}}/></LineChart></ResponsiveContainer></div></div>
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><PieChartIcon size={16} className="text-indigo-600"/> Motivos Recorrentes</h4><div className="flex-1 min-h-0"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/><Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px'}}/></PieChart></ResponsiveContainer></div></div>
@@ -285,7 +334,17 @@ export default function App() {
 
   if (!isAuthenticated) return (<div className="h-screen bg-slate-900 flex items-center justify-center p-4 animate-in fade-in duration-1000"><div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center animate-in zoom-in duration-500"><div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce"><Lock className="text-indigo-600" size={32} /></div><h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso SOE</h1><form onSubmit={handleLogin} className="space-y-4"><input type="password" title="Senha" className="w-full p-3 border rounded-xl text-center focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Senha" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} /><button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-all">Entrar</button></form></div></div>);
   const turmasList = [...new Set(students.map(s => s.class_id))].sort();
-  const filteredStudents = students.filter(s => { if (listClassFilter && s.class_id !== listClassFilter) return false; if (dashboardFilterType === 'RISK') { const r = checkRisk(s); if (!r.reprovadoFalta && !r.criticoFalta && !r.criticoNotas) return false; } if (dashboardFilterType === 'ACTIVE' && s.status !== 'ATIVO') return false; if (dashboardFilterType === 'TRANSFER' && s.status !== 'TRANSFERIDO') return false; if (dashboardFilterType === 'ABANDON' && s.status !== 'ABANDONO') return false; if (dashboardFilterType === 'RESOLVED') return s.logs?.some((l:any) => l.resolved); if (dashboardFilterType === 'RECURRENT') return (s.logs?.length || 0) >= 3; if (dashboardFilterType === 'WITH_LOGS') return (s.logs?.length || 0) > 0; return !globalSearch || s.name.toLowerCase().includes(globalSearch.toLowerCase()); });
+  const filteredStudents = students.filter(s => { 
+    if (listClassFilter && s.class_id !== listClassFilter) return false; 
+    if (dashboardFilterType === 'RISK') { const r = checkRisk(s); if (!r.reprovadoFalta && !r.criticoFalta && !r.criticoNotas) return false; } 
+    if (dashboardFilterType === 'ACTIVE' && s.status !== 'ATIVO') return false; 
+    if (dashboardFilterType === 'NEE' && !s.nee_description) return false;
+    if (dashboardFilterType === 'CT' && !s.ct_referral) return false;
+    if (dashboardFilterType === 'RESOLVED') return s.logs?.some((l:any) => l.resolved); 
+    if (dashboardFilterType === 'RECURRENT') return (s.logs?.length || 0) >= 3; 
+    if (dashboardFilterType === 'WITH_LOGS') return (s.logs?.length || 0) > 0; 
+    return !globalSearch || s.name.toLowerCase().includes(globalSearch.toLowerCase()); 
+  });
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden">
@@ -300,7 +359,7 @@ export default function App() {
         <div className="p-4 bg-[#151521] border-t border-white/5">
           <div className="flex items-center gap-3 mb-3"><Avatar name={SYSTEM_USER_NAME} src={adminPhoto} size="sm"/><div className="overflow-hidden"><p className="font-bold text-white text-xs truncate">{SYSTEM_USER_NAME}</p><p className="text-[10px] text-slate-400 truncate">{SYSTEM_MATRICULA}</p></div></div>
           <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 text-[10px] text-red-400 hover:text-red-300 transition-colors w-full"><LogOut size={12} /> Sair do Sistema</button>
-          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves</span></div><span className="text-[8px]">v5.0 Final</span></div>
+          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves</span></div><span className="text-[8px]">v6.1 Final</span></div>
         </div>
       </aside>
 
