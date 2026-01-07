@@ -68,7 +68,6 @@ const StudentList = ({ students, onSelectStudent }: any) => {
     </div>
   );
 };
-
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -102,14 +101,10 @@ export default function App() {
   const [conselhoTurma, setConselhoTurma] = useState<string>('');
   const [councilObs, setCouncilObs] = useState('');
   const [councilEnc, setCouncilEnc] = useState('');
-  
-  // Listas Dinâmicas
   const [listComportamento, setListComportamento] = useState<string[]>(DEFAULT_COMPORTAMENTO);
   const [listPedagogico, setListPedagogico] = useState<string[]>(DEFAULT_PEDAGOGICO);
   const [listSocial, setListSocial] = useState<string[]>(DEFAULT_SOCIAL);
   const [listEncaminhamentos, setListEncaminhamentos] = useState<string[]>(DEFAULT_ENCAMINHAMENTOS);
-  
-  // Inputs Temporários
   const [newItem, setNewItem] = useState('');
   const [editName, setEditName] = useState(''); const [editClass, setEditClass] = useState(''); const [editGuardian, setEditGuardian] = useState(''); const [editPhone, setEditPhone] = useState(''); const [editAddress, setEditAddress] = useState('');
   const [newName, setNewName] = useState(''); const [newClass, setNewClass] = useState('');
@@ -134,30 +129,9 @@ export default function App() {
 
   const addListItem = (listName: string) => { if (!newItem) return; if (listName === 'comp') { const n = [...listComportamento, newItem]; setListComportamento(n); localStorage.setItem('list_comp', JSON.stringify(n)); } if (listName === 'ped') { const n = [...listPedagogico, newItem]; setListPedagogico(n); localStorage.setItem('list_ped', JSON.stringify(n)); } if (listName === 'soc') { const n = [...listSocial, newItem]; setListSocial(n); localStorage.setItem('list_soc', JSON.stringify(n)); } if (listName === 'enc') { const n = [...listEncaminhamentos, newItem]; setListEncaminhamentos(n); localStorage.setItem('list_enc', JSON.stringify(n)); } setNewItem(''); };
   const removeListItem = (listName: string, item: string) => { if (listName === 'comp') { const n = listComportamento.filter(i => i !== item); setListComportamento(n); localStorage.setItem('list_comp', JSON.stringify(n)); } if (listName === 'ped') { const n = listPedagogico.filter(i => i !== item); setListPedagogico(n); localStorage.setItem('list_ped', JSON.stringify(n)); } if (listName === 'soc') { const n = listSocial.filter(i => i !== item); setListSocial(n); localStorage.setItem('list_soc', JSON.stringify(n)); } if (listName === 'enc') { const n = listEncaminhamentos.filter(i => i !== item); setListEncaminhamentos(n); localStorage.setItem('list_enc', JSON.stringify(n)); } };
-  
-  async function fetchStudents() { 
-    setLoading(true); 
-    const { data, error } = await supabase.from('students').select(`*, logs(id, student_id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`) .order('name'); 
-    if (!error && data) { 
-      const sortedData = data.map((student: any) => ({ ...student, logs: student.logs?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || [], desempenho: student.desempenho || [] })); 
-      setStudents(sortedData); 
-    } 
-    setLoading(false); 
-  }
-
+  async function fetchStudents() { setLoading(true); const { data, error } = await supabase.from('students').select(`*, logs(id, student_id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`) .order('name'); if (!error && data) { const sortedData = data.map((student: any) => ({ ...student, logs: student.logs?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || [], desempenho: student.desempenho || [] })); setStudents(sortedData); } setLoading(false); }
   const toggleItem = (list: string[], setList: any, item: string) => { if (list.includes(item)) setList(list.filter((i: string) => i !== item)); else setList([...list, item]); };
-  
-  const checkRisk = (student: any) => { 
-    const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; 
-    const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; 
-    let notasVermelhas = 0; 
-    if (ultDesempenho) { 
-      const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; 
-      notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; 
-    } 
-    return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas }; 
-  };
-
+  const checkRisk = (student: any) => { const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; let notasVermelhas = 0; if (ultDesempenho) { const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; } return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas }; };
   const stats = useMemo(() => { const allLogs = students.flatMap(s => s.logs || []); const last7Days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); const count = allLogs.filter(l => new Date(l.created_at).toDateString() === d.toDateString()).length; return { name: dateStr, total: count }; }).reverse(); const motivoCount: any = {}; allLogs.forEach(l => { try { const desc = JSON.parse(l.description); if (desc.motivos) desc.motivos.forEach((m: string) => { motivoCount[m] = (motivoCount[m] || 0) + 1; }); } catch (e) { } }); const pieData = Object.keys(motivoCount).map(key => ({ name: key, value: motivoCount[key] })).sort((a, b) => b.value - a.value).slice(0, 5); return { last7Days, pieData, allLogs }; }, [students]);
 
   const handleLogin = (e: React.FormEvent) => { e.preventDefault(); if (passwordInput === ACCESS_PASSWORD) { setIsAuthenticated(true); localStorage.setItem('soe_auth', 'true'); fetchStudents(); } };
@@ -168,11 +142,10 @@ export default function App() {
   const handleAddStudent = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, status: 'ATIVO' }]); if (!error) { alert('Criado!'); setIsNewStudentModalOpen(false); fetchStudents(); } else alert(error.message); };
   const handleRegisterExit = async () => { if (!selectedStudent) return; const logDesc = JSON.stringify({ solicitante: 'Secretaria/SOE', motivos: [exitType], obs: `SAÍDA REGISTRADA. Motivo detalhado: ${exitReason}` }); const { error: logError } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: 'Situação Escolar', description: logDesc, resolved: true, created_at: new Date().toISOString() }]); if (logError) return alert('Erro ao salvar histórico: ' + logError.message); const { error } = await supabase.from('students').update({ status: exitType, exit_reason: exitReason, exit_date: new Date().toISOString() }).eq('id', selectedStudent.id); if (!error) { alert('Saída registrada!'); setExitReason(''); setIsExitModalOpen(false); setIsModalOpen(false); fetchStudents(); } else alert(error.message); };
   const handleSaveRadar = async () => { const targetClass = conselhoTurma || students[0]?.class_id; if (!targetClass) return; const { error } = await supabase.from('class_radar').upsert({ turma: targetClass, bimestre: selectedBimestre, ...radarData }, { onConflict: 'turma, bimestre' }); if (!error) { alert('Avaliação da Turma Salva!'); setIsEvalModalOpen(false); } else { alert('Erro: ' + error.message); } };
-
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
   const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre); if(!desempenhoAtual) return; const { error } = await supabase.from('desempenho_bimestral').update({ lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie, his: desempenhoAtual.his, geo: desempenhoAtual.geo, ing: desempenhoAtual.ing, art: desempenhoAtual.art, edf: desempenhoAtual.edf, pd1: desempenhoAtual.pd1, pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3, faltas_bimestre: desempenhoAtual.faltas_bimestre, obs_conselho: councilObs, encaminhamento_conselho: councilEnc }).eq('id', desempenhoAtual.id); if(!error) { alert('Dados Salvos!'); fetchStudents(); } else alert('Erro: ' + error.message); };
   
-  // FUNÇÕES PDF (Recolocadas no lugar certo)
+  // --- FUNÇÕES DE PDF RESTAURADAS ---
   const printStudentData = (doc: jsPDF, student: any) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" }); doc.setFontSize(12); doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25); doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${student.name}`, 35, 35); doc.setFont("helvetica", "normal"); doc.text(`Turma: ${student.class_id}`, 160, 35); doc.text(`Responsável:`, 14, 43); doc.text(`${student.guardian_name || 'Não informado'}`, 40, 43); doc.text(`Telefone:`, 14, 50); doc.text(`${student.guardian_phone || '-'}`, 40, 50); doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60); const acadData = student.desempenho?.map((d: any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || []; autoTable(doc, { startY: 65, head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], body: acadData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 8, halign: 'center' }, styles: { fontSize: 8, halign: 'center' } }); const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85; doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY); const logsData = student.logs?.filter((l: any) => l.student_id === student.id).map((l: any) => { let desc = { motivos: [], obs: '', solicitante: '' }; try { desc = JSON.parse(l.description); } catch (e) { } return [new Date(l.created_at).toLocaleDateString('pt-BR'), l.category, `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`, l.resolved ? 'Resolvido' : 'Pendente']; }) || []; autoTable(doc, { startY: finalY + 5, head: [['Data', 'Tipo', 'Detalhes do Atendimento', 'Status']], body: logsData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 2: { cellWidth: 100 } } }); const pageHeight = doc.internal.pageSize.height; doc.line(60, pageHeight - 35, 150, pageHeight - 35); doc.setFont("helvetica", "bold"); doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 105, pageHeight - 30, { align: "center" }); doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 25, { align: "center" }); doc.setFontSize(8); doc.setTextColor(100); const timeNow = new Date().toLocaleString('pt-BR'); doc.text(`Emitido em: ${timeNow}`, 105, pageHeight - 15, { align: "center" }); };
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
   const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); if (!window.confirm(`Deseja gerar fichas da turma ${classId}?`)) return; const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`); };
@@ -184,6 +157,7 @@ export default function App() {
 
   const changeStudent = (direction: 'prev' | 'next') => { const turmas = [...new Set(students.map(s => s.class_id))].sort(); const currentClass = conselhoTurma || turmas[0]; const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name)); if (!projectedStudent || currentList.length === 0) return; const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id); if (direction === 'next') { if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]); else setProjectedStudent(currentList[0]); } else { if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]); else setProjectedStudent(currentList[currentList.length - 1]); } };
 
+  // --- RENDER CONSELHO (Compacto e Seguro) ---
   const renderConselho = () => {
       const turmas = [...new Set(students.map(s => s.class_id))].sort(); 
       const targetClass = conselhoTurma || turmas[0]; 
@@ -192,39 +166,27 @@ export default function App() {
       let totalFaltas = 0; let alunosRisco = 0; let totalOcorrencias = 0; let alunosBaixoRendimento = 0;
       councilStudents.forEach(s => { 
           const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
-          if(d) { 
-              totalFaltas += (d.faltas_bimestre || 0); 
-              if(d.faltas_bimestre > 20) alunosRisco++; 
-              const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf];
-              const notasVermelhas = disciplinasBase.filter(n => n !== null && n < 5).length;
-              if (notasVermelhas > 3) alunosBaixoRendimento++;
-          } 
+          if(d) { totalFaltas += (d.faltas_bimestre || 0); if(d.faltas_bimestre > 20) alunosRisco++; const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf]; const notasVermelhas = disciplinasBase.filter(n => n !== null && n < 5).length; if (notasVermelhas > 3) alunosBaixoRendimento++; } 
           totalOcorrencias += (s.logs?.length || 0); 
       });
-      const mediaFaltas = councilStudents.length > 0 ? Math.round(totalFaltas / councilStudents.length) : 0;
       
       if (conselhoFilterType === 'RISK') councilStudents = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && d.faltas_bimestre > 20; });
       if (conselhoFilterType === 'LOGS') councilStudents = councilStudents.filter(s => (s.logs?.length || 0) > 0);
       if (conselhoFilterType === 'GRADES') councilStudents = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); if (!d) return false; const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf]; return disciplinasBase.filter(n => n !== null && n < 5).length > 3; });
 
-      const radarChartData = [
-        { subject: 'Assiduidade', A: radarData.assiduidade || 0, fullMark: 5 }, { subject: 'Participação', A: radarData.participacao || 0, fullMark: 5 }, { subject: 'Relacionamento', A: radarData.relacionamento || 0, fullMark: 5 }, { subject: 'Rendimento', A: radarData.rendimento || 0, fullMark: 5 }, { subject: 'Tarefas', A: radarData.tarefas || 0, fullMark: 5 },
-      ];
+      const radarChartData = [ { subject: 'Assiduidade', A: radarData.assiduidade, fullMark: 5 }, { subject: 'Participação', A: radarData.participacao, fullMark: 5 }, { subject: 'Relacionamento', A: radarData.relacionamento, fullMark: 5 }, { subject: 'Rendimento', A: radarData.rendimento, fullMark: 5 }, { subject: 'Tarefas', A: radarData.tarefas, fullMark: 5 } ];
 
-      const renderNota = (val: any) => {
-        if (val === undefined || val === null) return <span className="text-slate-300">-</span>;
-        return <span className={`font-bold ${val < 5 ? 'text-red-600 bg-red-50 px-1 rounded' : 'text-slate-700'}`}>{val}</span>;
-      };
+      const renderNota = (val: any) => (val === undefined || val === null) ? <span className="text-slate-300">-</span> : <span className={`font-bold ${val < 5 ? 'text-red-600 bg-red-50 px-1 rounded' : 'text-slate-700'}`}>{val}</span>;
 
       if (!targetClass) return <div className="p-10 text-center text-slate-400">Carregando dados...</div>;
       
       return (
           <div className="max-w-[1800px] mx-auto pb-20 w-full h-full flex flex-col overflow-hidden">
-              <div className="flex flex-col md:flex-row justify-between items-end mb-8 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="space-y-2">
-                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><GraduationCap className="text-indigo-600"/> Conselho de Classe Digital</h2>
+              <div className="flex flex-col md:flex-row justify-between items-end mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                  <div className="space-y-1">
+                      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><GraduationCap className="text-indigo-600"/> Conselho de Classe Digital</h2>
                       <div className="flex flex-wrap gap-2 items-center">
-                          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200"><Calendar size={16} className="text-slate-400"/><input type="date" className="text-xs font-bold outline-none bg-transparent" value={dataConselho} onChange={e => setDataConselho(e.target.value)}/></div>
+                          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200"><Calendar size={14} className="text-slate-400"/><input type="date" className="text-xs font-bold outline-none bg-transparent" value={dataConselho} onChange={e => setDataConselho(e.target.value)}/></div>
                           <select className="p-2 border rounded-lg font-bold bg-slate-50 text-xs" value={targetClass} onChange={e => {setConselhoTurma(e.target.value); setConselhoFilterType('ALL');}}>{turmas.map(t => <option key={t} value={t}>{t}</option>)}</select>
                           <select className="p-2 border rounded-lg font-bold bg-slate-50 text-xs" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select>
                       </div>
@@ -235,26 +197,15 @@ export default function App() {
                   </div>
               </div>
               
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                  <div className="lg:col-span-2 grid grid-cols-2 gap-4">
-                      <div onClick={() => setConselhoFilterType('ALL')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'ALL' ? 'bg-indigo-600 text-white shadow-indigo-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Total Alunos</span><span className="text-3xl font-black">{students.filter(s => s.class_id === targetClass).length}</span></div><Users2 size={32} className="opacity-20"/></div>
-                      <div onClick={() => setConselhoFilterType('RISK')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'RISK' ? 'bg-red-500 text-white shadow-red-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Em Alerta (Faltas)</span><span className="text-3xl font-black">{alunosRisco}</span></div><AlertTriangle size={32} className="opacity-20"/></div>
-                      <div onClick={() => setConselhoFilterType('GRADES')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'GRADES' ? 'bg-orange-500 text-white shadow-orange-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Baixo Rendimento</span><span className="text-3xl font-black">{alunosBaixoRendimento}</span></div><BarChart3 size={32} className="opacity-20"/></div>
-                      <div onClick={() => setConselhoFilterType('LOGS')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'LOGS' ? 'bg-blue-600 text-white shadow-blue-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Com Ocorrências</span><span className="text-3xl font-black">{councilStudents.filter(s => (s.logs?.length || 0) > 0).length}</span></div><FileText size={32} className="opacity-20"/></div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                  <div className="lg:col-span-2 grid grid-cols-2 gap-3">
+                      <div onClick={() => setConselhoFilterType('ALL')} className={`cursor-pointer p-3 rounded-xl transition-all flex items-center justify-between ${conselhoFilterType === 'ALL' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50 border'}`}><div className="flex flex-col"><span className="text-[9px] uppercase font-bold opacity-70">Total</span><span className="text-xl font-black">{students.filter(s => s.class_id === targetClass).length}</span></div><Users2 size={20} className="opacity-30"/></div>
+                      <div onClick={() => setConselhoFilterType('RISK')} className={`cursor-pointer p-3 rounded-xl transition-all flex items-center justify-between ${conselhoFilterType === 'RISK' ? 'bg-red-500 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50 border'}`}><div className="flex flex-col"><span className="text-[9px] uppercase font-bold opacity-70">Risco Faltas</span><span className="text-xl font-black">{alunosRisco}</span></div><AlertTriangle size={20} className="opacity-30"/></div>
+                      <div onClick={() => setConselhoFilterType('GRADES')} className={`cursor-pointer p-3 rounded-xl transition-all flex items-center justify-between ${conselhoFilterType === 'GRADES' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50 border'}`}><div className="flex flex-col"><span className="text-[9px] uppercase font-bold opacity-70">Notas Baixas</span><span className="text-xl font-black">{alunosBaixoRendimento}</span></div><BarChart3 size={20} className="opacity-30"/></div>
+                      <div onClick={() => setConselhoFilterType('LOGS')} className={`cursor-pointer p-3 rounded-xl transition-all flex items-center justify-between ${conselhoFilterType === 'LOGS' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50 border'}`}><div className="flex flex-col"><span className="text-[9px] uppercase font-bold opacity-70">Ocorrências</span><span className="text-xl font-black">{councilStudents.filter(s => (s.logs?.length || 0) > 0).length}</span></div><FileText size={20} className="opacity-30"/></div>
                   </div>
-                  <div className="bg-white rounded-2xl p-2 flex flex-col items-center justify-center relative overflow-hidden shadow-sm border border-slate-100">
-                      <h4 className="text-[10px] font-bold text-slate-400 uppercase absolute top-4 left-6 tracking-widest">Radar da Turma</h4>
-                      <div className="w-full h-48 mt-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarChartData}>
-                            <PolarGrid stroke="#e2e8f0" />
-                            <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: '#64748b', fontWeight: 'bold' }} />
-                            <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
-                            <Radar name="Turma" dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
-                            <Tooltip />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </div>
+                  <div className="bg-white rounded-xl p-2 flex flex-col items-center justify-center relative overflow-hidden shadow-sm border border-slate-100 h-32">
+                      <div className="w-full h-full"><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="60%" data={radarChartData}><PolarGrid stroke="#e2e8f0"/><PolarAngleAxis dataKey="subject" tick={{ fontSize: 8, fill: '#64748b', fontWeight: 'bold' }}/><PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false}/><Radar name="Turma" dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.6}/><Tooltip/></RadarChart></ResponsiveContainer></div>
                   </div>
               </div>
               
@@ -262,13 +213,10 @@ export default function App() {
                   <div className="overflow-x-auto flex-1">
                       <table className="w-full text-xs text-left min-w-[1000px]">
                           <thead className="bg-slate-50 text-slate-500 font-bold uppercase sticky top-0 z-10 border-b">
-                              <tr>
-                                  <th className="px-4 py-4 sticky left-0 bg-slate-50 z-20">Estudante</th>
-                                  <th className="px-2 py-4 text-center">LP</th><th className="px-2 py-4 text-center">MAT</th><th className="px-2 py-4 text-center">CIE</th><th className="px-2 py-4 text-center">HIS</th><th className="px-2 py-4 text-center">GEO</th><th className="px-2 py-4 text-center">ING</th><th className="px-2 py-4 text-center">ART</th><th className="px-2 py-4 text-center">EDF</th><th className="px-2 py-4 text-center bg-slate-100">PD1</th><th className="px-2 py-4 text-center bg-slate-100">PD2</th><th className="px-2 py-4 text-center bg-slate-100">PD3</th><th className="px-4 py-4 text-center bg-red-50 text-red-700">FALTAS</th><th className="px-4 py-4">Atendimentos</th>
-                              </tr>
+                              <tr><th className="px-4 py-3 sticky left-0 bg-slate-50 z-20">Estudante</th><th className="px-2 py-3 text-center">LP</th><th className="px-2 py-3 text-center">MAT</th><th className="px-2 py-3 text-center">CIE</th><th className="px-2 py-3 text-center">HIS</th><th className="px-2 py-3 text-center">GEO</th><th className="px-2 py-3 text-center">ING</th><th className="px-2 py-3 text-center">ART</th><th className="px-2 py-3 text-center">EDF</th><th className="px-2 py-3 text-center bg-slate-100">PD1</th><th className="px-2 py-3 text-center bg-slate-100">PD2</th><th className="px-2 py-3 text-center bg-slate-100">PD3</th><th className="px-4 py-3 text-center bg-red-50 text-red-700">FALTAS</th><th className="px-4 py-3">Atendimentos</th></tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                              {councilStudents.map(s => {
+                              {councilStudents.length === 0 ? <tr><td colSpan={14} className="p-8 text-center text-slate-400 font-bold">Nenhum aluno encontrado.</td></tr> : councilStudents.map(s => {
                                   const notas = s.desempenho?.find((d: any) => d.bimestre === selectedBimestre) || {};
                                   return (
                                       <tr key={s.id} onClick={() => setProjectedStudent(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
@@ -351,8 +299,8 @@ export default function App() {
           <p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p><p>{SYSTEM_ROLE}</p><p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p>
           <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white transition-colors"><LogOut size={12} /> Sair do Sistema</button>
           <div className="mt-4 pt-4 border-t border-slate-700 flex flex-col gap-1 text-slate-400">
-            <div className="flex items-center gap-2"><Code size={12}/> <span className="text-[9px] font-bold">Desenvolvedor: {SYSTEM_USER_NAME}</span></div>
-            <span className="text-[8px] opacity-50">v1.0.8 Enterprise Edition</span>
+            <div className="flex items-center gap-2"><Code size={12}/> <span className="text-[9px] font-bold">Dev. & Design: {SYSTEM_USER_NAME}</span></div>
+            <span className="text-[8px] opacity-50">v1.0.9 Enterprise Edition</span>
           </div>
         </div>
       </aside>
