@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff, BrainCircuit, ClipboardList
 } from 'lucide-react';
 
 // ==============================================================================
@@ -97,8 +97,9 @@ export default function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
 
-  // --- NOVO: MODO PROJEÇÃO DO CONSELHO ---
+  // --- MODO PROJEÇÃO E SIGILO ---
   const [projectedStudent, setProjectedStudent] = useState<any | null>(null);
+  const [isSensitiveVisible, setIsSensitiveVisible] = useState(false); // Default: Oculto
 
   // Tabs & Forms
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil');
@@ -167,7 +168,8 @@ export default function App() {
     setSolicitante('Professor');
     setEncaminhamento('');
     setExitReason(''); 
-  }, [selectedStudent]);
+    setIsSensitiveVisible(false); // Reseta sigilo ao fechar/abrir
+  }, [selectedStudent, projectedStudent]);
 
   // FUNÇÕES DE CONFIGURAÇÃO
   const addListItem = (listName: string) => {
@@ -300,13 +302,12 @@ export default function App() {
     }
   };
 
-  // --- FUNÇÕES DE EDIÇÃO NO CONSELHO (NOVO) ---
+  // --- FUNÇÕES DE EDIÇÃO NO CONSELHO ---
   const handleUpdateGrade = (field: string, value: string) => {
       if(!projectedStudent) return;
       const newStudent = { ...projectedStudent };
       const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre);
       
-      // Se não existir registro para este bimestre, não editamos (por segurança, deveria ter sido importado)
       if (bimIndex >= 0) {
           const numValue = value === '' ? null : parseFloat(value.replace(',', '.'));
           newStudent.desempenho[bimIndex][field] = numValue;
@@ -331,10 +332,48 @@ export default function App() {
 
       if(!error) {
           alert('Alterações de nota/falta salvas com sucesso!');
-          fetchStudents(); // Atualiza a lista geral
+          fetchStudents(); 
       } else {
           alert('Erro ao salvar: ' + error.message);
       }
+  };
+
+  // --- GERAR ATA DO CONSELHO (PDF) ---
+  const generateCouncilAta = (targetClass: string) => {
+      const councilStudents = students.filter(s => s.class_id === targetClass);
+      if(councilStudents.length === 0) return alert('Turma vazia');
+
+      const doc = new jsPDF();
+      doc.setFontSize(14); doc.setFont("helvetica", "bold");
+      doc.text(`ATA DO CONSELHO DE CLASSE - TURMA ${targetClass}`, 105, 20, {align: "center"});
+      doc.setFontSize(10); doc.setFont("helvetica", "normal");
+      doc.text(`${selectedBimestre} - ${new Date().toLocaleDateString()}`, 105, 26, {align: "center"});
+
+      const rows = councilStudents.map(s => {
+          const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {};
+          const logs = s.logs?.length || 0;
+          return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.faltas_bimestre||0, logs];
+      });
+
+      autoTable(doc, {
+          startY: 35,
+          head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'Faltas', 'Ocorr.']],
+          body: rows,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [79, 70, 229] }
+      });
+
+      // Espaço para assinaturas
+      let finalY = (doc as any).lastAutoTable.finalY + 20;
+      doc.text("Assinaturas dos Professores Presentes:", 14, finalY);
+      finalY += 10;
+      doc.line(14, finalY, 100, finalY); doc.text("Professor(a)", 14, finalY + 5);
+      doc.line(110, finalY, 196, finalY); doc.text("Coordenação / SOE", 110, finalY + 5);
+      finalY += 20;
+      doc.line(14, finalY, 100, finalY); doc.text("Professor(a)", 14, finalY + 5);
+      doc.line(110, finalY, 196, finalY); doc.text("Professor(a)", 110, finalY + 5);
+
+      doc.save(`ATA_CONSELHO_${targetClass}.pdf`);
   };
 
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -427,17 +466,55 @@ export default function App() {
       const targetClass = conselhoTurma || turmas[0];
       const councilStudents = students.filter(s => s.class_id === targetClass);
 
+      // --- DIAGNÓSTICO DA TURMA (NOVO) ---
+      const statsTurma = useMemo(() => {
+          let totalFaltas = 0;
+          let alunosRisco = 0;
+          let totalOcorrencias = 0;
+          councilStudents.forEach(s => {
+              const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
+              if(d) {
+                  totalFaltas += (d.faltas_bimestre || 0);
+                  if(d.faltas_bimestre > 20) alunosRisco++;
+              }
+              totalOcorrencias += (s.logs?.length || 0);
+          });
+          const mediaFaltas = councilStudents.length > 0 ? Math.round(totalFaltas / councilStudents.length) : 0;
+          return { totalFaltas, mediaFaltas, alunosRisco, totalOcorrencias };
+      }, [councilStudents, selectedBimestre]);
+
       return (
           <div className="max-w-[1800px] mx-auto pb-20 w-full h-full flex flex-col">
               <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3"><GraduationCap size={28} className="text-indigo-600"/> Conselho de Classe Digital</h2>
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 items-center">
                       <select className="p-3 border rounded-xl font-bold bg-white shadow-sm" value={targetClass} onChange={e => setConselhoTurma(e.target.value)}>
                           {turmas.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                       <select className="p-3 border rounded-xl font-bold bg-white shadow-sm" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}>
                           <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
                       </select>
+                      <button onClick={() => generateCouncilAta(targetClass)} className="bg-slate-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-bold hover:bg-slate-900 shadow-md"><ClipboardList size={20}/> Gerar Ata PDF</button>
+                  </div>
+              </div>
+
+              {/* PAINEL DE DIAGNÓSTICO (NOVO) */}
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+                      <div className="bg-indigo-100 p-3 rounded-full text-indigo-600"><Users2 size={24}/></div>
+                      <div><p className="text-xs font-bold text-slate-400 uppercase">Alunos na Turma</p><p className="text-2xl font-black text-slate-700">{councilStudents.length}</p></div>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+                      <div className="bg-orange-100 p-3 rounded-full text-orange-600"><Clock size={24}/></div>
+                      <div><p className="text-xs font-bold text-slate-400 uppercase">Média de Faltas</p><p className="text-2xl font-black text-slate-700">{statsTurma.mediaFaltas}</p></div>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+                      <div className="bg-red-100 p-3 rounded-full text-red-600"><AlertTriangle size={24}/></div>
+                      <div><p className="text-xs font-bold text-slate-400 uppercase">Ponto de Atenção</p><p className="text-2xl font-black text-red-600">{statsTurma.alunosRisco} <span className="text-xs text-red-400 font-normal">alunos</span></p></div>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+                      <div className="bg-blue-100 p-3 rounded-full text-blue-600"><FileText size={24}/></div>
+                      <div><p className="text-xs font-bold text-slate-400 uppercase">Total Ocorrências</p><p className="text-2xl font-black text-slate-700">{statsTurma.totalOcorrencias}</p></div>
                   </div>
               </div>
               
@@ -464,16 +541,10 @@ export default function App() {
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                               {councilStudents.map(s => {
-                                  // Encontrar notas do bimestre selecionado
                                   const notas = s.desempenho?.find((d: any) => d.bimestre === selectedBimestre) || {};
-                                  // Contar logs
                                   const totalLogs = s.logs?.length || 0;
                                   const logsGraves = s.logs?.filter((l: any) => JSON.stringify(l).toLowerCase().includes('agressividade') || JSON.stringify(l).toLowerCase().includes('suspensão')).length || 0;
-                                  
-                                  const renderNota = (val: number) => {
-                                      if (val === undefined || val === null) return <span className="text-slate-300">-</span>;
-                                      return <span className={`font-bold ${val < 5 ? 'text-red-600 bg-red-50 px-1 rounded' : 'text-slate-700'}`}>{val}</span>;
-                                  };
+                                  const renderNota = (val: number) => { if (val === undefined || val === null) return <span className="text-slate-300">-</span>; return <span className={`font-bold ${val < 5 ? 'text-red-600 bg-red-50 px-1 rounded' : 'text-slate-700'}`}>{val}</span>; };
 
                                   return (
                                       <tr key={s.id} onClick={() => setProjectedStudent(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
@@ -659,7 +730,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE PROJEÇÃO (COM EDIÇÃO DE NOTAS) */}
+      {/* MODAL DE PROJEÇÃO (COM EDIÇÃO, PRIVACIDADE E NOTAS EXTRAS) */}
       {projectedStudent && (
         <div className="fixed inset-0 bg-slate-950/90 z-[100] flex items-center justify-center p-8 backdrop-blur-md">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-300">
@@ -673,7 +744,11 @@ export default function App() {
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <button onClick={handleSaveCouncilChanges} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95"><Save size={20}/> SALVAR ALTERAÇÕES</button>
+                        {/* BOTÃO DE PRIVACIDADE SOE */}
+                        <button onClick={() => setIsSensitiveVisible(!isSensitiveVisible)} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-colors ${isSensitiveVisible ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+                            {isSensitiveVisible ? <><EyeOff size={18}/> Ocultar Sigilo</> : <><Eye size={18}/> Ver Detalhes SOE</>}
+                        </button>
+                        <button onClick={handleSaveCouncilChanges} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95"><Save size={20}/> SALVAR</button>
                         <button onClick={() => setProjectedStudent(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"><X size={32}/></button>
                     </div>
                 </div>
@@ -692,10 +767,12 @@ export default function App() {
                             <div className="grid grid-cols-3 gap-3">
                                 {(() => {
                                     const notas = projectedStudent.desempenho?.find((d:any) => d.bimestre === selectedBimestre) || {};
+                                    // LISTA COMPLETA INCLUINDO PD2 e PD3
                                     const disciplinas = [
                                         {n:'LP', k:'lp', v: notas.lp}, {n:'MAT', k:'mat', v: notas.mat}, {n:'CIE', k:'cie', v: notas.cie},
                                         {n:'HIS', k:'his', v: notas.his}, {n:'GEO', k:'geo', v: notas.geo}, {n:'ING', k:'ing', v: notas.ing},
-                                        {n:'ART', k:'art', v: notas.art}, {n:'EDF', k:'edf', v: notas.edf}, {n:'PD1', k:'pd1', v: notas.pd1}
+                                        {n:'ART', k:'art', v: notas.art}, {n:'EDF', k:'edf', v: notas.edf}, 
+                                        {n:'PD1', k:'pd1', v: notas.pd1}, {n:'PD2', k:'pd2', v: notas.pd2}, {n:'PD3', k:'pd3', v: notas.pd3}
                                     ];
                                     return disciplinas.map(d => (
                                         <div key={d.k} className={`flex flex-col items-center p-2 rounded-xl border-2 transition-colors ${d.v < 5 && d.v !== null && d.v !== '' ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100 focus-within:border-indigo-400'}`}>
@@ -725,7 +802,7 @@ export default function App() {
                     {/* COLUNA 2: OCORRÊNCIAS E DELIBERAÇÕES */}
                     <div className="lg:w-2/3 p-8 bg-white overflow-y-auto flex flex-col gap-8">
                         
-                        {/* LISTA DE OCORRÊNCIAS */}
+                        {/* LISTA DE OCORRÊNCIAS (COM BLUR DE PRIVACIDADE) */}
                         <div className="flex-1">
                             <h3 className="font-bold text-indigo-900 text-lg uppercase mb-4 flex items-center gap-2"><FileText size={20}/> Resumo de Ocorrências</h3>
                             <div className="space-y-3">
@@ -740,7 +817,11 @@ export default function App() {
                                             <div className="flex flex-wrap gap-2 mb-2">
                                                 {desc.motivos?.map((m:string) => <span key={m} className="text-[10px] font-bold bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-600">{m}</span>)}
                                             </div>
-                                            <p className="text-sm text-slate-600 italic">"{desc.obs}"</p>
+                                            {/* LÓGICA DE BLUR / PRIVACIDADE */}
+                                            <div className={`text-sm text-slate-600 italic transition-all duration-300 ${isSensitiveVisible ? '' : 'blur-sm select-none'}`}>
+                                                "{desc.obs}"
+                                            </div>
+                                            {!isSensitiveVisible && <p className="text-[10px] text-center text-slate-400 uppercase mt-1">Conteúdo Oculto (Sigilo SOE)</p>}
                                         </div>
                                     )
                                 }) : <p className="text-slate-400 text-center py-8 italic">Nenhuma ocorrência registrada.</p>}
@@ -749,7 +830,7 @@ export default function App() {
 
                         {/* CAMPOS DE DELIBERAÇÃO */}
                         <div className="bg-orange-50 p-6 rounded-2xl border border-orange-100">
-                            <h3 className="font-bold text-orange-800 text-lg uppercase mb-4 flex items-center gap-2"><GraduationCap size={20}/> Deliberação do Conselho</h3>
+                            <h3 className="font-bold text-orange-800 text-lg uppercase mb-4 flex items-center gap-2"><BrainCircuit size={20}/> Deliberação do Conselho</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs font-bold text-orange-400 uppercase mb-1 block">Anotações / Observações</label>
