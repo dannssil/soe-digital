@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, ChevronLeft, Star, Activity, Heart, Brain, PenTool, Copyright
 } from 'lucide-react';
 
 // ==============================================================================
@@ -76,11 +76,8 @@ export default function App() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<'dashboard' | 'students' | 'conselho'>('dashboard');
-  const [dashboardFilterType, setDashboardFilterType] = useState<'ALL' | 'RISK' | 'ACTIVE' | 'TRANSFER' | 'ABANDON'>('ALL');
-  
-  // NOVO ESTADO DE FILTRO DO CONSELHO INCLUINDO 'GRADES' (NOTAS)
+  const [dashboardFilterType, setDashboardFilterType] = useState<'ALL' | 'RISK' | 'ACTIVE' | 'TRANSFER' | 'ABANDON' | 'RESOLVED' | 'RECURRENT' | 'WITH_LOGS'>('ALL');
   const [conselhoFilterType, setConselhoFilterType] = useState<'ALL' | 'RISK' | 'LOGS' | 'GRADES'>('ALL');
-  
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -95,6 +92,7 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [projectedStudent, setProjectedStudent] = useState<any | null>(null);
   const [isSensitiveVisible, setIsSensitiveVisible] = useState(false); 
+  const [isEvalModalOpen, setIsEvalModalOpen] = useState(false); // NOVO MODAL AVALIAÇÃO
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil');
   const [isEditing, setIsEditing] = useState(false);
   const [selectedClassFilter, setSelectedClassFilter] = useState<string | null>(null);
@@ -102,6 +100,8 @@ export default function App() {
   const [selectedBimestre, setSelectedBimestre] = useState('1º Bimestre');
   const [dataConselho, setDataConselho] = useState(new Date().toISOString().split('T')[0]);
   const [conselhoTurma, setConselhoTurma] = useState<string>('');
+  const [councilObs, setCouncilObs] = useState('');
+  const [councilEnc, setCouncilEnc] = useState('');
   const [listComportamento, setListComportamento] = useState<string[]>(DEFAULT_COMPORTAMENTO);
   const [listPedagogico, setListPedagogico] = useState<string[]>(DEFAULT_PEDAGOGICO);
   const [listSocial, setListSocial] = useState<string[]>(DEFAULT_SOCIAL);
@@ -123,8 +123,7 @@ export default function App() {
   const [exitType, setExitType] = useState<'TRANSFERIDO' | 'ABANDONO'>('TRANSFERIDO');
 
   useEffect(() => {
-    const savedAuth = localStorage.getItem('soe_auth');
-    const savedPhoto = localStorage.getItem('adminPhoto');
+    const savedAuth = localStorage.getItem('soe_auth'); const savedPhoto = localStorage.getItem('adminPhoto');
     const savedComp = localStorage.getItem('list_comp'); if (savedComp) setListComportamento(JSON.parse(savedComp));
     const savedPed = localStorage.getItem('list_ped'); if (savedPed) setListPedagogico(JSON.parse(savedPed));
     const savedSoc = localStorage.getItem('list_soc'); if (savedSoc) setListSocial(JSON.parse(savedSoc));
@@ -140,7 +139,15 @@ export default function App() {
 
   useEffect(() => {
     setObsLivre(""); setMotivosSelecionados([]); setResolvido(false); setSolicitante('Professor'); setEncaminhamento(''); setExitReason(''); setIsSensitiveVisible(false);
-  }, [selectedStudent, projectedStudent]);
+  }, [selectedStudent]);
+
+  useEffect(() => {
+      if (projectedStudent) {
+          const dadosBimestre = projectedStudent.desempenho?.find((d: any) => d.bimestre === selectedBimestre);
+          setCouncilObs(dadosBimestre?.obs_conselho || '');
+          setCouncilEnc(dadosBimestre?.encaminhamento_conselho || '');
+      } else { setCouncilObs(''); setCouncilEnc(''); }
+  }, [projectedStudent, selectedBimestre]);
 
   const addListItem = (listName: string) => { if (!newItem) return; if (listName === 'comp') { const n = [...listComportamento, newItem]; setListComportamento(n); localStorage.setItem('list_comp', JSON.stringify(n)); } if (listName === 'ped') { const n = [...listPedagogico, newItem]; setListPedagogico(n); localStorage.setItem('list_ped', JSON.stringify(n)); } if (listName === 'soc') { const n = [...listSocial, newItem]; setListSocial(n); localStorage.setItem('list_soc', JSON.stringify(n)); } if (listName === 'enc') { const n = [...listEncaminhamentos, newItem]; setListEncaminhamentos(n); localStorage.setItem('list_enc', JSON.stringify(n)); } setNewItem(''); };
   const removeListItem = (listName: string, item: string) => { if (listName === 'comp') { const n = listComportamento.filter(i => i !== item); setListComportamento(n); localStorage.setItem('list_comp', JSON.stringify(n)); } if (listName === 'ped') { const n = listPedagogico.filter(i => i !== item); setListPedagogico(n); localStorage.setItem('list_ped', JSON.stringify(n)); } if (listName === 'soc') { const n = listSocial.filter(i => i !== item); setListSocial(n); localStorage.setItem('list_soc', JSON.stringify(n)); } if (listName === 'enc') { const n = listEncaminhamentos.filter(i => i !== item); setListEncaminhamentos(n); localStorage.setItem('list_enc', JSON.stringify(n)); } };
@@ -154,18 +161,7 @@ export default function App() {
 
   const toggleItem = (list: string[], setList: any, item: string) => { if (list.includes(item)) setList(list.filter((i: string) => i !== item)); else setList([...list, item]); };
   
-  // CRITÉRIO DE RISCO (EXCLUI PDs)
-  const checkRisk = (student: any) => { 
-      const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; 
-      const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; 
-      let notasVermelhas = 0; 
-      if (ultDesempenho) { 
-          // AQUI ESTÃO APENAS AS MATÉRIAS BASE (SEM PD)
-          const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; 
-          notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; 
-      } 
-      return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas }; 
-  };
+  const checkRisk = (student: any) => { const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; let notasVermelhas = 0; if (ultDesempenho) { const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; } return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas }; };
   
   const stats = useMemo(() => { const allLogs = students.flatMap(s => s.logs || []); const last7Days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); const count = allLogs.filter(l => new Date(l.created_at).toDateString() === d.toDateString()).length; return { name: dateStr, total: count }; }).reverse(); const motivoCount: any = {}; allLogs.forEach(l => { try { const desc = JSON.parse(l.description); if (desc.motivos) desc.motivos.forEach((m: string) => { motivoCount[m] = (motivoCount[m] || 0) + 1; }); } catch (e) { } }); const pieData = Object.keys(motivoCount).map(key => ({ name: key, value: motivoCount[key] })).sort((a, b) => b.value - a.value).slice(0, 5); return { last7Days, pieData, allLogs }; }, [students]);
 
@@ -176,13 +172,40 @@ export default function App() {
   const handleQuickSave = async () => { if (!quickSelectedStudent || !quickReason) return; const desc = JSON.stringify({ solicitante: 'SOE (Rápido)', motivos: [quickReason], acoes: [], obs: '[Registro Rápido via Mobile]' }); const { error } = await supabase.from('logs').insert([{ student_id: quickSelectedStudent.id, category: 'Atendimento SOE', description: desc, resolved: false, created_at: new Date().toISOString() }]); if (!error) { alert(`Salvo!`); setIsQuickModalOpen(false); fetchStudents(); } };
   const handleAddStudent = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, status: 'ATIVO' }]); if (!error) { alert('Criado!'); setIsNewStudentModalOpen(false); fetchStudents(); } else alert(error.message); };
   const handleRegisterExit = async () => { if (!selectedStudent) return; const logDesc = JSON.stringify({ solicitante: 'Secretaria/SOE', motivos: [exitType], obs: `SAÍDA REGISTRADA. Motivo detalhado: ${exitReason}` }); const { error: logError } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: 'Situação Escolar', description: logDesc, resolved: true, created_at: new Date().toISOString() }]); if (logError) return alert('Erro ao salvar histórico: ' + logError.message); const { error } = await supabase.from('students').update({ status: exitType, exit_reason: exitReason, exit_date: new Date().toISOString() }).eq('id', selectedStudent.id); if (!error) { alert('Saída registrada!'); setExitReason(''); setIsExitModalOpen(false); setIsModalOpen(false); fetchStudents(); } else alert(error.message); };
+
+  // --- NOVA FUNÇÃO DE NAVEGAÇÃO ENTRE ALUNOS ---
+  const changeStudent = (direction: 'prev' | 'next') => {
+      const turmas = [...new Set(students.map(s => s.class_id))].sort();
+      const currentClass = conselhoTurma || turmas[0];
+      const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name));
+      if (!projectedStudent || currentList.length === 0) return;
+      const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id);
+      if (direction === 'next') {
+          if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]);
+          else setProjectedStudent(currentList[0]); // Loop para o início
+      } else {
+          if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]);
+          else setProjectedStudent(currentList[currentList.length - 1]); // Loop para o final
+      }
+  };
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
-  const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre); if(!desempenhoAtual) return; const { error } = await supabase.from('desempenho_bimestral').update({ lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie, his: desempenhoAtual.his, geo: desempenhoAtual.geo, ing: desempenhoAtual.ing, art: desempenhoAtual.art, edf: desempenhoAtual.edf, pd1: desempenhoAtual.pd1, pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3, faltas_bimestre: desempenhoAtual.faltas_bimestre }).eq('id', desempenhoAtual.id); if(!error) { alert('Salvo!'); fetchStudents(); } else alert('Erro: ' + error.message); };
+  const handleSaveCouncilChanges = async () => { 
+      if(!projectedStudent) return; 
+      const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre); 
+      if(!desempenhoAtual) return; 
+      const { error } = await supabase.from('desempenho_bimestral').update({ 
+          lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie, his: desempenhoAtual.his, 
+          geo: desempenhoAtual.geo, ing: desempenhoAtual.ing, art: desempenhoAtual.art, edf: desempenhoAtual.edf, 
+          pd1: desempenhoAtual.pd1, pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3, 
+          faltas_bimestre: desempenhoAtual.faltas_bimestre,
+          obs_conselho: councilObs, encaminhamento_conselho: councilEnc 
+      }).eq('id', desempenhoAtual.id); 
+      if(!error) { alert('Dados Salvos!'); fetchStudents(); } else alert('Erro: ' + error.message); 
+  };
 
   const printStudentData = (doc: jsPDF, student: any) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" }); doc.setFontSize(12); doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25); doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${student.name}`, 35, 35); doc.setFont("helvetica", "normal"); doc.text(`Turma: ${student.class_id}`, 160, 35); doc.text(`Responsável:`, 14, 43); doc.text(`${student.guardian_name || 'Não informado'}`, 40, 43); doc.text(`Telefone:`, 14, 50); doc.text(`${student.guardian_phone || '-'}`, 40, 50); doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60); const acadData = student.desempenho?.map((d: any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || []; autoTable(doc, { startY: 65, head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], body: acadData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 8, halign: 'center' }, styles: { fontSize: 8, halign: 'center' } }); const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85; doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY); const logsData = student.logs?.filter((l: any) => l.student_id === student.id).map((l: any) => { let desc = { motivos: [], obs: '', solicitante: '' }; try { desc = JSON.parse(l.description); } catch (e) { } return [new Date(l.created_at).toLocaleDateString('pt-BR'), l.category, `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`, l.resolved ? 'Resolvido' : 'Pendente']; }) || []; autoTable(doc, { startY: finalY + 5, head: [['Data', 'Tipo', 'Detalhes do Atendimento', 'Status']], body: logsData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 2: { cellWidth: 100 } } }); const pageHeight = doc.internal.pageSize.height; doc.line(60, pageHeight - 35, 150, pageHeight - 35); doc.setFont("helvetica", "bold"); doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 105, pageHeight - 30, { align: "center" }); doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 25, { align: "center" }); doc.setFontSize(8); doc.setTextColor(100); const timeNow = new Date().toLocaleString('pt-BR'); doc.text(`Emitido em: ${timeNow}`, 105, pageHeight - 15, { align: "center" }); };
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
   const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); if (!window.confirm(`Deseja gerar fichas da turma ${classId}?`)) return; const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`); };
-  
   const generateCouncilAta = (targetClass: string) => { const councilStudents = students.filter(s => s.class_id === targetClass); if(councilStudents.length === 0) return alert('Turma vazia'); const doc = new jsPDF({ orientation: 'landscape' }); doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(`ATA DO CONSELHO DE CLASSE - TURMA ${targetClass}`, 148, 20, {align: "center"}); doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`Referente ao: ${selectedBimestre} | Data da Reunião: ${new Date(dataConselho).toLocaleDateString('pt-BR')}`, 148, 26, {align: "center"}); const rows = councilStudents.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {}; return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.geo||'-', d.ing||'-', d.art||'-', d.edf||'-', d.pd1||'-', d.pd2||'-', d.pd3||'-', d.faltas_bimestre||0, s.logs?.length||0]; }); autoTable(doc, { startY: 35, head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas', 'Atend.']], body: rows, styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [30, 41, 59] } }); let finalY = (doc as any).lastAutoTable.finalY + 25; doc.setFont("helvetica", "bold"); doc.line(100, finalY, 200, finalY); doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 150, finalY + 5, {align: "center"}); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(`${SYSTEM_ROLE} - Matrícula: ${SYSTEM_MATRICULA}`, 150, finalY + 10, {align: "center"}); doc.save(`ATA_CONSELHO_${targetClass}.pdf`); };
   const handleExportReport = () => { const wb = XLSX.utils.book_new(); const summaryData = [["Métrica", "Valor"], ["Total Alunos", students.length], ["Total Atendimentos", stats.allLogs.length], ["Atendimentos Resolvidos", stats.allLogs.filter(l => l.resolved).length], ["Alunos em Risco", students.filter(s => checkRisk(s).reprovadoFalta || checkRisk(s).criticoNotas).length]]; const wsSummary = XLSX.utils.aoa_to_sheet(summaryData); XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo"); const motivesData = [["Motivo", "Ocorrências"]]; stats.pieData.forEach(d => motivesData.push([d.name, d.value])); const wsMotives = XLSX.utils.aoa_to_sheet(motivesData); XLSX.utils.book_append_sheet(wb, wsMotives, "Motivos"); const studentsData = [["Nome", "Turma", "Total Atendimentos", "Situação"]]; students.map(s => ({ ...s, count: s.logs?.length || 0 })).filter(s => s.count > 0).sort((a, b) => b.count - a.count).forEach(s => { studentsData.push([s.name, s.class_id, s.count, checkRisk(s).reprovadoFalta ? "Risco Faltas" : "Normal"]); }); const wsStudents = XLSX.utils.aoa_to_sheet(studentsData); XLSX.utils.book_append_sheet(wb, wsStudents, "Alunos Recorrentes"); XLSX.writeFile(wb, `Relatorio_Gerencial_SOE.xlsx`); };
   const handleBackup = () => { const wb = XLSX.utils.book_new(); const studentsBackup = students.map(s => ({ ID: s.id, Nome: s.name, Turma: s.class_id, Status: s.status, Responsavel: s.guardian_name, Telefone: s.guardian_phone })); const wsStudents = XLSX.utils.json_to_sheet(studentsBackup); XLSX.utils.book_append_sheet(wb, wsStudents, "Alunos"); const logsBackup = students.flatMap(s => s.logs?.map((l: any) => ({ Aluno: s.name, Turma: s.class_id, Data: new Date(l.created_at).toLocaleDateString(), Tipo: l.category, Descricao: l.description, Resolvido: l.resolved ? "SIM" : "NAO" })) || []); const wsLogs = XLSX.utils.json_to_sheet(logsBackup); XLSX.utils.book_append_sheet(wb, wsLogs, "Historico_Atendimentos"); XLSX.writeFile(wb, `BACKUP_COMPLETO_SOE_${new Date().toISOString().split('T')[0]}.xlsx`); };
@@ -191,17 +214,12 @@ export default function App() {
 
   const renderConselho = () => {
       const turmas = [...new Set(students.map(s => s.class_id))].sort(); const targetClass = conselhoTurma || turmas[0]; let councilStudents = students.filter(s => s.class_id === targetClass);
-      
-      let totalFaltas = 0; let alunosRisco = 0; let totalOcorrencias = 0;
-      let alunosBaixoRendimento = 0; // CONTADOR DO NOVO CARD
-
+      let totalFaltas = 0; let alunosRisco = 0; let totalOcorrencias = 0; let alunosBaixoRendimento = 0;
       councilStudents.forEach(s => { 
           const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
           if(d) { 
               totalFaltas += (d.faltas_bimestre || 0); 
               if(d.faltas_bimestre > 20) alunosRisco++; 
-              
-              // LÓGICA DO NOVO CARD (EXCLUI PDs)
               const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf];
               const notasVermelhas = disciplinasBase.filter(n => n !== null && n < 5).length;
               if (notasVermelhas > 3) alunosBaixoRendimento++;
@@ -210,20 +228,11 @@ export default function App() {
       });
       const mediaFaltas = councilStudents.length > 0 ? Math.round(totalFaltas / councilStudents.length) : 0;
       
-      // FILTRO INTERATIVO DO CONSELHO
       if (conselhoFilterType === 'RISK') councilStudents = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && d.faltas_bimestre > 20; });
       if (conselhoFilterType === 'LOGS') councilStudents = councilStudents.filter(s => (s.logs?.length || 0) > 0);
-      
-      // NOVO FILTRO DE NOTAS
-      if (conselhoFilterType === 'GRADES') councilStudents = councilStudents.filter(s => {
-          const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
-          if (!d) return false;
-          const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf];
-          return disciplinasBase.filter(n => n !== null && n < 5).length > 3;
-      });
+      if (conselhoFilterType === 'GRADES') councilStudents = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); if (!d) return false; const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf]; return disciplinasBase.filter(n => n !== null && n < 5).length > 3; });
 
       if (!targetClass) return <div className="p-10 text-center text-slate-400">Carregando dados...</div>;
-
       return (
           <div className="max-w-[1800px] mx-auto pb-20 w-full h-full flex flex-col overflow-hidden">
               <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -232,22 +241,17 @@ export default function App() {
                       <div className="flex items-center gap-2 bg-white p-2 rounded-xl border shadow-sm"><Calendar size={18} className="text-slate-400"/><input type="date" className="text-sm font-bold outline-none" value={dataConselho} onChange={e => setDataConselho(e.target.value)}/></div>
                       <select className="p-3 border rounded-xl font-bold bg-white shadow-sm text-sm" value={targetClass} onChange={e => {setConselhoTurma(e.target.value); setConselhoFilterType('ALL');}}>{turmas.map(t => <option key={t} value={t}>{t}</option>)}</select>
                       <select className="p-3 border rounded-xl font-bold bg-white shadow-sm text-sm" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select>
+                      {/* BOTÃO AVALIAÇÃO GLOBAL */}
+                      <button onClick={() => setIsEvalModalOpen(true)} className="bg-orange-500 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-bold hover:bg-orange-600 shadow-md text-sm"><Activity size={18}/> Radar da Turma</button>
                       <button onClick={() => generateCouncilAta(targetClass)} className="bg-slate-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-bold hover:bg-slate-900 shadow-md text-sm"><Printer size={18}/> Gerar Ata PDF</button>
                   </div>
               </div>
-              
-              {/* CARDS COM NOVO CARD DE BAIXO RENDIMENTO */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                   <div onClick={() => setConselhoFilterType('ALL')} className={`cursor-pointer p-4 rounded-xl shadow-sm border transition-all flex items-center gap-4 ${conselhoFilterType === 'ALL' ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white border-slate-100 hover:border-indigo-300'}`}><Users2 size={24}/><div><p className="text-[10px] font-bold uppercase opacity-70">Total Turma</p><p className="text-2xl font-black">{students.filter(s => s.class_id === targetClass).length}</p></div></div>
-                  
                   <div onClick={() => setConselhoFilterType('RISK')} className={`cursor-pointer p-4 rounded-xl shadow-sm border transition-all flex items-center gap-4 ${conselhoFilterType === 'RISK' ? 'bg-red-600 text-white border-red-700' : 'bg-white border-slate-100 hover:border-red-300'}`}><AlertTriangle size={24}/><div><p className="text-[10px] font-bold uppercase opacity-70">Em Alerta (Faltas)</p><p className="text-2xl font-black">{alunosRisco}</p></div></div>
-                  
-                  {/* NOVO CARD INTERATIVO DE NOTAS */}
                   <div onClick={() => setConselhoFilterType('GRADES')} className={`cursor-pointer p-4 rounded-xl shadow-sm border transition-all flex items-center gap-4 ${conselhoFilterType === 'GRADES' ? 'bg-orange-500 text-white border-orange-600' : 'bg-white border-slate-100 hover:border-orange-300'}`}><BarChart3 size={24}/><div><p className="text-[10px] font-bold uppercase opacity-70">Baixo Rendimento</p><p className="text-2xl font-black">{alunosBaixoRendimento}</p></div></div>
-                  
                   <div onClick={() => setConselhoFilterType('LOGS')} className={`cursor-pointer p-4 rounded-xl shadow-sm border transition-all flex items-center gap-4 ${conselhoFilterType === 'LOGS' ? 'bg-blue-600 text-white border-blue-700' : 'bg-white border-slate-100 hover:border-blue-300'}`}><FileText size={24}/><div><p className="text-[10px] font-bold uppercase opacity-70">Com Atendimentos</p><p className="text-2xl font-black">{councilStudents.filter(s => (s.logs?.length || 0) > 0).length}</p></div></div>
               </div>
-              
               <div className="bg-white rounded-2xl shadow-sm border overflow-hidden flex-1 flex flex-col min-h-0">
                   <div className="overflow-x-auto flex-1">
                       <table className="w-full text-xs text-left min-w-[1000px]">
@@ -294,12 +298,10 @@ export default function App() {
             <div onClick={() => { setDashboardFilterType('ABANDON'); setView('students'); }} className="cursor-pointer flex justify-between items-center"><span className="text-xs font-bold text-slate-400 uppercase">Abandono</span><span className="text-xl font-black text-red-600">{abandono}</span></div>
           </div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-80">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-full"><h4 className="text-sm font-bold text-slate-700 mb-4 uppercase">Volume de Atendimentos</h4><ResponsiveContainer width="100%" height="100%"><LineChart data={stats.last7Days}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" /><XAxis dataKey="name" axisLine={false} tickLine={false} /><YAxis axisLine={false} tickLine={false} /><Tooltip /><Line type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={4} dot={{ r: 6, fill: '#6366f1' }} /></LineChart></ResponsiveContainer></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-full"><h4 className="text-sm font-bold text-slate-700 mb-4 uppercase flex items-center gap-2"><BarChart3 size={16} /> Motivos Recorrentes</h4><ResponsiveContainer width="100%" height="80%"><PieChart><Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip /><Legend verticalAlign="bottom" height={40} iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} /></PieChart></ResponsiveContainer></div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[600px]">
           <div className="lg:col-span-1 bg-white rounded-2xl border border-red-100 shadow-sm flex flex-col overflow-hidden"><div className="bg-red-50 px-6 py-4 border-b border-red-100"><h3 className="font-bold text-red-800 uppercase text-sm">Alunos em Risco</h3></div><div className="flex-1 overflow-y-auto p-2">{studentsInRisk.length > 0 ? studentsInRisk.map(s => (<div key={s.id} onClick={() => { setSelectedStudent(s); setIsModalOpen(true); }} className="p-3 hover:bg-red-50 rounded-xl cursor-pointer flex items-center justify-between border-b last:border-0 border-slate-100 group transition-colors"><div className="flex items-center gap-3"><Avatar name={s.name} src={s.photo_url} size="sm" /><div><p className="font-bold text-slate-800 text-sm group-hover:text-red-700">{s.name}</p><p className="text-xs text-slate-500 font-bold">Turma {s.class_id}</p></div></div></div>)) : <p className="p-4 text-center text-slate-400 text-sm">Nenhum aluno em risco.</p>}</div></div>
           <div className="lg:col-span-2 bg-white rounded-2xl border border-indigo-100 shadow-sm flex flex-col overflow-hidden"><div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center"><h3 className="font-bold text-indigo-800 uppercase">Pastas de Turmas</h3></div><div className="flex-1 overflow-y-auto p-6"><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{turmas.map(t => { const total = students.filter(s => s.class_id === t).length; const risco = students.filter(s => s.class_id === t && (checkRisk(s).reprovadoFalta || checkRisk(s).criticoNotas)).length; const percent = total > 0 ? (risco / total) * 100 : 0; const isSelected = selectedClassFilter === t; return (<div key={t} onClick={() => setSelectedClassFilter(isSelected ? null : t)} className={`p-5 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-lg flex flex-col justify-between h-36 hover:-translate-y-1 duration-300 ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 ring-4 ring-indigo-100' : 'bg-white border-slate-100 hover:border-indigo-300'}`}><div className="flex justify-between items-start"><h4 className="font-bold text-lg truncate w-3/4" title={t}>{t}</h4><div className="flex gap-2"><button onClick={(e) => generateBatchPDF(t, e)} className={`p-2 rounded-full transition-colors ${isSelected ? 'text-indigo-200 hover:bg-indigo-500 hover:text-white' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600'}`} title="Imprimir Turma"><Printer size={18} /></button><Folder size={20} className={isSelected ? 'text-indigo-200' : 'text-slate-300'} /></div></div><div><div className="flex justify-between text-[10px] mb-1 font-bold"><span className={isSelected ? 'text-indigo-200' : 'text-slate-400'}>{total} Alunos</span><span className={isSelected ? 'text-white' : 'text-red-500'}>{Math.round(percent)}% Risco</span></div><div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? 'bg-black/20' : 'bg-slate-100'}`}><div className={`h-full transition-all duration-500 ${percent > 30 ? 'bg-red-500' : 'bg-emerald-400'}`} style={{ width: `${percent}%` }}></div></div></div></div>) })}</div></div></div>
@@ -319,6 +321,10 @@ export default function App() {
     if (dashboardFilterType === 'ACTIVE' && s.status !== 'ATIVO') return false;
     if (dashboardFilterType === 'TRANSFER' && s.status !== 'TRANSFERIDO') return false;
     if (dashboardFilterType === 'ABANDON' && s.status !== 'ABANDONO') return false;
+    // NOVOS FILTROS
+    if (dashboardFilterType === 'RESOLVED') return s.logs?.some((l:any) => l.resolved);
+    if (dashboardFilterType === 'RECURRENT') return (s.logs?.length || 0) >= 3;
+    if (dashboardFilterType === 'WITH_LOGS') return (s.logs?.length || 0) > 0;
     return !globalSearch || s.name.toLowerCase().includes(globalSearch.toLowerCase());
   });
 
@@ -334,18 +340,13 @@ export default function App() {
           <button onClick={handleBackup} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><Database size={18} /> Backup</button>
           <button onClick={() => { setIsSettingsModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><Settings size={18} /> Configurações</button>
         </nav>
-        <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400"><p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p><p>{SYSTEM_ROLE}</p><p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p><button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white transition-colors"><LogOut size={12} /> Sair do Sistema</button></div>
+        <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400"><p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p><p>{SYSTEM_ROLE}</p><p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p><button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white transition-colors"><LogOut size={12} /> Sair do Sistema</button><div className="mt-4 pt-4 border-t border-slate-700 flex items-center gap-2 text-slate-500"><Copyright size={10}/> <span className="text-[9px]">Desenvolvido por {SYSTEM_USER_NAME}</span></div></div>
       </aside>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         <header className="bg-white border-b px-4 md:px-8 py-3 flex justify-between items-center shadow-sm z-10 gap-4">
           <div className="flex items-center gap-3 flex-1"><button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden text-slate-600"><Menu size={24} /></button>
-          {/* BOTÃO VOLTAR NAVEGAÇÃO */}
-          {view !== 'dashboard' && (
-              <button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-bold text-sm bg-slate-100 px-3 py-1 rounded-full">
-                  <ArrowLeft size={16} /> Voltar ao Início
-              </button>
-          )}
+          {view !== 'dashboard' && (<button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-bold text-sm bg-slate-100 px-3 py-1 rounded-full"><ArrowLeft size={16} /> Voltar ao Início</button>)}
           <div className="flex-1 max-w-md relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="Buscar aluno..." className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-full text-sm outline-none" value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); if (e.target.value.length > 0) setView('students'); }} /></div></div>
           <Avatar name={SYSTEM_USER_NAME} src={adminPhoto} />
         </header>
@@ -383,6 +384,24 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL RADAR TURMA */}
+      {isEvalModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Activity className="text-orange-500" /> Avaliação da Turma</h3><button onClick={() => setIsEvalModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={24} /></button></div>
+            <div className="space-y-6">
+              {[ {l: 'Assiduidade', i: <Clock size={18}/>}, {l: 'Participação', i: <Brain size={18}/>}, {l: 'Relacionamento', i: <Heart size={18}/>}, {l: 'Rendimento', i: <BarChart3 size={18}/>}, {l: 'Tarefas', i: <PenTool size={18}/>} ].map((item, idx) => (
+                <div key={idx}>
+                  <label className="flex items-center gap-2 text-sm font-bold text-slate-600 mb-2">{item.i} {item.l}</label>
+                  <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">Fraco</span><input type="range" min="1" max="5" defaultValue="3" className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-500" /><span className="text-xs font-bold text-slate-400">Excelente</span></div>
+                </div>
+              ))}
+              <div className="pt-4 border-t"><button onClick={() => { alert('Avaliação registrada (Simulação)!'); setIsEvalModalOpen(false); }} className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold hover:bg-orange-600">Salvar Avaliação</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL PROJEÇÃO */}
       {projectedStudent && (
         <div className="fixed inset-0 bg-slate-950/90 z-[100] flex items-center justify-center p-4 lg:p-8 backdrop-blur-md">
@@ -390,6 +409,9 @@ export default function App() {
                 <div className="bg-indigo-900 text-white p-6 flex justify-between items-center shadow-lg">
                     <div className="flex items-center gap-4"><MonitorPlay size={32} className="text-indigo-400"/><div><h2 className="text-2xl lg:text-3xl font-black uppercase tracking-wider">{projectedStudent.name}</h2><p className="text-indigo-300 font-bold text-sm lg:text-lg">TURMA {projectedStudent.class_id} | {selectedBimestre}</p></div></div>
                     <div className="flex items-center gap-2 lg:gap-4">
+                        <button onClick={() => changeStudent('prev')} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors" title="Anterior"><ChevronLeft size={24} color="white"/></button>
+                        <button onClick={() => changeStudent('next')} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors" title="Próximo"><ChevronRight size={24} color="white"/></button>
+                        <div className="w-[1px] h-8 bg-white/20 mx-2"></div>
                         <button onClick={() => setIsSensitiveVisible(!isSensitiveVisible)} className={`flex items-center gap-2 px-3 py-2 rounded-full font-bold text-[10px] lg:text-sm transition-colors ${isSensitiveVisible ? 'bg-red-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
                             {isSensitiveVisible ? <EyeOff size={16}/> : <Eye size={16}/>} Sigilo
                         </button>
@@ -438,8 +460,8 @@ export default function App() {
                         <div className="bg-orange-50 p-6 rounded-2xl border border-orange-100">
                             <h3 className="font-bold text-orange-800 text-lg uppercase mb-4 flex items-center gap-2"><ClipboardList size={20}/> Deliberação do Conselho</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div><label className="text-[10px] font-bold text-orange-400 uppercase mb-1 block">Anotações</label><textarea title="Anotações" className="w-full p-3 rounded-xl border border-orange-200 text-sm h-32" placeholder="Digite as observações..."></textarea></div>
-                                <div><label className="text-[10px] font-bold text-orange-400 uppercase mb-1 block">Encaminhamentos</label><textarea title="Encaminhamentos" className="w-full p-3 rounded-xl border border-orange-200 text-sm h-32" placeholder="Encaminhar para..."></textarea></div>
+                                <div><label className="text-[10px] font-bold text-orange-400 uppercase mb-1 block">Anotações</label><textarea title="Anotações" className="w-full p-3 rounded-xl border border-orange-200 text-sm h-32" placeholder="Digite as observações..." value={councilObs} onChange={(e) => setCouncilObs(e.target.value)}></textarea></div>
+                                <div><label className="text-[10px] font-bold text-orange-400 uppercase mb-1 block">Encaminhamentos</label><textarea title="Encaminhamentos" className="w-full p-3 rounded-xl border border-orange-200 text-sm h-32" placeholder="Encaminhar para..." value={councilEnc} onChange={(e) => setCouncilEnc(e.target.value)}></textarea></div>
                             </div>
                         </div>
                     </div>
@@ -467,7 +489,7 @@ export default function App() {
       )}
 
       {/* OUTROS MODAIS (RELATÓRIOS, ZAP, SAÍDA, IMPORTAÇÃO, NOVO ALUNO) */}
-      {isReportModalOpen && (<div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600" /> Relatórios Gerenciais</h3><button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28} /></button></div><div className="flex-1 overflow-y-auto space-y-6 pr-2"><div className="grid grid-cols-3 gap-4"><div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 text-center"><h4 className="text-sm uppercase font-bold text-indigo-400 mb-2">Total Atendimentos</h4><p className="text-4xl font-black text-indigo-700">{stats.allLogs.length}</p></div><div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100 text-center"><h4 className="text-sm uppercase font-bold text-emerald-400 mb-2">Casos Resolvidos</h4><p className="text-4xl font-black text-emerald-700">{stats.allLogs.filter(l => l.resolved).length}</p></div><div className="bg-amber-50 p-6 rounded-xl border border-amber-100 text-center"><h4 className="text-sm uppercase font-bold text-amber-400 mb-2">Alunos Frequentes</h4><p className="text-4xl font-black text-amber-700">{students.filter(s => (s.logs?.length || 0) >= 3).length}</p></div></div><div className="grid grid-cols-2 gap-6"><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Top 5 Motivos</h4>{stats.pieData.map((d, i) => (<div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><span className="font-medium text-slate-700">{d.name}</span><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{d.value}</span></div>))}</div><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Alunos com +3 Atendimentos</h4><div className="max-h-48 overflow-y-auto">{students.map(s => ({ ...s, count: s.logs?.length || 0 })).filter(s => s.count >= 3).sort((a, b) => b.count - a.count).map(s => (<div key={s.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><div><p className="font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-slate-400">{s.class_id}</p></div><span className="font-bold text-red-600 bg-red-50 px-2 py-1 rounded">{s.count}</span></div>))}</div></div></div></div><div className="pt-6 border-t mt-4 flex justify-end"><button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg transition-transform hover:scale-105"><FileSpreadsheet /> Baixar Relatório Completo</button></div></div></div>)}
+      {isReportModalOpen && (<div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600" /> Relatórios Gerenciais</h3><button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28} /></button></div><div className="flex-1 overflow-y-auto space-y-6 pr-2"><div className="grid grid-cols-3 gap-4"><div onClick={() => { setIsReportModalOpen(false); setDashboardFilterType('WITH_LOGS'); setView('students'); }} className="cursor-pointer bg-indigo-50 p-6 rounded-xl border border-indigo-100 text-center hover:bg-indigo-100 transition-colors"><h4 className="text-sm uppercase font-bold text-indigo-400 mb-2">Total Atendimentos</h4><p className="text-4xl font-black text-indigo-700">{stats.allLogs.length}</p></div><div onClick={() => { setIsReportModalOpen(false); setDashboardFilterType('RESOLVED'); setView('students'); }} className="cursor-pointer bg-emerald-50 p-6 rounded-xl border border-emerald-100 text-center hover:bg-emerald-100 transition-colors"><h4 className="text-sm uppercase font-bold text-emerald-400 mb-2">Casos Resolvidos</h4><p className="text-4xl font-black text-emerald-700">{stats.allLogs.filter(l => l.resolved).length}</p></div><div onClick={() => { setIsReportModalOpen(false); setDashboardFilterType('RECURRENT'); setView('students'); }} className="cursor-pointer bg-amber-50 p-6 rounded-xl border border-amber-100 text-center hover:bg-amber-100 transition-colors"><h4 className="text-sm uppercase font-bold text-amber-400 mb-2">Alunos Frequentes</h4><p className="text-4xl font-black text-amber-700">{students.filter(s => (s.logs?.length || 0) >= 3).length}</p></div></div><div className="grid grid-cols-2 gap-6"><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Top 5 Motivos</h4>{stats.pieData.map((d, i) => (<div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><span className="font-medium text-slate-700">{d.name}</span><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{d.value}</span></div>))}</div><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Alunos com +3 Atendimentos</h4><div className="max-h-48 overflow-y-auto">{students.map(s => ({ ...s, count: s.logs?.length || 0 })).filter(s => s.count >= 3).sort((a, b) => b.count - a.count).map(s => (<div key={s.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><div><p className="font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-slate-400">{s.class_id}</p></div><span className="font-bold text-red-600 bg-red-50 px-2 py-1 rounded">{s.count}</span></div>))}</div></div></div></div><div className="pt-6 border-t mt-4 flex justify-end"><button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg transition-transform hover:scale-105"><FileSpreadsheet /> Baixar Relatório Completo</button></div></div></div>)}
       {isQuickModalOpen && (<div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"><div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200"><button onClick={() => setIsQuickModalOpen(false)} className="absolute top-4 right-4 text-slate-400"><X size={24} /></button><h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-slate-800"><div className="bg-yellow-100 p-2 rounded-full"><Zap className="text-yellow-600" fill="currentColor" /></div> Registro Flash</h3><div className="relative mb-4"><input autoFocus placeholder="Digite o nome do aluno..." className={`w-full p-4 border rounded-xl text-lg font-bold outline-none transition-all ${quickSelectedStudent ? 'bg-green-50 border-green-300 text-green-800' : 'bg-slate-50 focus:ring-2 focus:ring-yellow-400'}`} value={quickSearchTerm} onChange={e => { setQuickSearchTerm(e.target.value); if (quickSelectedStudent && e.target.value !== quickSelectedStudent.name) setQuickSelectedStudent(null); }} />{quickSelectedStudent && <CheckSquare className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600" />}{quickSearchTerm.length > 0 && !quickSelectedStudent && (<div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl mt-1 max-h-48 overflow-y-auto z-50">{students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0, 10).map(s => (<div key={s.id} onClick={() => { setQuickSelectedStudent(s); setQuickSearchTerm(s.name); }} className="p-3 hover:bg-yellow-50 cursor-pointer border-b last:border-0 transition-colors flex justify-between items-center"><span className="font-bold text-slate-700 text-sm">{s.name}</span><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{s.class_id}</span></div>))}{students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).length === 0 && <div className="p-3 text-center text-slate-400 text-xs">Nenhum aluno encontrado</div>}</div>)}</div><div className="grid grid-cols-2 gap-2 mb-6 mt-4">{FLASH_REASONS.map(r => (<button key={r} onClick={() => setQuickReason(r)} className={`p-3 rounded-xl text-xs font-bold border transition-all ${quickReason === r ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{r}</button>))}</div><button onClick={handleQuickSave} disabled={!quickSelectedStudent || !quickReason} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-xl disabled:opacity-50 disabled:shadow-none transition-all hover:bg-green-700 active:scale-95">CONFIRMAR REGISTRO</button></div></div>)}
       {isExitModalOpen && (<div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"><h3 className="text-xl font-bold mb-4 text-red-600">Registrar Saída de Aluno</h3><div className="space-y-4"><div className="flex gap-4 bg-slate-100 p-2 rounded-lg"><label className="flex items-center gap-2 font-bold text-sm cursor-pointer"><input type="radio" name="exitType" checked={exitType === 'TRANSFERIDO'} onChange={() => setExitType('TRANSFERIDO')} /> TRANSFERÊNCIA</label><label className="flex items-center gap-2 font-bold text-sm text-red-600 cursor-pointer"><input type="radio" name="exitType" checked={exitType === 'ABANDONO'} onChange={() => setExitType('ABANDONO')} /> ABANDONO</label></div><textarea className="w-full p-3 border rounded-xl h-24" placeholder="Motivo detalhado da saída..." value={exitReason} onChange={e => setExitReason(e.target.value)} /><div className="flex justify-end gap-2"><button onClick={() => setIsExitModalOpen(false)} className="px-4 py-2 font-bold text-slate-500">CANCELAR</button><button onClick={handleRegisterExit} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700 shadow-lg">CONFIRMAR SAÍDA</button></div></div></div></div>)}
       {isImportModalOpen && (<div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"><h3 className="text-xl font-bold mb-4 text-indigo-600 flex items-center gap-2"><FileSpreadsheet size={24} /> Importar Excel</h3><div className="space-y-4"><div><label className="block text-sm font-bold text-slate-700 mb-1">Bimestre de Referência</label><select title="bim" className="w-full p-3 border rounded-xl" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select></div><div className="border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center bg-indigo-50">{importing ? <p className="animate-pulse font-bold text-indigo-600">Sincronizando...</p> : <input title="file" type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="w-full text-sm" />}</div><div className="flex justify-end"><button onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold">Fechar</button></div></div></div></div>)}
