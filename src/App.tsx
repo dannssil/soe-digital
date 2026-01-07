@@ -3,13 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-// --- IMPORTS GRÁFICOS ---
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, BarChart, Bar,
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
-// --- IMPORTS ÍCONES ---
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
@@ -67,14 +65,14 @@ const StudentList = ({ students, onSelectStudent }: any) => {
               <tr key={s.id} onClick={() => onSelectStudent(s)} className="hover:bg-indigo-50 cursor-pointer transition-colors group">
                 <td className="px-6 py-4 flex items-center gap-4"><Avatar name={s.name} src={s.photo_url} size="md" /><div className="font-bold text-slate-700 text-base group-hover:text-indigo-700 transition-colors">{s.name}</div></td>
                 <td className="px-6 py-4 text-slate-500 font-mono text-xs flex items-center gap-2">
-                  {s.birth_date ? <><Cake size={12} className="text-pink-400"/> {new Date(s.birth_date).toLocaleDateString('pt-BR')}</> : '-'}
+                  {s.birth_date ? <><Cake size={12} className="text-pink-400"/> {new Date(s.birth_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</> : '-'}
                 </td>
                 <td className="px-6 py-4 text-slate-500 font-bold">{s.class_id}</td>
                 <td className="px-6 py-4">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${s.status === 'ATIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.status}</span>
                      {s.nee_description && <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-purple-100 text-purple-700 flex items-center gap-1" title={s.nee_description}><Puzzle size={10}/> NEE</span>}
-                     {s.ct_referral && <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-orange-100 text-orange-700 flex items-center gap-1" title="Encaminhado ao CT"><Scale size={10}/> CT</span>}
+                     {s.ct_referral && <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-orange-100 text-orange-700 flex items-center gap-1" title={s.ct_referral}><Scale size={10}/> CT</span>}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right"><button className="text-slate-400 hover:text-indigo-600 p-2 transform hover:scale-110 transition-transform"><ChevronRight size={20} /></button></td>
@@ -180,7 +178,7 @@ export default function App() {
   const handleSaveRadar = async () => { const targetClass = conselhoTurma || students[0]?.class_id; if (!targetClass) return; const { error } = await supabase.from('class_radar').upsert({ turma: targetClass, bimestre: selectedBimestre, ...radarData }, { onConflict: 'turma, bimestre' }); if (!error) { alert('Avaliação da Turma Salva!'); setIsEvalModalOpen(false); } else { alert('Erro: ' + error.message); } };
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) { if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return; const file = event.target.files[0]; const fileName = `${selectedStudent.id}-${Math.random()}.${file.name.split('.').pop()}`; const { error } = await supabase.storage.from('photos').upload(fileName, file); if (error) { alert('Erro upload: ' + error.message); return; } const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName); await supabase.from('students').update({ photo_url: publicUrl }).eq('id', selectedStudent.id); setSelectedStudent({ ...selectedStudent, photo_url: publicUrl }); fetchStudents(); }
   
-  // --- IMPORTAÇÃO INTELIGENTE (DT NASCIMENTO + NEE + CT) ---
+  // --- IMPORTAÇÃO INTELIGENTE REFORÇADA ---
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) { 
     if (!e.target.files || e.target.files.length === 0) return; 
     setImporting(true); 
@@ -191,34 +189,101 @@ export default function App() {
         const bstr = evt.target?.result; 
         const workbook = XLSX.read(bstr, { type: 'binary' }); 
         const ws = workbook.Sheets[workbook.SheetNames[0]]; 
-        const data = XLSX.utils.sheet_to_json(ws); 
         
-        for (const row of (data as any[])) { 
-          const nomeExcel = (row['ESTUDANTE'] || row['NOME'] || row['ALUNO'])?.toString().toUpperCase().trim(); 
+        // 1. Converte para Matriz (Array de Arrays) para achar o cabeçalho real
+        const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+        let headerRowIndex = 0;
+        
+        // Procura a linha que tem "Estudante" ou "Nome" ou "Alunos"
+        for (let i = 0; i < rawData.length; i++) {
+            const rowStr = rawData[i].join(' ').toUpperCase();
+            if (rowStr.includes('ESTUDANTE') || rowStr.includes('NOME DO ALUNO') || rowStr.includes('CODIGO')) {
+                headerRowIndex = i;
+                break;
+            }
+        }
+
+        // 2. Lê de novo usando a linha certa como cabeçalho
+        const data = XLSX.utils.sheet_to_json(ws, { range: headerRowIndex });
+        
+        // Normaliza as chaves (remove acentos e espaços) para facilitar o match
+        const normalizeKey = (key: string) => key.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+        let updatedCount = 0;
+
+        for (const row of (data as any[])) {
+          // Cria um mapa normalizado da linha atual
+          const rowMap: any = {};
+          Object.keys(row).forEach(k => rowMap[normalizeKey(k)] = row[k]);
+
+          // Tenta achar o nome
+          const nomeExcel = (rowMap['ESTUDANTE'] || rowMap['NOME'] || rowMap['ALUNO'] || rowMap['NOME DO ESTUDANTE'])?.toString().toUpperCase().trim(); 
           if (!nomeExcel) continue; 
           
           const aluno = students.find(s => s.name.toUpperCase().trim() === nomeExcel); 
           
           if (aluno) { 
             const updates: any = {};
-            if (row['DATA DE NASCIMENTO'] || row['NASCIMENTO'] || row['DN']) {
-              const rawDate = row['DATA DE NASCIMENTO'] || row['NASCIMENTO'] || row['DN'];
-              if (rawDate) {
-                  if (typeof rawDate === 'number') { const jsDate = new Date(Math.round((rawDate - 25569)*86400*1000)); updates.birth_date = jsDate.toISOString(); } 
-                  else { const parts = rawDate.split('/'); if(parts.length === 3) updates.birth_date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).toISOString(); }
-              }
+
+            // A. DATA DE NASCIMENTO
+            const rawDate = rowMap['DATA DE NASCIMENTO'] || rowMap['NASCIMENTO'] || rowMap['DN'];
+            if (rawDate) {
+               if (typeof rawDate === 'number') { 
+                   // Excel Serial Date
+                   const jsDate = new Date(Math.round((rawDate - 25569)*86400*1000)); 
+                   updates.birth_date = jsDate.toISOString(); 
+               } else if (typeof rawDate === 'string') {
+                   // String PT-BR
+                   const parts = rawDate.split('/'); 
+                   if(parts.length === 3) updates.birth_date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).toISOString();
+               }
             }
-            if (row['NEE'] || row['DEFICIENCIA']) { updates.nee_description = row['NEE'] || row['DEFICIENCIA']; }
-            if (row['CONSELHO TUTELAR'] || row['CT']) { updates.ct_referral = row['MOTIVO'] || "Encaminhado"; }
 
-            if (Object.keys(updates).length > 0) { await supabase.from('students').update(updates).eq('id', aluno.id); }
+            // B. NEE
+            if (rowMap['NEE'] || rowMap['DEFICIENCIA'] || rowMap['NECESSIDADES']) { 
+                updates.nee_description = rowMap['NEE'] || rowMap['DEFICIENCIA'] || rowMap['NECESSIDADES']; 
+            }
 
-            const parseNota = (val: any) => val ? parseFloat(val.toString().replace(',', '.')) : null; 
-            await supabase.from('desempenho_bimestral').insert([{ aluno_id: aluno.id, bimestre: selectedBimestre, art: parseNota(row['ART']), cie: parseNota(row['CIE']), edf: parseNota(row['EDF']), geo: parseNota(row['GEO']), his: parseNota(row['HIS']), ing: parseNota(row['ING']), lp: parseNota(row['LP']), mat: parseNota(row['MAT']), pd1: parseNota(row['PD1']), pd2: parseNota(row['PD2']), pd3: parseNota(row['PD3']), faltas_bimestre: row['FALTAS'] ? parseInt(row['FALTAS']) : 0 }]); 
+            // C. CONSELHO TUTELAR
+            if (rowMap['CONSELHO TUTELAR'] || rowMap['CT']) { 
+                updates.ct_referral = rowMap['MOTIVO DO ENCAMINHAMENTO'] || rowMap['MOTIVO'] || "Encaminhado"; 
+            }
+
+            if (Object.keys(updates).length > 0) { 
+                await supabase.from('students').update(updates).eq('id', aluno.id);
+                updatedCount++;
+            }
+
+            // D. NOTAS (Opcional, se tiver)
+            if (rowMap['LP'] || rowMap['MAT']) {
+                const parseNota = (val: any) => val ? parseFloat(val.toString().replace(',', '.')) : null; 
+                await supabase.from('desempenho_bimestral').insert([{ 
+                    aluno_id: aluno.id, 
+                    bimestre: selectedBimestre, 
+                    art: parseNota(rowMap['ART']), 
+                    cie: parseNota(rowMap['CIE']), 
+                    edf: parseNota(rowMap['EDF']), 
+                    geo: parseNota(rowMap['GEO']), 
+                    his: parseNota(rowMap['HIS']), 
+                    ing: parseNota(rowMap['ING']), 
+                    lp: parseNota(rowMap['LP'] || rowMap['L. PORTUGUESA']), 
+                    mat: parseNota(rowMap['MAT'] || rowMap['MATEMATICA']), 
+                    pd1: parseNota(rowMap['PD1']), 
+                    pd2: parseNota(rowMap['PD2']), 
+                    pd3: parseNota(rowMap['PD3']), 
+                    faltas_bimestre: rowMap['FALTAS'] ? parseInt(rowMap['FALTAS']) : 0 
+                }]);
+            }
           } 
         } 
-        alert(`Importação Concluída!`); setIsImportModalOpen(false); setImporting(false); fetchStudents(); 
-      } catch (err) { alert('Erro na importação: ' + err); setImporting(false); } 
+        alert(`Processo concluído! ${updatedCount} alunos atualizados.`); 
+        setIsImportModalOpen(false); 
+        setImporting(false); 
+        fetchStudents(); 
+      } catch (err) { 
+        alert('Erro na importação: ' + err); 
+        setImporting(false); 
+      } 
     }; 
     reader.readAsBinaryString(file); 
   }
@@ -285,11 +350,11 @@ export default function App() {
       );
   };
 
-  // --- RENDER DASHBOARD (CORRIGIDO E ATUALIZADO V6.1) ---
+  // --- RENDER DASHBOARD (AGORA COM OS CARDS CERTOS) ---
   const renderDashboard = () => {
     let studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
     const ativos = students.filter(s => s.status === 'ATIVO').length;
-    // CONTAGENS DE ANEE E CT PARA OS CARDS
+    // NOVAS CONTAGENS
     const nees = students.filter(s => s.nee_description).length;
     const cts = students.filter(s => s.ct_referral).length;
 
@@ -298,31 +363,15 @@ export default function App() {
 
     return (
       <div className="space-y-6 pb-20 w-full max-w-[1600px] mx-auto">
-        {/* GRID 4x1 CORRIGIDO (Total, Alerta, NEE, CT) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div onClick={() => { setDashboardFilterType('ALL'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
-             <div><p className="text-[10px] font-bold text-slate-400 uppercase">Total Alunos</p><p className="text-2xl font-black text-indigo-900">{students.length}</p></div>
-             <div className="bg-indigo-50 p-3 rounded-lg text-indigo-600 group-hover:bg-indigo-100 transition-colors"><Users2 size={20}/></div>
-          </div>
-          <div onClick={() => { setDashboardFilterType('RISK'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
-             <div><p className="text-[10px] font-bold text-slate-400 uppercase">Em Alerta</p><p className="text-2xl font-black text-red-600">{studentsInRisk.length}</p></div>
-             <div className="bg-red-50 p-3 rounded-lg text-red-600 group-hover:bg-red-100 transition-colors"><AlertTriangle size={20}/></div>
-          </div>
-          {/* CARD ANEE (NOVO) */}
-          <div onClick={() => { setDashboardFilterType('NEE'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
-             <div><p className="text-[10px] font-bold text-slate-400 uppercase">ANEE / Inclusão</p><p className="text-2xl font-black text-purple-600">{nees}</p></div>
-             <div className="bg-purple-50 p-3 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors"><Puzzle size={20}/></div>
-          </div>
-          {/* CARD CONSELHO TUTELAR (NOVO) */}
-          <div onClick={() => { setDashboardFilterType('CT'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
-             <div><p className="text-[10px] font-bold text-slate-400 uppercase">Conselho Tutelar</p><p className="text-2xl font-black text-orange-600">{cts}</p></div>
-             <div className="bg-orange-50 p-3 rounded-lg text-orange-600 group-hover:bg-orange-100 transition-colors"><Scale size={20}/></div>
-          </div>
+          <div onClick={() => { setDashboardFilterType('ALL'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group"><div><p className="text-[10px] font-bold text-slate-400 uppercase">Total Alunos</p><p className="text-2xl font-black text-indigo-900">{students.length}</p></div><div className="bg-indigo-50 p-3 rounded-lg text-indigo-600 group-hover:bg-indigo-100 transition-colors"><Users2 size={20}/></div></div>
+          <div onClick={() => { setDashboardFilterType('RISK'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group"><div><p className="text-[10px] font-bold text-slate-400 uppercase">Em Alerta</p><p className="text-2xl font-black text-red-600">{studentsInRisk.length}</p></div><div className="bg-red-50 p-3 rounded-lg text-red-600 group-hover:bg-red-100 transition-colors"><AlertTriangle size={20}/></div></div>
+          <div onClick={() => { setDashboardFilterType('NEE'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group"><div><p className="text-[10px] font-bold text-slate-400 uppercase">ANEE / Inclusão</p><p className="text-2xl font-black text-purple-600">{nees}</p></div><div className="bg-purple-50 p-3 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors"><Puzzle size={20}/></div></div>
+          <div onClick={() => { setDashboardFilterType('CT'); setView('students'); }} className="cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between group"><div><p className="text-[10px] font-bold text-slate-400 uppercase">Conselho Tutelar</p><p className="text-2xl font-black text-orange-600">{cts}</p></div><div className="bg-orange-50 p-3 rounded-lg text-orange-600 group-hover:bg-orange-100 transition-colors"><Scale size={20}/></div></div>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[256px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[300px]">
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><Activity size={16} className="text-indigo-600"/> Volume de Atendimentos</h4><div className="flex-1 min-h-0"><ResponsiveContainer width="100%" height="100%"><LineChart data={stats.last7Days}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}}/><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}}/><Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/><Line type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={3} dot={{r: 4, fill: '#6366f1'}}/></LineChart></ResponsiveContainer></div></div>
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><PieChartIcon size={16} className="text-indigo-600"/> Motivos Recorrentes</h4><div className="flex-1 min-h-0"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={stats.pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/><Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px'}}/></PieChart></ResponsiveContainer></div></div>
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><PieChartIcon size={16} className="text-indigo-600"/> Motivos Recorrentes</h4><div className="flex-1 min-h-0"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={stats.pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/><Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px'}}/></PieChart></ResponsiveContainer></div></div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[400px]">
           <div className="bg-white rounded-xl border border-red-100 shadow-sm flex flex-col overflow-hidden"><div className="bg-red-50 px-4 py-3 border-b border-red-100 flex justify-between items-center"><h3 className="font-bold text-red-800 text-xs uppercase flex items-center gap-2"><AlertTriangle size={14}/> Alunos em Risco</h3><span className="bg-white text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{studentsInRisk.length}</span></div><div className="flex-1 overflow-y-auto p-2 space-y-1">{studentsInRisk.length > 0 ? studentsInRisk.map(s => (<div key={s.id} onClick={() => { setSelectedStudent(s); setIsModalOpen(true); }} className="p-3 hover:bg-red-50 rounded-lg cursor-pointer flex items-center justify-between border border-transparent hover:border-red-100 transition-all group"><div className="flex items-center gap-3"><Avatar name={s.name} src={s.photo_url} size="sm"/><div className="truncate w-32"><p className="font-bold text-slate-700 text-xs group-hover:text-red-700 truncate">{s.name}</p><p className="text-[10px] text-slate-400 font-bold">Turma {s.class_id}</p></div></div><ChevronRight size={14} className="text-slate-300 group-hover:text-red-400"/></div>)) : <div className="h-full flex flex-col items-center justify-center text-slate-300 text-xs"><ShieldCheck size={32} className="mb-2 opacity-50"/><p>Tudo tranquilo!</p></div>}</div></div>
@@ -359,7 +408,7 @@ export default function App() {
         <div className="p-4 bg-[#151521] border-t border-white/5">
           <div className="flex items-center gap-3 mb-3"><Avatar name={SYSTEM_USER_NAME} src={adminPhoto} size="sm"/><div className="overflow-hidden"><p className="font-bold text-white text-xs truncate">{SYSTEM_USER_NAME}</p><p className="text-[10px] text-slate-400 truncate">{SYSTEM_MATRICULA}</p></div></div>
           <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 text-[10px] text-red-400 hover:text-red-300 transition-colors w-full"><LogOut size={12} /> Sair do Sistema</button>
-          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves</span></div><span className="text-[8px]">v6.1 Final</span></div>
+          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves da Silva</span></div><span className="text-[8px]">v6.5 Pro</span></div>
         </div>
       </aside>
 
