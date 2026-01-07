@@ -300,6 +300,43 @@ export default function App() {
     }
   };
 
+  // --- FUNÇÕES DE EDIÇÃO NO CONSELHO (NOVO) ---
+  const handleUpdateGrade = (field: string, value: string) => {
+      if(!projectedStudent) return;
+      const newStudent = { ...projectedStudent };
+      const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre);
+      
+      // Se não existir registro para este bimestre, não editamos (por segurança, deveria ter sido importado)
+      if (bimIndex >= 0) {
+          const numValue = value === '' ? null : parseFloat(value.replace(',', '.'));
+          newStudent.desempenho[bimIndex][field] = numValue;
+          setProjectedStudent(newStudent);
+      }
+  };
+
+  const handleSaveCouncilChanges = async () => {
+      if(!projectedStudent) return;
+      const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre);
+      if(!desempenhoAtual) return;
+
+      const { error } = await supabase.from('desempenho_bimestral')
+          .update({
+              lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie,
+              his: desempenhoAtual.his, geo: desempenhoAtual.geo, ing: desempenhoAtual.ing,
+              art: desempenhoAtual.art, edf: desempenhoAtual.edf, pd1: desempenhoAtual.pd1,
+              pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3,
+              faltas_bimestre: desempenhoAtual.faltas_bimestre
+          })
+          .eq('id', desempenhoAtual.id);
+
+      if(!error) {
+          alert('Alterações de nota/falta salvas com sucesso!');
+          fetchStudents(); // Atualiza a lista geral
+      } else {
+          alert('Erro ao salvar: ' + error.message);
+      }
+  };
+
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return;
     const file = event.target.files[0];
@@ -622,7 +659,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE PROJEÇÃO (NOVO - COM EFEITO CARD E CAMPOS DE CONSELHO) */}
+      {/* MODAL DE PROJEÇÃO (COM EDIÇÃO DE NOTAS) */}
       {projectedStudent && (
         <div className="fixed inset-0 bg-slate-950/90 z-[100] flex items-center justify-center p-8 backdrop-blur-md">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-300">
@@ -635,39 +672,52 @@ export default function App() {
                             <p className="text-indigo-300 font-bold text-lg">TURMA {projectedStudent.class_id} | {selectedBimestre}</p>
                         </div>
                     </div>
-                    <button onClick={() => setProjectedStudent(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"><X size={32}/></button>
+                    <div className="flex items-center gap-4">
+                        <button onClick={handleSaveCouncilChanges} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95"><Save size={20}/> SALVAR ALTERAÇÕES</button>
+                        <button onClick={() => setProjectedStudent(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"><X size={32}/></button>
+                    </div>
                 </div>
 
                 {/* CORPO DA PROJEÇÃO */}
                 <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
                     
-                    {/* COLUNA 1: FOTO E RESUMO DE NOTAS */}
+                    {/* COLUNA 1: FOTO E RESUMO DE NOTAS (EDITÁVEL) */}
                     <div className="lg:w-1/3 bg-slate-100 p-8 flex flex-col items-center border-r border-slate-200 overflow-y-auto">
                         <div className="mb-6 transform hover:scale-105 transition-transform duration-500">
                             <Avatar name={projectedStudent.name} src={projectedStudent.photo_url} size="2xl"/>
                         </div>
                         
-                        <div className="w-full bg-white rounded-2xl p-6 shadow-sm mb-6">
-                            <h3 className="text-center font-bold text-slate-400 text-sm uppercase mb-4 tracking-widest">Desempenho Acadêmico</h3>
+                        <div className="w-full bg-white rounded-2xl p-6 shadow-sm mb-6 border border-slate-200">
+                            <h3 className="text-center font-bold text-slate-400 text-sm uppercase mb-4 tracking-widest flex items-center justify-center gap-2"><Pencil size={14}/> Notas Editáveis</h3>
                             <div className="grid grid-cols-3 gap-3">
                                 {(() => {
                                     const notas = projectedStudent.desempenho?.find((d:any) => d.bimestre === selectedBimestre) || {};
                                     const disciplinas = [
-                                        {n:'LP', v: notas.lp}, {n:'MAT', v: notas.mat}, {n:'CIE', v: notas.cie},
-                                        {n:'HIS', v: notas.his}, {n:'GEO', v: notas.geo}, {n:'ING', v: notas.ing},
-                                        {n:'ART', v: notas.art}, {n:'EDF', v: notas.edf}, {n:'PD1', v: notas.pd1}
+                                        {n:'LP', k:'lp', v: notas.lp}, {n:'MAT', k:'mat', v: notas.mat}, {n:'CIE', k:'cie', v: notas.cie},
+                                        {n:'HIS', k:'his', v: notas.his}, {n:'GEO', k:'geo', v: notas.geo}, {n:'ING', k:'ing', v: notas.ing},
+                                        {n:'ART', k:'art', v: notas.art}, {n:'EDF', k:'edf', v: notas.edf}, {n:'PD1', k:'pd1', v: notas.pd1}
                                     ];
                                     return disciplinas.map(d => (
-                                        <div key={d.n} className={`flex flex-col items-center p-2 rounded-xl border-2 ${d.v < 5 && d.v !== undefined ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
+                                        <div key={d.k} className={`flex flex-col items-center p-2 rounded-xl border-2 transition-colors ${d.v < 5 && d.v !== null && d.v !== '' ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100 focus-within:border-indigo-400'}`}>
                                             <span className="text-[10px] font-bold text-slate-400">{d.n}</span>
-                                            <span className={`text-2xl font-black ${d.v < 5 ? 'text-red-600' : 'text-slate-700'}`}>{d.v ?? '-'}</span>
+                                            <input 
+                                                type="number" 
+                                                className={`w-full text-center bg-transparent font-black text-2xl outline-none ${d.v < 5 && d.v !== null && d.v !== '' ? 'text-red-600' : 'text-slate-700'}`}
+                                                value={d.v ?? ''}
+                                                onChange={(e) => handleUpdateGrade(d.k, e.target.value)}
+                                            />
                                         </div>
                                     ));
                                 })()}
                             </div>
                             <div className="mt-4 pt-4 border-t flex justify-between items-center">
                                 <span className="text-xs font-bold text-slate-400 uppercase">Faltas no Bimestre</span>
-                                <span className="text-2xl font-black text-slate-700">{(projectedStudent.desempenho?.find((d:any) => d.bimestre === selectedBimestre) || {}).faltas_bimestre || 0}</span>
+                                <input 
+                                    type="number"
+                                    className="w-20 text-right font-black text-2xl text-slate-700 bg-slate-50 border rounded-lg p-1 outline-none focus:ring-2 focus:ring-indigo-400"
+                                    value={(projectedStudent.desempenho?.find((d:any) => d.bimestre === selectedBimestre) || {}).faltas_bimestre || ''}
+                                    onChange={(e) => handleUpdateGrade('faltas_bimestre', e.target.value)}
+                                />
                             </div>
                         </div>
                     </div>
@@ -697,7 +747,7 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* CAMPOS DE DELIBERAÇÃO (SIMULAÇÃO) */}
+                        {/* CAMPOS DE DELIBERAÇÃO */}
                         <div className="bg-orange-50 p-6 rounded-2xl border border-orange-100">
                             <h3 className="font-bold text-orange-800 text-lg uppercase mb-4 flex items-center gap-2"><GraduationCap size={20}/> Deliberação do Conselho</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -709,9 +759,6 @@ export default function App() {
                                     <label className="text-xs font-bold text-orange-400 uppercase mb-1 block">Encaminhamentos</label>
                                     <textarea className="w-full p-3 rounded-xl border border-orange-200 bg-white text-sm h-32 resize-none focus:ring-2 focus:ring-orange-400 outline-none" placeholder="Encaminhar para..."></textarea>
                                 </div>
-                            </div>
-                            <div className="mt-4 flex justify-end">
-                                <button className="bg-orange-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md">Salvar Deliberação (Simulação)</button>
                             </div>
                         </div>
 
