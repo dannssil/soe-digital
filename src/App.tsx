@@ -79,7 +79,9 @@ export default function App() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [view, setView] = useState<'dashboard' | 'students'>('dashboard');
+  // ESTADO 'VIEW' ATUALIZADO PARA INCLUIR 'CONSELHO'
+  const [view, setView] = useState<'dashboard' | 'students' | 'conselho'>('dashboard');
+  
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -101,6 +103,9 @@ export default function App() {
   const [selectedClassFilter, setSelectedClassFilter] = useState<string | null>(null);
   const [listClassFilter, setListClassFilter] = useState<string | null>(null);
   const [selectedBimestre, setSelectedBimestre] = useState('1º Bimestre');
+
+  // Estado Específico do Conselho
+  const [conselhoTurma, setConselhoTurma] = useState<string>('');
 
   // LISTAS DINÂMICAS (Customizáveis)
   const [listComportamento, setListComportamento] = useState<string[]>(DEFAULT_COMPORTAMENTO);
@@ -376,6 +381,91 @@ export default function App() {
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
   const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); if (!window.confirm(`Deseja gerar um arquivo com TODAS as ${classStudents.length} fichas da turma ${classId}?`)) return; const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`); };
 
+  // --- MÓDULO NOVO: RENDERIZA O CONSELHO DE CLASSE ---
+  const renderConselho = () => {
+      const turmas = [...new Set(students.map(s => s.class_id))].sort();
+      const targetClass = conselhoTurma || turmas[0];
+      const councilStudents = students.filter(s => s.class_id === targetClass);
+
+      return (
+          <div className="max-w-[1800px] mx-auto pb-20 w-full h-full flex flex-col">
+              <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3"><GraduationCap size={28} className="text-indigo-600"/> Conselho de Classe Digital</h2>
+                  <div className="flex gap-4">
+                      <select className="p-3 border rounded-xl font-bold bg-white shadow-sm" value={targetClass} onChange={e => setConselhoTurma(e.target.value)}>
+                          {turmas.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <select className="p-3 border rounded-xl font-bold bg-white shadow-sm" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}>
+                          <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
+                      </select>
+                  </div>
+              </div>
+              
+              <div className="bg-white rounded-2xl shadow-sm border overflow-hidden flex-1 flex flex-col">
+                  <div className="overflow-auto flex-1">
+                      <table className="w-full text-xs text-left">
+                          <thead className="bg-indigo-600 text-white font-bold uppercase sticky top-0 z-10">
+                              <tr>
+                                  <th className="px-4 py-3">Estudante</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-700">LP</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-700">MAT</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-700">CIE</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-700">HIS</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-700">GEO</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-700">ING</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-700">ART</th>
+                                  <th className="px-2 py-3 text-center bg-indigo-700">EDF</th>
+                                  <th className="px-4 py-3 text-center bg-red-600">FALTAS</th>
+                                  <th className="px-4 py-3">Ocorrências / Perfil</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {councilStudents.map(s => {
+                                  // Encontrar notas do bimestre selecionado
+                                  const notas = s.desempenho?.find((d: any) => d.bimestre === selectedBimestre) || {};
+                                  // Contar logs
+                                  const totalLogs = s.logs?.length || 0;
+                                  const logsGraves = s.logs?.filter((l: any) => JSON.stringify(l).toLowerCase().includes('agressividade') || JSON.stringify(l).toLowerCase().includes('suspensão')).length || 0;
+                                  
+                                  const renderNota = (val: number) => {
+                                      if (val === undefined || val === null) return <span className="text-slate-300">-</span>;
+                                      return <span className={`font-bold ${val < 5 ? 'text-red-600 bg-red-50 px-1 rounded' : 'text-slate-700'}`}>{val}</span>;
+                                  };
+
+                                  return (
+                                      <tr key={s.id} className="hover:bg-indigo-50 transition-colors">
+                                          <td className="px-4 py-3 font-bold text-slate-700 flex items-center gap-2 border-r">
+                                              <Avatar name={s.name} src={s.photo_url} size="sm"/> <span className="truncate max-w-[200px]">{s.name}</span>
+                                          </td>
+                                          <td className="px-2 py-3 text-center border-r">{renderNota(notas.lp)}</td>
+                                          <td className="px-2 py-3 text-center border-r">{renderNota(notas.mat)}</td>
+                                          <td className="px-2 py-3 text-center border-r">{renderNota(notas.cie)}</td>
+                                          <td className="px-2 py-3 text-center border-r">{renderNota(notas.his)}</td>
+                                          <td className="px-2 py-3 text-center border-r">{renderNota(notas.geo)}</td>
+                                          <td className="px-2 py-3 text-center border-r">{renderNota(notas.ing)}</td>
+                                          <td className="px-2 py-3 text-center border-r">{renderNota(notas.art)}</td>
+                                          <td className="px-2 py-3 text-center border-r">{renderNota(notas.edf)}</td>
+                                          <td className="px-4 py-3 text-center border-r font-bold">
+                                              {notas.faltas_bimestre > 20 ? <span className="bg-red-600 text-white px-2 py-1 rounded text-[10px] animate-pulse">{notas.faltas_bimestre}</span> : <span className="text-slate-500">{notas.faltas_bimestre || 0}</span>}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                              <div className="flex flex-col">
+                                                  <span className="text-[10px] uppercase font-bold text-slate-400">{totalLogs} Registros</span>
+                                                  {logsGraves > 0 && <span className="text-[10px] font-bold text-red-600 flex items-center gap-1"><AlertTriangle size={10}/> {logsGraves} Ocorrências Graves</span>}
+                                              </div>
+                                          </td>
+                                      </tr>
+                                  );
+                              })}
+                          </tbody>
+                      </table>
+                      {councilStudents.length === 0 && <div className="p-12 text-center text-slate-400">Nenhum aluno nesta turma para este bimestre.</div>}
+                  </div>
+              </div>
+          </div>
+      );
+  };
+
   const renderDashboard = () => {
     let studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
     const ativos = students.filter(s => s.status === 'ATIVO').length;
@@ -458,6 +548,8 @@ export default function App() {
         <nav className="flex-1 p-4 space-y-2">
           <button onClick={() => { setView('dashboard'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
           <button onClick={() => { setView('students'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
+          {/* BOTÃO NOVO: CONSELHO DE CLASSE */}
+          <button onClick={() => { setView('conselho'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'conselho' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><GraduationCap size={18} /> Conselho de Classe</button>
           <button onClick={() => { setIsReportModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><FileBarChart2 size={18} /> Relatórios</button>
           <button onClick={handleBackup} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><Database size={18} /> Backup</button>
           {/* BOTÃO CONFIGURAÇÕES (NOVO) */}
@@ -473,13 +565,16 @@ export default function App() {
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          {view === 'dashboard' ? renderDashboard() : (
+          {/* LÓGICA DE NAVEGAÇÃO ENTRE AS TELAS */}
+          {view === 'dashboard' && renderDashboard()}
+          {view === 'students' && (
             <div className="max-w-[1600px] mx-auto pb-20 w-full h-full flex flex-col">
               <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-slate-800">Estudantes</h2><div className="flex gap-2"><button onClick={() => setIsImportModalOpen(true)} className="bg-green-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-transform active:scale-95"><FileSpreadsheet size={20} /> Importar</button><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-indigo-700 transition-transform active:scale-95"><Plus size={20} /> Novo Aluno</button></div></div>
               <div className="mb-6 flex gap-3 overflow-x-auto pb-2"><button onClick={() => setListClassFilter(null)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border ${!listClassFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'} hover:scale-105 transition-transform`}>Todos</button>{turmasList.map(t => (<button key={t} onClick={() => setListClassFilter(t)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border flex items-center gap-2 hover:scale-105 transition-transform ${listClassFilter === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}><Folder size={14} /> {t}</button>))}</div>
               <div className="flex-1 min-h-0"><StudentList students={students.filter(s => !listClassFilter || s.class_id === listClassFilter)} onSelectStudent={(s: any) => { setSelectedStudent(s); setIsModalOpen(true); }} searchTerm={globalSearch} /></div>
             </div>
           )}
+          {view === 'conselho' && renderConselho()}
         </div>
       </main>
 
