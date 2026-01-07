@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff, Filter
 } from 'lucide-react';
 
 // ==============================================================================
@@ -48,7 +48,6 @@ function Avatar({ name, src, size = "md" }: { name: string, src?: string | null,
 }
 
 const StudentList = ({ students, onSelectStudent, searchTerm }: any) => {
-  const filtered = students.filter((s: any) => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow duration-300">
       <div className="overflow-x-auto flex-1">
@@ -57,7 +56,7 @@ const StudentList = ({ students, onSelectStudent, searchTerm }: any) => {
             <tr><th className="px-6 py-4">Estudante</th><th className="px-6 py-4">Turma</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Ações</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map((s: any) => (
+            {students.map((s: any) => (
               <tr key={s.id} onClick={() => onSelectStudent(s)} className="hover:bg-indigo-50 cursor-pointer transition-colors group">
                 <td className="px-6 py-4 flex items-center gap-4"><Avatar name={s.name} src={s.photo_url} size="md" /><div className="font-bold text-slate-700 text-base group-hover:text-indigo-700 transition-colors">{s.name}</div></td>
                 <td className="px-6 py-4 text-slate-500 font-bold">{s.class_id}</td>
@@ -81,6 +80,9 @@ export default function App() {
 
   const [view, setView] = useState<'dashboard' | 'students' | 'conselho'>('dashboard');
   
+  // FILTRO DO DASHBOARD
+  const [dashboardFilterType, setDashboardFilterType] = useState<'ALL' | 'RISK' | 'ACTIVE' | 'TRANSFER' | 'ABANDON'>('ALL');
+
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -332,43 +334,6 @@ export default function App() {
       }
   };
 
-  // --- GERAR ATA DO CONSELHO (PDF) ---
-  const generateCouncilAta = (targetClass: string) => {
-      const councilStudents = students.filter(s => s.class_id === targetClass);
-      if(councilStudents.length === 0) return alert('Turma vazia');
-
-      const doc = new jsPDF();
-      doc.setFontSize(14); doc.setFont("helvetica", "bold");
-      doc.text(`ATA DO CONSELHO DE CLASSE - TURMA ${targetClass}`, 105, 20, {align: "center"});
-      doc.setFontSize(10); doc.setFont("helvetica", "normal");
-      doc.text(`${selectedBimestre} - ${new Date().toLocaleDateString()}`, 105, 26, {align: "center"});
-
-      const rows = councilStudents.map(s => {
-          const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {};
-          const logs = s.logs?.length || 0;
-          return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.faltas_bimestre||0, logs];
-      });
-
-      autoTable(doc, {
-          startY: 35,
-          head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'Faltas', 'Ocorr.']],
-          body: rows,
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [79, 70, 229] }
-      });
-
-      let finalY = (doc as any).lastAutoTable.finalY + 20;
-      doc.text("Assinaturas dos Professores Presentes:", 14, finalY);
-      finalY += 10;
-      doc.line(14, finalY, 100, finalY); doc.text("Professor(a)", 14, finalY + 5);
-      doc.line(110, finalY, 196, finalY); doc.text("Coordenação / SOE", 110, finalY + 5);
-      finalY += 20;
-      doc.line(14, finalY, 100, finalY); doc.text("Professor(a)", 14, finalY + 5);
-      doc.line(110, finalY, 196, finalY); doc.text("Professor(a)", 110, finalY + 5);
-
-      doc.save(`ATA_CONSELHO_${targetClass}.pdf`);
-  };
-
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return;
     const file = event.target.files[0];
@@ -428,6 +393,9 @@ export default function App() {
     XLSX.writeFile(wb, `BACKUP_COMPLETO_SOE_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  // --- FUNÇÕES DE GERAÇÃO DE PDF E EXIBIÇÃO ---
+  // (Definidas AQUI para garantir que estejam no escopo antes de serem usadas no return)
+
   const printStudentData = (doc: jsPDF, student: any) => {
     doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" });
     doc.setFontSize(12); doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25);
@@ -453,12 +421,47 @@ export default function App() {
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
   const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); if (!window.confirm(`Deseja gerar um arquivo com TODAS as ${classStudents.length} fichas da turma ${classId}?`)) return; const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`); };
 
+  const generateCouncilAta = (targetClass: string) => {
+      const councilStudents = students.filter(s => s.class_id === targetClass);
+      if(councilStudents.length === 0) return alert('Turma vazia');
+
+      const doc = new jsPDF();
+      doc.setFontSize(14); doc.setFont("helvetica", "bold");
+      doc.text(`ATA DO CONSELHO DE CLASSE - TURMA ${targetClass}`, 105, 20, {align: "center"});
+      doc.setFontSize(10); doc.setFont("helvetica", "normal");
+      doc.text(`${selectedBimestre} - ${new Date().toLocaleDateString()}`, 105, 26, {align: "center"});
+
+      const rows = councilStudents.map(s => {
+          const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {};
+          const logs = s.logs?.length || 0;
+          return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.faltas_bimestre||0, logs];
+      });
+
+      autoTable(doc, {
+          startY: 35,
+          head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'Faltas', 'Atend.']],
+          body: rows,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [79, 70, 229] }
+      });
+
+      let finalY = (doc as any).lastAutoTable.finalY + 20;
+      doc.text("Assinaturas dos Professores Presentes:", 14, finalY);
+      finalY += 10;
+      doc.line(14, finalY, 100, finalY); doc.text("Professor(a)", 14, finalY + 5);
+      doc.line(110, finalY, 196, finalY); doc.text("Coordenação / SOE", 110, finalY + 5);
+      finalY += 20;
+      doc.line(14, finalY, 100, finalY); doc.text("Professor(a)", 14, finalY + 5);
+      doc.line(110, finalY, 196, finalY); doc.text("Professor(a)", 110, finalY + 5);
+
+      doc.save(`ATA_CONSELHO_${targetClass}.pdf`);
+  };
+
   const renderConselho = () => {
       const turmas = [...new Set(students.map(s => s.class_id))].sort();
       const targetClass = conselhoTurma || turmas[0];
       const councilStudents = students.filter(s => s.class_id === targetClass);
 
-      // CÁLCULO SEGURO E DIRETO DOS DADOS DA TURMA
       let totalFaltas = 0;
       let alunosRisco = 0;
       let totalOcorrencias = 0;
@@ -474,7 +477,6 @@ export default function App() {
       const mediaFaltas = councilStudents.length > 0 ? Math.round(totalFaltas / councilStudents.length) : 0;
       const statsTurma = { totalFaltas, mediaFaltas, alunosRisco, totalOcorrencias };
 
-      // Se não houver turmas, mostra carregando
       if (!targetClass) return <div className="p-10 text-center text-slate-400">Carregando dados...</div>;
 
       return (
@@ -507,7 +509,7 @@ export default function App() {
                   </div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
                       <div className="bg-blue-100 p-3 rounded-full text-blue-600"><FileText size={24}/></div>
-                      <div><p className="text-xs font-bold text-slate-400 uppercase">Total Ocorrências</p><p className="text-2xl font-black text-slate-700">{statsTurma.totalOcorrencias}</p></div>
+                      <div><p className="text-xs font-bold text-slate-400 uppercase">Total Atendimentos</p><p className="text-2xl font-black text-slate-700">{statsTurma.totalOcorrencias}</p></div>
                   </div>
               </div>
               
@@ -529,7 +531,7 @@ export default function App() {
                                   <th className="px-2 py-3 text-center bg-indigo-800">PD2</th>
                                   <th className="px-2 py-3 text-center bg-indigo-800">PD3</th>
                                   <th className="px-4 py-3 text-center bg-red-600">FALTAS</th>
-                                  <th className="px-4 py-3">Ocorrências / Perfil</th>
+                                  <th className="px-4 py-3">Atendimentos / Perfil</th>
                               </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -562,7 +564,7 @@ export default function App() {
                                               <div className="flex justify-between items-center">
                                                   <div className="flex flex-col">
                                                       <span className="text-[10px] uppercase font-bold text-slate-400">{totalLogs} Registros</span>
-                                                      {logsGraves > 0 && <span className="text-[10px] font-bold text-red-600 flex items-center gap-1"><AlertTriangle size={10}/> {logsGraves} Ocorrências Graves</span>}
+                                                      {logsGraves > 0 && <span className="text-[10px] font-bold text-red-600 flex items-center gap-1"><AlertTriangle size={10}/> {logsGraves} Atendimentos Graves</span>}
                                                   </div>
                                                   <Maximize2 size={14} className="text-slate-300 opacity-0 group-hover:opacity-100" />
                                               </div>
@@ -590,12 +592,12 @@ export default function App() {
     return (
       <div className="space-y-8 pb-20 w-full max-w-[1600px] mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Alunos</p><h3 className="text-3xl font-black text-indigo-600">{students.length}</h3></div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Ativos</p><h3 className="text-3xl font-black text-emerald-600">{ativos}</h3></div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Em Alerta</p><h3 className="text-3xl font-black text-red-500">{studentsInRisk.length}</h3></div>
+          <div onClick={() => { setDashboardFilterType('ALL'); setView('students'); }} className="cursor-pointer bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Alunos</p><h3 className="text-3xl font-black text-indigo-600">{students.length}</h3></div>
+          <div onClick={() => { setDashboardFilterType('ACTIVE'); setView('students'); }} className="cursor-pointer bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Ativos</p><h3 className="text-3xl font-black text-emerald-600">{ativos}</h3></div>
+          <div onClick={() => { setDashboardFilterType('RISK'); setView('students'); }} className="cursor-pointer bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Em Alerta</p><h3 className="text-3xl font-black text-red-500">{studentsInRisk.length}</h3></div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow hover:-translate-y-1 duration-300 flex flex-col justify-center gap-1">
-            <div className="flex justify-between items-center"><span className="text-xs font-bold text-slate-400 uppercase">Transferidos</span><span className="text-xl font-black text-orange-500">{transferidos}</span></div>
-            <div className="flex justify-between items-center"><span className="text-xs font-bold text-slate-400 uppercase">Abandono</span><span className="text-xl font-black text-red-600">{abandono}</span></div>
+            <div onClick={() => { setDashboardFilterType('TRANSFER'); setView('students'); }} className="cursor-pointer flex justify-between items-center"><span className="text-xs font-bold text-slate-400 uppercase">Transferidos</span><span className="text-xl font-black text-orange-500">{transferidos}</span></div>
+            <div onClick={() => { setDashboardFilterType('ABANDON'); setView('students'); }} className="cursor-pointer flex justify-between items-center"><span className="text-xs font-bold text-slate-400 uppercase">Abandono</span><span className="text-xl font-black text-red-600">{abandono}</span></div>
           </div>
         </div>
 
@@ -654,13 +656,31 @@ export default function App() {
 
   const turmasList = [...new Set(students.map(s => s.class_id))].sort();
 
+  // FILTRO INTELIGENTE DE ESTUDANTES
+  const filteredStudents = students.filter(s => {
+    // 1. Filtro da Sidebar (Turma)
+    if (listClassFilter && s.class_id !== listClassFilter) return false;
+    
+    // 2. Filtro do Dashboard
+    if (dashboardFilterType === 'RISK') {
+      const r = checkRisk(s);
+      if (!r.reprovadoFalta && !r.criticoFalta && !r.criticoNotas) return false;
+    }
+    if (dashboardFilterType === 'ACTIVE' && s.status !== 'ATIVO') return false;
+    if (dashboardFilterType === 'TRANSFER' && s.status !== 'TRANSFERIDO') return false;
+    if (dashboardFilterType === 'ABANDON' && s.status !== 'ABANDONO') return false;
+
+    // 3. Busca Global (Nome)
+    return !globalSearch || s.name.toLowerCase().includes(globalSearch.toLowerCase());
+  });
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden">
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex items-center gap-3 border-b border-slate-800"><div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} /></div><div><h1 className="font-bold text-lg">SOE Digital</h1><p className="text-[10px] uppercase text-slate-400">CED 4 Guará</p></div></div>
         <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => { setView('dashboard'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
-          <button onClick={() => { setView('students'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
+          <button onClick={() => { setView('dashboard'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
+          <button onClick={() => { setView('students'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
           {/* BOTÃO NOVO: CONSELHO DE CLASSE */}
           <button onClick={() => { setView('conselho'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'conselho' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><GraduationCap size={18} /> Conselho de Classe</button>
           <button onClick={() => { setIsReportModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><FileBarChart2 size={18} /> Relatórios</button>
@@ -683,8 +703,17 @@ export default function App() {
           {view === 'students' && (
             <div className="max-w-[1600px] mx-auto pb-20 w-full h-full flex flex-col">
               <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-slate-800">Estudantes</h2><div className="flex gap-2"><button onClick={() => setIsImportModalOpen(true)} className="bg-green-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-transform active:scale-95"><FileSpreadsheet size={20} /> Importar</button><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-indigo-700 transition-transform active:scale-95"><Plus size={20} /> Novo Aluno</button></div></div>
+              
+              {/* BANNER DE FILTRO ATIVO */}
+              {dashboardFilterType !== 'ALL' && (
+                <div className="bg-indigo-50 border-indigo-200 border p-3 rounded-xl mb-4 flex items-center justify-between">
+                  <span className="font-bold text-indigo-700 flex items-center gap-2"><Filter size={18}/> Filtrando por: {dashboardFilterType === 'RISK' ? 'ALUNOS EM RISCO' : dashboardFilterType} ({filteredStudents.length})</span>
+                  <button onClick={() => setDashboardFilterType('ALL')} className="text-xs font-bold text-slate-500 underline hover:text-indigo-600">Limpar Filtro</button>
+                </div>
+              )}
+
               <div className="mb-6 flex gap-3 overflow-x-auto pb-2"><button onClick={() => setListClassFilter(null)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border ${!listClassFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'} hover:scale-105 transition-transform`}>Todos</button>{turmasList.map(t => (<button key={t} onClick={() => setListClassFilter(t)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap border flex items-center gap-2 hover:scale-105 transition-transform ${listClassFilter === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}><Folder size={14} /> {t}</button>))}</div>
-              <div className="flex-1 min-h-0"><StudentList students={students.filter(s => !listClassFilter || s.class_id === listClassFilter)} onSelectStudent={(s: any) => { setSelectedStudent(s); setIsModalOpen(true); }} searchTerm={globalSearch} /></div>
+              <div className="flex-1 min-h-0"><StudentList students={filteredStudents} onSelectStudent={(s: any) => { setSelectedStudent(s); setIsModalOpen(true); }} searchTerm={globalSearch} /></div>
             </div>
           )}
           {view === 'conselho' && renderConselho()}
@@ -797,7 +826,7 @@ export default function App() {
                         
                         {/* LISTA DE OCORRÊNCIAS (COM BLUR DE PRIVACIDADE) */}
                         <div className="flex-1">
-                            <h3 className="font-bold text-indigo-900 text-lg uppercase mb-4 flex items-center gap-2"><FileText size={20}/> Resumo de Ocorrências</h3>
+                            <h3 className="font-bold text-indigo-900 text-lg uppercase mb-4 flex items-center gap-2"><FileText size={20}/> Resumo de Atendimentos</h3>
                             <div className="space-y-3">
                                 {projectedStudent.logs && projectedStudent.logs.length > 0 ? projectedStudent.logs.map((log: any) => {
                                     let desc = { motivos: [], obs: '' }; try { desc = JSON.parse(log.description); } catch(e) {}
@@ -817,7 +846,7 @@ export default function App() {
                                             {!isSensitiveVisible && <p className="text-[10px] text-center text-slate-400 uppercase mt-1">Conteúdo Oculto (Sigilo SOE)</p>}
                                         </div>
                                     )
-                                }) : <p className="text-slate-400 text-center py-8 italic">Nenhuma ocorrência registrada.</p>}
+                                }) : <p className="text-slate-400 text-center py-8 italic">Nenhum atendimento registrado.</p>}
                             </div>
                         </div>
 
@@ -864,7 +893,7 @@ export default function App() {
       )}
 
       {/* MODAL RELATÓRIOS (MANTIDO) */}
-      {isReportModalOpen && (<div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600" /> Relatórios Gerenciais</h3><button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28} /></button></div><div className="flex-1 overflow-y-auto space-y-6 pr-2"><div className="grid grid-cols-3 gap-4"><div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 text-center"><h4 className="text-sm uppercase font-bold text-indigo-400 mb-2">Total Ocorrências</h4><p className="text-4xl font-black text-indigo-700">{stats.allLogs.length}</p></div><div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100 text-center"><h4 className="text-sm uppercase font-bold text-emerald-400 mb-2">Casos Resolvidos</h4><p className="text-4xl font-black text-emerald-700">{stats.allLogs.filter(l => l.resolved).length}</p></div><div className="bg-amber-50 p-6 rounded-xl border border-amber-100 text-center"><h4 className="text-sm uppercase font-bold text-amber-400 mb-2">Alunos Frequentes</h4><p className="text-4xl font-black text-amber-700">{students.filter(s => (s.logs?.length || 0) >= 3).length}</p></div></div><div className="grid grid-cols-2 gap-6"><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Top 5 Motivos</h4>{stats.pieData.map((d, i) => (<div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><span className="font-medium text-slate-700">{d.name}</span><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{d.value}</span></div>))}</div><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Alunos com +3 Ocorrências</h4><div className="max-h-48 overflow-y-auto">{students.map(s => ({ ...s, count: s.logs?.length || 0 })).filter(s => s.count >= 3).sort((a, b) => b.count - a.count).map(s => (<div key={s.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><div><p className="font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-slate-400">{s.class_id}</p></div><span className="font-bold text-red-600 bg-red-50 px-2 py-1 rounded">{s.count}</span></div>))}</div></div></div></div><div className="pt-6 border-t mt-4 flex justify-end"><button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg hover:scale-105 transition-transform"><FileSpreadsheet /> Baixar Relatório Completo (Excel)</button></div></div></div>)}
+      {isReportModalOpen && (<div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600" /> Relatórios Gerenciais</h3><button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28} /></button></div><div className="flex-1 overflow-y-auto space-y-6 pr-2"><div className="grid grid-cols-3 gap-4"><div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 text-center"><h4 className="text-sm uppercase font-bold text-indigo-400 mb-2">Total Atendimentos</h4><p className="text-4xl font-black text-indigo-700">{stats.allLogs.length}</p></div><div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100 text-center"><h4 className="text-sm uppercase font-bold text-emerald-400 mb-2">Casos Resolvidos</h4><p className="text-4xl font-black text-emerald-700">{stats.allLogs.filter(l => l.resolved).length}</p></div><div className="bg-amber-50 p-6 rounded-xl border border-amber-100 text-center"><h4 className="text-sm uppercase font-bold text-amber-400 mb-2">Alunos Frequentes</h4><p className="text-4xl font-black text-amber-700">{students.filter(s => (s.logs?.length || 0) >= 3).length}</p></div></div><div className="grid grid-cols-2 gap-6"><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Top 5 Motivos</h4>{stats.pieData.map((d, i) => (<div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><span className="font-medium text-slate-700">{d.name}</span><span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{d.value}</span></div>))}</div><div className="border rounded-xl p-4"><h4 className="font-bold text-sm uppercase text-slate-500 mb-4 border-b pb-2">Alunos com +3 Atendimentos</h4><div className="max-h-48 overflow-y-auto">{students.map(s => ({ ...s, count: s.logs?.length || 0 })).filter(s => s.count >= 3).sort((a, b) => b.count - a.count).map(s => (<div key={s.id} className="flex justify-between items-center py-2 border-b last:border-0 text-sm"><div><p className="font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-slate-400">{s.class_id}</p></div><span className="font-bold text-red-600 bg-red-50 px-2 py-1 rounded">{s.count}</span></div>))}</div></div></div></div><div className="pt-6 border-t mt-4 flex justify-end"><button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg hover:scale-105 transition-transform"><FileSpreadsheet /> Baixar Relatório Completo (Excel)</button></div></div></div>)}
 
       {/* OUTROS MODAIS (ZAP, SAÍDA, IMPORTAÇÃO, ETC) MANTIDOS - ADICIONE AQUI O RESTANTE DO CÓDIGO PADRÃO */}
       {isQuickModalOpen && (<div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"><div className="bg-white rounded-2xl p-6 w-full max-w-sm relative shadow-2xl animate-in zoom-in duration-200"><button onClick={() => setIsQuickModalOpen(false)} className="absolute top-4 right-4 text-slate-400"><X size={24} /></button><h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-slate-800"><div className="bg-yellow-100 p-2 rounded-full"><Zap className="text-yellow-600" fill="currentColor" /></div> Registro Flash</h3><div className="relative mb-4"><input autoFocus placeholder="Digite o nome do aluno..." className={`w-full p-4 border rounded-xl text-lg font-bold outline-none transition-all ${quickSelectedStudent ? 'bg-green-50 border-green-300 text-green-800' : 'bg-slate-50 focus:ring-2 focus:ring-yellow-400'}`} value={quickSearchTerm} onChange={e => { setQuickSearchTerm(e.target.value); if (quickSelectedStudent && e.target.value !== quickSelectedStudent.name) setQuickSelectedStudent(null); }} />{quickSelectedStudent && <CheckSquare className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600" />}{quickSearchTerm.length > 0 && !quickSelectedStudent && (<div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl mt-1 max-h-48 overflow-y-auto z-50">{students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0, 10).map(s => (<div key={s.id} onClick={() => { setQuickSelectedStudent(s); setQuickSearchTerm(s.name); }} className="p-3 hover:bg-yellow-50 cursor-pointer border-b last:border-0 transition-colors flex justify-between items-center"><span className="font-bold text-slate-700 text-sm">{s.name}</span><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{s.class_id}</span></div>))}{students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).length === 0 && <div className="p-3 text-center text-slate-400 text-xs">Nenhum aluno encontrado</div>}</div>)}</div><div className="grid grid-cols-2 gap-2 mb-6 mt-4">{FLASH_REASONS.map(r => (<button key={r} onClick={() => setQuickReason(r)} className={`p-3 rounded-xl text-xs font-bold border transition-all ${quickReason === r ? 'bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{r}</button>))}</div><button onClick={handleQuickSave} disabled={!quickSelectedStudent || !quickReason} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-xl disabled:opacity-50 disabled:shadow-none transition-all hover:bg-green-700 active:scale-95">CONFIRMAR REGISTRO</button></div></div>)}
