@@ -3,19 +3,19 @@
   "name": "SOE Digital - CED 4 Guará",
   "icons": [
     {
-      "src": "/icone-oficial-v4.png",
+      "src": "/icone-192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any maskable"
     },
     {
-      "src": "/icone-oficial-v4.png",
+      "src": "/icone-512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
     }
   ],
-  "start_url": "/?v=4",
+  "start_url": "/?v=5",
   "display": "standalone",
   "theme_color": "#4f46e5",
   "background_color": "#f0f0f0"
