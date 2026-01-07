@@ -12,7 +12,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, ChevronLeft, Star, Activity, Heart, Brain, PenTool, Copyright, Code
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, ChevronLeft, Star, Activity, Heart, Brain, PenTool, Copyright, Code, Search as SearchIcon
 } from 'lucide-react';
 
 // --- CONEXÃO ---
@@ -41,8 +41,8 @@ function Avatar({ name, src, size = "md" }: { name: string, src?: string | null,
   const initials = safeName.substring(0, 2).toUpperCase();
   const sizeClasses: any = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-16 h-16 text-xl", xl: "w-24 h-24 text-2xl", "2xl": "w-40 h-40 text-4xl" };
   const pxSize: any = { sm: 32, md: 40, lg: 64, xl: 96, "2xl": 160 };
-  if (src) return <img src={src} alt={name} className={`${sizeClasses[size]} rounded-full object-cover shadow-sm ring-4 ring-white bg-gray-100`} style={{ width: pxSize[size], height: pxSize[size] }} />;
-  return <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-4 ring-white`} style={{ width: pxSize[size], height: pxSize[size] }}>{initials}</div>;
+  if (src) return <img src={src} alt={name} className={`${sizeClasses[size]} rounded-full object-cover shadow-sm ring-2 ring-white bg-gray-100`} style={{ width: pxSize[size], height: pxSize[size] }} />;
+  return <div className={`${sizeClasses[size]} rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-white`} style={{ width: pxSize[size], height: pxSize[size] }}>{initials}</div>;
 }
 
 const StudentList = ({ students, onSelectStudent }: any) => {
@@ -68,6 +68,7 @@ const StudentList = ({ students, onSelectStudent }: any) => {
     </div>
   );
 };
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -101,10 +102,14 @@ export default function App() {
   const [conselhoTurma, setConselhoTurma] = useState<string>('');
   const [councilObs, setCouncilObs] = useState('');
   const [councilEnc, setCouncilEnc] = useState('');
+  
+  // Listas Dinâmicas
   const [listComportamento, setListComportamento] = useState<string[]>(DEFAULT_COMPORTAMENTO);
   const [listPedagogico, setListPedagogico] = useState<string[]>(DEFAULT_PEDAGOGICO);
   const [listSocial, setListSocial] = useState<string[]>(DEFAULT_SOCIAL);
   const [listEncaminhamentos, setListEncaminhamentos] = useState<string[]>(DEFAULT_ENCAMINHAMENTOS);
+  
+  // Inputs Temporários
   const [newItem, setNewItem] = useState('');
   const [editName, setEditName] = useState(''); const [editClass, setEditClass] = useState(''); const [editGuardian, setEditGuardian] = useState(''); const [editPhone, setEditPhone] = useState(''); const [editAddress, setEditAddress] = useState('');
   const [newName, setNewName] = useState(''); const [newClass, setNewClass] = useState('');
@@ -129,9 +134,30 @@ export default function App() {
 
   const addListItem = (listName: string) => { if (!newItem) return; if (listName === 'comp') { const n = [...listComportamento, newItem]; setListComportamento(n); localStorage.setItem('list_comp', JSON.stringify(n)); } if (listName === 'ped') { const n = [...listPedagogico, newItem]; setListPedagogico(n); localStorage.setItem('list_ped', JSON.stringify(n)); } if (listName === 'soc') { const n = [...listSocial, newItem]; setListSocial(n); localStorage.setItem('list_soc', JSON.stringify(n)); } if (listName === 'enc') { const n = [...listEncaminhamentos, newItem]; setListEncaminhamentos(n); localStorage.setItem('list_enc', JSON.stringify(n)); } setNewItem(''); };
   const removeListItem = (listName: string, item: string) => { if (listName === 'comp') { const n = listComportamento.filter(i => i !== item); setListComportamento(n); localStorage.setItem('list_comp', JSON.stringify(n)); } if (listName === 'ped') { const n = listPedagogico.filter(i => i !== item); setListPedagogico(n); localStorage.setItem('list_ped', JSON.stringify(n)); } if (listName === 'soc') { const n = listSocial.filter(i => i !== item); setListSocial(n); localStorage.setItem('list_soc', JSON.stringify(n)); } if (listName === 'enc') { const n = listEncaminhamentos.filter(i => i !== item); setListEncaminhamentos(n); localStorage.setItem('list_enc', JSON.stringify(n)); } };
-  async function fetchStudents() { setLoading(true); const { data, error } = await supabase.from('students').select(`*, logs(id, student_id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`) .order('name'); if (!error && data) { const sortedData = data.map((student: any) => ({ ...student, logs: student.logs?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || [], desempenho: student.desempenho || [] })); setStudents(sortedData); } setLoading(false); }
+  
+  async function fetchStudents() { 
+    setLoading(true); 
+    const { data, error } = await supabase.from('students').select(`*, logs(id, student_id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`) .order('name'); 
+    if (!error && data) { 
+      const sortedData = data.map((student: any) => ({ ...student, logs: student.logs?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || [], desempenho: student.desempenho || [] })); 
+      setStudents(sortedData); 
+    } 
+    setLoading(false); 
+  }
+
   const toggleItem = (list: string[], setList: any, item: string) => { if (list.includes(item)) setList(list.filter((i: string) => i !== item)); else setList([...list, item]); };
-  const checkRisk = (student: any) => { const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; let notasVermelhas = 0; if (ultDesempenho) { const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; } return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas }; };
+  
+  const checkRisk = (student: any) => { 
+    const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; 
+    const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; 
+    let notasVermelhas = 0; 
+    if (ultDesempenho) { 
+      const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; 
+      notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; 
+    } 
+    return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas }; 
+  };
+
   const stats = useMemo(() => { const allLogs = students.flatMap(s => s.logs || []); const last7Days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); const count = allLogs.filter(l => new Date(l.created_at).toDateString() === d.toDateString()).length; return { name: dateStr, total: count }; }).reverse(); const motivoCount: any = {}; allLogs.forEach(l => { try { const desc = JSON.parse(l.description); if (desc.motivos) desc.motivos.forEach((m: string) => { motivoCount[m] = (motivoCount[m] || 0) + 1; }); } catch (e) { } }); const pieData = Object.keys(motivoCount).map(key => ({ name: key, value: motivoCount[key] })).sort((a, b) => b.value - a.value).slice(0, 5); return { last7Days, pieData, allLogs }; }, [students]);
 
   const handleLogin = (e: React.FormEvent) => { e.preventDefault(); if (passwordInput === ACCESS_PASSWORD) { setIsAuthenticated(true); localStorage.setItem('soe_auth', 'true'); fetchStudents(); } };
@@ -142,10 +168,11 @@ export default function App() {
   const handleAddStudent = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, status: 'ATIVO' }]); if (!error) { alert('Criado!'); setIsNewStudentModalOpen(false); fetchStudents(); } else alert(error.message); };
   const handleRegisterExit = async () => { if (!selectedStudent) return; const logDesc = JSON.stringify({ solicitante: 'Secretaria/SOE', motivos: [exitType], obs: `SAÍDA REGISTRADA. Motivo detalhado: ${exitReason}` }); const { error: logError } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: 'Situação Escolar', description: logDesc, resolved: true, created_at: new Date().toISOString() }]); if (logError) return alert('Erro ao salvar histórico: ' + logError.message); const { error } = await supabase.from('students').update({ status: exitType, exit_reason: exitReason, exit_date: new Date().toISOString() }).eq('id', selectedStudent.id); if (!error) { alert('Saída registrada!'); setExitReason(''); setIsExitModalOpen(false); setIsModalOpen(false); fetchStudents(); } else alert(error.message); };
   const handleSaveRadar = async () => { const targetClass = conselhoTurma || students[0]?.class_id; if (!targetClass) return; const { error } = await supabase.from('class_radar').upsert({ turma: targetClass, bimestre: selectedBimestre, ...radarData }, { onConflict: 'turma, bimestre' }); if (!error) { alert('Avaliação da Turma Salva!'); setIsEvalModalOpen(false); } else { alert('Erro: ' + error.message); } };
+
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
   const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre); if(!desempenhoAtual) return; const { error } = await supabase.from('desempenho_bimestral').update({ lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie, his: desempenhoAtual.his, geo: desempenhoAtual.geo, ing: desempenhoAtual.ing, art: desempenhoAtual.art, edf: desempenhoAtual.edf, pd1: desempenhoAtual.pd1, pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3, faltas_bimestre: desempenhoAtual.faltas_bimestre, obs_conselho: councilObs, encaminhamento_conselho: councilEnc }).eq('id', desempenhoAtual.id); if(!error) { alert('Dados Salvos!'); fetchStudents(); } else alert('Erro: ' + error.message); };
   
-  // --- FUNÇÕES DE PDF RESTAURADAS ---
+  // FUNÇÕES PDF (Recolocadas aqui para evitar erro generatePDF)
   const printStudentData = (doc: jsPDF, student: any) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" }); doc.setFontSize(12); doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25); doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${student.name}`, 35, 35); doc.setFont("helvetica", "normal"); doc.text(`Turma: ${student.class_id}`, 160, 35); doc.text(`Responsável:`, 14, 43); doc.text(`${student.guardian_name || 'Não informado'}`, 40, 43); doc.text(`Telefone:`, 14, 50); doc.text(`${student.guardian_phone || '-'}`, 40, 50); doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60); const acadData = student.desempenho?.map((d: any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || []; autoTable(doc, { startY: 65, head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], body: acadData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 8, halign: 'center' }, styles: { fontSize: 8, halign: 'center' } }); const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85; doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY); const logsData = student.logs?.filter((l: any) => l.student_id === student.id).map((l: any) => { let desc = { motivos: [], obs: '', solicitante: '' }; try { desc = JSON.parse(l.description); } catch (e) { } return [new Date(l.created_at).toLocaleDateString('pt-BR'), l.category, `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`, l.resolved ? 'Resolvido' : 'Pendente']; }) || []; autoTable(doc, { startY: finalY + 5, head: [['Data', 'Tipo', 'Detalhes do Atendimento', 'Status']], body: logsData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 2: { cellWidth: 100 } } }); const pageHeight = doc.internal.pageSize.height; doc.line(60, pageHeight - 35, 150, pageHeight - 35); doc.setFont("helvetica", "bold"); doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 105, pageHeight - 30, { align: "center" }); doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 25, { align: "center" }); doc.setFontSize(8); doc.setTextColor(100); const timeNow = new Date().toLocaleString('pt-BR'); doc.text(`Emitido em: ${timeNow}`, 105, pageHeight - 15, { align: "center" }); };
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
   const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); if (!window.confirm(`Deseja gerar fichas da turma ${classId}?`)) return; const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`); };
@@ -156,8 +183,6 @@ export default function App() {
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) { if (!e.target.files || e.target.files.length === 0) return; setImporting(true); const file = e.target.files[0]; const reader = new FileReader(); reader.onload = async (evt) => { try { const bstr = evt.target?.result; const workbook = XLSX.read(bstr, { type: 'binary' }); const ws = workbook.Sheets[workbook.SheetNames[0]]; const data = XLSX.utils.sheet_to_json(ws); for (const row of (data as any[])) { const nomeExcel = row['ESTUDANTE']?.toString().toUpperCase().trim(); if (!nomeExcel) continue; const aluno = students.find(s => s.name.toUpperCase().trim() === nomeExcel); if (aluno) { const parseNota = (val: any) => val ? parseFloat(val.toString().replace(',', '.')) : null; await supabase.from('desempenho_bimestral').insert([{ aluno_id: aluno.id, bimestre: selectedBimestre, art: parseNota(row['ART']), cie: parseNota(row['CIE']), edf: parseNota(row['EDF']), geo: parseNota(row['GEO']), his: parseNota(row['HIS']), ing: parseNota(row['ING']), lp: parseNota(row['LP']), mat: parseNota(row['MAT']), pd1: parseNota(row['PD1']), pd2: parseNota(row['PD2']), pd3: parseNota(row['PD3']), faltas_bimestre: row['FALTAS'] ? parseInt(row['FALTAS']) : 0 }]); } } alert(`Sucesso!`); setIsImportModalOpen(false); setImporting(false); fetchStudents(); } catch (err) { alert('Erro: ' + err); setImporting(false); } }; reader.readAsBinaryString(file); }
 
   const changeStudent = (direction: 'prev' | 'next') => { const turmas = [...new Set(students.map(s => s.class_id))].sort(); const currentClass = conselhoTurma || turmas[0]; const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name)); if (!projectedStudent || currentList.length === 0) return; const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id); if (direction === 'next') { if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]); else setProjectedStudent(currentList[0]); } else { if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]); else setProjectedStudent(currentList[currentList.length - 1]); } };
-
-  // --- RENDER CONSELHO (Compacto e Seguro) ---
   const renderConselho = () => {
       const turmas = [...new Set(students.map(s => s.class_id))].sort(); 
       const targetClass = conselhoTurma || turmas[0]; 
@@ -181,52 +206,67 @@ export default function App() {
       if (!targetClass) return <div className="p-10 text-center text-slate-400">Carregando dados...</div>;
       
       return (
-          <div className="max-w-[1800px] mx-auto pb-20 w-full h-full flex flex-col overflow-hidden">
-              <div className="flex flex-col md:flex-row justify-between items-end mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                  <div className="space-y-1">
-                      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><GraduationCap className="text-indigo-600"/> Conselho de Classe Digital</h2>
-                      <div className="flex flex-wrap gap-2 items-center">
-                          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200"><Calendar size={14} className="text-slate-400"/><input type="date" className="text-xs font-bold outline-none bg-transparent" value={dataConselho} onChange={e => setDataConselho(e.target.value)}/></div>
-                          <select className="p-2 border rounded-lg font-bold bg-slate-50 text-xs" value={targetClass} onChange={e => {setConselhoTurma(e.target.value); setConselhoFilterType('ALL');}}>{turmas.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                          <select className="p-2 border rounded-lg font-bold bg-slate-50 text-xs" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select>
+          <div className="max-w-[1800px] mx-auto pb-4 w-full h-full flex flex-col overflow-hidden bg-slate-50/50">
+              <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm flex-shrink-0">
+                  <div className="flex items-center gap-4">
+                      <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><GraduationCap size={24}/></div>
+                      <div>
+                          <h2 className="text-xl font-bold text-slate-800">Conselho de Classe Digital</h2>
+                          <div className="flex gap-2 mt-1">
+                              <div className="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-md border border-slate-200"><Calendar size={14} className="text-slate-400"/><input type="date" className="text-xs font-bold outline-none bg-transparent text-slate-600" value={dataConselho} onChange={e => setDataConselho(e.target.value)}/></div>
+                              <select className="px-3 py-1 border rounded-md font-bold bg-slate-100 text-xs text-slate-600" value={targetClass} onChange={e => {setConselhoTurma(e.target.value); setConselhoFilterType('ALL');}}>{turmas.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                              <select className="px-3 py-1 border rounded-md font-bold bg-slate-100 text-xs text-slate-600" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select>
+                          </div>
                       </div>
                   </div>
-                  <div className="flex gap-2">
-                      <button onClick={() => setIsEvalModalOpen(true)} className="bg-orange-50 text-orange-600 border border-orange-200 px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-orange-100 text-xs transition-colors"><Activity size={16}/> Avaliar Turma</button>
-                      <button onClick={() => generateCouncilAta(targetClass)} className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-slate-900 text-xs transition-colors shadow-lg shadow-slate-200"><Printer size={16}/> Gerar Ata PDF</button>
+                  <div className="flex gap-3">
+                      <button onClick={() => setIsEvalModalOpen(true)} className="bg-orange-50 text-orange-600 border border-orange-200 px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-orange-100 text-sm transition-colors"><Activity size={16}/> Avaliar Turma</button>
+                      <button onClick={() => generateCouncilAta(targetClass)} className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-slate-900 text-sm transition-colors shadow-lg shadow-slate-200"><Printer size={16}/> Gerar Ata PDF</button>
                   </div>
               </div>
               
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-                  <div className="lg:col-span-2 grid grid-cols-2 gap-3">
-                      <div onClick={() => setConselhoFilterType('ALL')} className={`cursor-pointer p-3 rounded-xl transition-all flex items-center justify-between ${conselhoFilterType === 'ALL' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50 border'}`}><div className="flex flex-col"><span className="text-[9px] uppercase font-bold opacity-70">Total</span><span className="text-xl font-black">{students.filter(s => s.class_id === targetClass).length}</span></div><Users2 size={20} className="opacity-30"/></div>
-                      <div onClick={() => setConselhoFilterType('RISK')} className={`cursor-pointer p-3 rounded-xl transition-all flex items-center justify-between ${conselhoFilterType === 'RISK' ? 'bg-red-500 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50 border'}`}><div className="flex flex-col"><span className="text-[9px] uppercase font-bold opacity-70">Risco Faltas</span><span className="text-xl font-black">{alunosRisco}</span></div><AlertTriangle size={20} className="opacity-30"/></div>
-                      <div onClick={() => setConselhoFilterType('GRADES')} className={`cursor-pointer p-3 rounded-xl transition-all flex items-center justify-between ${conselhoFilterType === 'GRADES' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50 border'}`}><div className="flex flex-col"><span className="text-[9px] uppercase font-bold opacity-70">Notas Baixas</span><span className="text-xl font-black">{alunosBaixoRendimento}</span></div><BarChart3 size={20} className="opacity-30"/></div>
-                      <div onClick={() => setConselhoFilterType('LOGS')} className={`cursor-pointer p-3 rounded-xl transition-all flex items-center justify-between ${conselhoFilterType === 'LOGS' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50 border'}`}><div className="flex flex-col"><span className="text-[9px] uppercase font-bold opacity-70">Ocorrências</span><span className="text-xl font-black">{councilStudents.filter(s => (s.logs?.length || 0) > 0).length}</span></div><FileText size={20} className="opacity-30"/></div>
+              <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-4 gap-4 flex-shrink-0">
+                  <div onClick={() => setConselhoFilterType('ALL')} className={`cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between ${conselhoFilterType === 'ALL' ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''}`}>
+                      <div><p className="text-[10px] font-bold text-slate-400 uppercase">Total Alunos</p><p className="text-2xl font-black text-slate-800">{students.filter(s => s.class_id === targetClass).length}</p></div>
+                      <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><Users2 size={20}/></div>
                   </div>
-                  <div className="bg-white rounded-xl p-2 flex flex-col items-center justify-center relative overflow-hidden shadow-sm border border-slate-100 h-32">
-                      <div className="w-full h-full"><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="60%" data={radarChartData}><PolarGrid stroke="#e2e8f0"/><PolarAngleAxis dataKey="subject" tick={{ fontSize: 8, fill: '#64748b', fontWeight: 'bold' }}/><PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false}/><Radar name="Turma" dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.6}/><Tooltip/></RadarChart></ResponsiveContainer></div>
+                  <div onClick={() => setConselhoFilterType('RISK')} className={`cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between ${conselhoFilterType === 'RISK' ? 'ring-2 ring-red-500 bg-red-50' : ''}`}>
+                      <div><p className="text-[10px] font-bold text-slate-400 uppercase">Risco Faltas</p><p className="text-2xl font-black text-red-600">{alunosRisco}</p></div>
+                      <div className="bg-red-100 p-2 rounded-lg text-red-600"><AlertTriangle size={20}/></div>
+                  </div>
+                  <div onClick={() => setConselhoFilterType('GRADES')} className={`cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between ${conselhoFilterType === 'GRADES' ? 'ring-2 ring-orange-500 bg-orange-50' : ''}`}>
+                      <div><p className="text-[10px] font-bold text-slate-400 uppercase">Notas Baixas</p><p className="text-2xl font-black text-orange-600">{alunosBaixoRendimento}</p></div>
+                      <div className="bg-orange-100 p-2 rounded-lg text-orange-600"><BarChart3 size={20}/></div>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center relative overflow-hidden">
+                      <div className="absolute top-2 left-3 text-[10px] font-bold text-slate-400 uppercase">Radar da Turma</div>
+                      <div className="w-full h-20 mt-2"><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarChartData}><PolarGrid stroke="#f1f5f9"/><PolarAngleAxis dataKey="subject" tick={false}/><PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false}/><Radar name="Turma" dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.5}/><Tooltip/></RadarChart></ResponsiveContainer></div>
                   </div>
               </div>
               
-              <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-0 shadow-sm">
-                  <div className="overflow-x-auto flex-1">
-                      <table className="w-full text-xs text-left min-w-[1000px]">
-                          <thead className="bg-slate-50 text-slate-500 font-bold uppercase sticky top-0 z-10 border-b">
-                              <tr><th className="px-4 py-3 sticky left-0 bg-slate-50 z-20">Estudante</th><th className="px-2 py-3 text-center">LP</th><th className="px-2 py-3 text-center">MAT</th><th className="px-2 py-3 text-center">CIE</th><th className="px-2 py-3 text-center">HIS</th><th className="px-2 py-3 text-center">GEO</th><th className="px-2 py-3 text-center">ING</th><th className="px-2 py-3 text-center">ART</th><th className="px-2 py-3 text-center">EDF</th><th className="px-2 py-3 text-center bg-slate-100">PD1</th><th className="px-2 py-3 text-center bg-slate-100">PD2</th><th className="px-2 py-3 text-center bg-slate-100">PD3</th><th className="px-4 py-3 text-center bg-red-50 text-red-700">FALTAS</th><th className="px-4 py-3">Atendimentos</th></tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                              {councilStudents.length === 0 ? <tr><td colSpan={14} className="p-8 text-center text-slate-400 font-bold">Nenhum aluno encontrado.</td></tr> : councilStudents.map(s => {
-                                  const notas = s.desempenho?.find((d: any) => d.bimestre === selectedBimestre) || {};
-                                  return (
-                                      <tr key={s.id} onClick={() => setProjectedStudent(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
-                                          <td className="px-4 py-3 font-bold text-slate-700 flex items-center gap-2 border-r sticky left-0 bg-white group-hover:bg-indigo-50 z-10 min-w-[200px]"><Avatar name={s.name} src={s.photo_url} size="sm"/> <span className="truncate">{s.name}</span></td>
-                                          <td className="px-2 py-3 text-center border-r">{renderNota(notas.lp)}</td><td className="px-2 py-3 text-center border-r">{renderNota(notas.mat)}</td><td className="px-2 py-3 text-center border-r">{renderNota(notas.cie)}</td><td className="px-2 py-3 text-center border-r">{renderNota(notas.his)}</td><td className="px-2 py-3 text-center border-r">{renderNota(notas.geo)}</td><td className="px-2 py-3 text-center border-r">{renderNota(notas.ing)}</td><td className="px-2 py-3 text-center border-r">{renderNota(notas.art)}</td><td className="px-2 py-3 text-center border-r">{renderNota(notas.edf)}</td><td className="px-2 py-3 text-center border-r bg-slate-50">{renderNota(notas.pd1)}</td><td className="px-2 py-3 text-center border-r bg-slate-50">{renderNota(notas.pd2)}</td><td className="px-2 py-3 text-center border-r bg-slate-50">{renderNota(notas.pd3)}</td><td className="px-4 py-3 text-center border-r font-bold bg-red-50">{notas.faltas_bimestre > 20 ? <span className="text-red-600 animate-pulse">{notas.faltas_bimestre}</span> : <span>{notas.faltas_bimestre || 0}</span>}</td><td className="px-4 py-3"><span className="text-[10px] uppercase font-bold text-slate-400">{s.logs?.length || 0} Atend.</span></td>
-                                      </tr>
-                                  );
-                              })}
-                          </tbody>
-                      </table>
+              <div className="px-6 flex-1 min-h-0 flex flex-col">
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
+                      <div className="overflow-x-auto flex-1">
+                          <table className="w-full text-xs text-left">
+                              <thead className="bg-slate-50 text-slate-500 font-bold uppercase sticky top-0 z-10 border-b border-slate-200">
+                                  <tr>
+                                      <th className="px-4 py-3 sticky left-0 bg-slate-50 z-20 shadow-sm">Nome do Aluno</th>
+                                      <th className="px-2 py-3 text-center">LP</th><th className="px-2 py-3 text-center">MAT</th><th className="px-2 py-3 text-center">CIE</th><th className="px-2 py-3 text-center">HIS</th><th className="px-2 py-3 text-center">GEO</th><th className="px-2 py-3 text-center">ING</th><th className="px-2 py-3 text-center">ART</th><th className="px-2 py-3 text-center">EDF</th><th className="px-2 py-3 text-center bg-slate-100">PD1</th><th className="px-2 py-3 text-center bg-slate-100">PD2</th><th className="px-2 py-3 text-center bg-slate-100">PD3</th><th className="px-4 py-3 text-center bg-red-50 text-red-700">FALTAS</th><th className="px-4 py-3">Atendimentos</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                  {councilStudents.length === 0 ? <tr><td colSpan={14} className="p-8 text-center text-slate-400 font-bold">Nenhum aluno encontrado.</td></tr> : councilStudents.map(s => {
+                                      const notas = s.desempenho?.find((d: any) => d.bimestre === selectedBimestre) || {};
+                                      return (
+                                          <tr key={s.id} onClick={() => setProjectedStudent(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
+                                              <td className="px-4 py-3 font-bold text-slate-700 flex items-center gap-3 border-r border-slate-100 sticky left-0 bg-white group-hover:bg-indigo-50 z-10 shadow-sm"><Avatar name={s.name} src={s.photo_url} size="sm"/> <span className="truncate">{s.name}</span></td>
+                                              <td className="px-2 py-3 text-center border-r border-slate-50">{renderNota(notas.lp)}</td><td className="px-2 py-3 text-center border-r border-slate-50">{renderNota(notas.mat)}</td><td className="px-2 py-3 text-center border-r border-slate-50">{renderNota(notas.cie)}</td><td className="px-2 py-3 text-center border-r border-slate-50">{renderNota(notas.his)}</td><td className="px-2 py-3 text-center border-r border-slate-50">{renderNota(notas.geo)}</td><td className="px-2 py-3 text-center border-r border-slate-50">{renderNota(notas.ing)}</td><td className="px-2 py-3 text-center border-r border-slate-50">{renderNota(notas.art)}</td><td className="px-2 py-3 text-center border-r border-slate-50">{renderNota(notas.edf)}</td><td className="px-2 py-3 text-center border-r border-slate-50 bg-slate-50">{renderNota(notas.pd1)}</td><td className="px-2 py-3 text-center border-r border-slate-50 bg-slate-50">{renderNota(notas.pd2)}</td><td className="px-2 py-3 text-center border-r border-slate-50 bg-slate-50">{renderNota(notas.pd3)}</td><td className="px-4 py-3 text-center border-r border-slate-50 font-bold bg-red-50">{notas.faltas_bimestre > 20 ? <span className="text-red-600 animate-pulse">{notas.faltas_bimestre}</span> : <span>{notas.faltas_bimestre || 0}</span>}</td><td className="px-4 py-3"><span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full">{s.logs?.length || 0} Reg.</span></td>
+                                          </tr>
+                                      );
+                                  })}
+                              </tbody>
+                          </table>
+                      </div>
                   </div>
               </div>
           </div>
@@ -285,7 +325,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden">
-      <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-[#1E1E2D] text-white flex flex-col shadow-2xl transition-transform duration-300 md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex items-center gap-3 border-b border-slate-800"><div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} /></div><div><h1 className="font-bold text-lg">SOE Digital</h1><p className="text-[10px] uppercase text-slate-400">CED 4 Guará</p></div></div>
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <button onClick={() => { setView('dashboard'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
@@ -299,8 +339,8 @@ export default function App() {
           <p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p><p>{SYSTEM_ROLE}</p><p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p>
           <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white transition-colors"><LogOut size={12} /> Sair do Sistema</button>
           <div className="mt-4 pt-4 border-t border-slate-700 flex flex-col gap-1 text-slate-400">
-            <div className="flex items-center gap-2"><Code size={12}/> <span className="text-[9px] font-bold">Dev. & Design: {SYSTEM_USER_NAME}</span></div>
-            <span className="text-[8px] opacity-50">v1.0.9 Enterprise Edition</span>
+            <div className="flex items-center gap-2"><Code size={12}/> <span className="text-[9px] font-bold">Dev. & Design: Daniel Alves da Silva</span></div>
+            <span className="text-[8px] opacity-50">v1.1.0 Enterprise Edition</span>
           </div>
         </div>
       </aside>
@@ -309,7 +349,7 @@ export default function App() {
         <header className="bg-white border-b px-4 md:px-8 py-3 flex justify-between items-center shadow-sm z-10 gap-4">
           <div className="flex items-center gap-3 flex-1"><button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden text-slate-600"><Menu size={24} /></button>
           {view !== 'dashboard' && (<button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-bold text-sm bg-slate-100 px-3 py-1 rounded-full"><ArrowLeft size={16} /> Voltar ao Início</button>)}
-          <div className="flex-1 max-w-md relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="Buscar aluno..." className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-full text-sm outline-none" value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); if (e.target.value.length > 0) setView('students'); }} /></div></div>
+          <div className="flex-1 max-w-md relative"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="Buscar aluno..." className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-full text-sm outline-none" value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); if (e.target.value.length > 0) setView('students'); }} /></div></div>
           <Avatar name={SYSTEM_USER_NAME} src={adminPhoto} />
         </header>
 
