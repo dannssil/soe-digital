@@ -12,7 +12,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, ChevronLeft, Star, Activity, Heart, Brain, PenTool, Copyright, Code, Cpu
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, ChevronLeft, Star, Activity, Heart, Brain, PenTool, Copyright, Code
 } from 'lucide-react';
 
 // --- CONEXÃO ---
@@ -156,62 +156,73 @@ export default function App() {
 
   const changeStudent = (direction: 'prev' | 'next') => { const turmas = [...new Set(students.map(s => s.class_id))].sort(); const currentClass = conselhoTurma || turmas[0]; const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name)); if (!projectedStudent || currentList.length === 0) return; const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id); if (direction === 'next') { if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]); else setProjectedStudent(currentList[0]); } else { if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]); else setProjectedStudent(currentList[currentList.length - 1]); } };
 
-  // REORGANIZAÇÃO VISUAL DO CONSELHO (HEADER LIMPO + CARDS SEM BORDAS)
   const renderConselho = () => {
-      const turmas = [...new Set(students.map(s => s.class_id))].sort(); const targetClass = conselhoTurma || turmas[0]; let councilStudents = students.filter(s => s.class_id === targetClass);
+      const turmas = [...new Set(students.map(s => s.class_id))].sort(); 
+      const targetClass = conselhoTurma || turmas[0]; 
+      let councilStudents = students.filter(s => s.class_id === targetClass);
+      
       let totalFaltas = 0; let alunosRisco = 0; let totalOcorrencias = 0; let alunosBaixoRendimento = 0;
       councilStudents.forEach(s => { 
           const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
-          if(d) { totalFaltas += (d.faltas_bimestre || 0); if(d.faltas_bimestre > 20) alunosRisco++; const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf]; const notasVermelhas = disciplinasBase.filter(n => n !== null && n < 5).length; if (notasVermelhas > 3) alunosBaixoRendimento++; } 
+          if(d) { 
+              totalFaltas += (d.faltas_bimestre || 0); 
+              if(d.faltas_bimestre > 20) alunosRisco++; 
+              const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf];
+              const notasVermelhas = disciplinasBase.filter(n => n !== null && n < 5).length;
+              if (notasVermelhas > 3) alunosBaixoRendimento++;
+          } 
           totalOcorrencias += (s.logs?.length || 0); 
       });
       const mediaFaltas = councilStudents.length > 0 ? Math.round(totalFaltas / councilStudents.length) : 0;
       
+      // FILTRO APRIMORADO E SEGURO (Impede lista vazia se dados faltarem)
       if (conselhoFilterType === 'RISK') councilStudents = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && d.faltas_bimestre > 20; });
       if (conselhoFilterType === 'LOGS') councilStudents = councilStudents.filter(s => (s.logs?.length || 0) > 0);
       if (conselhoFilterType === 'GRADES') councilStudents = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); if (!d) return false; const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf]; return disciplinasBase.filter(n => n !== null && n < 5).length > 3; });
 
       const radarChartData = [
-        { subject: 'Assiduidade', A: radarData.assiduidade || 0, fullMark: 5 }, { subject: 'Participação', A: radarData.participacao || 0, fullMark: 5 }, { subject: 'Relacionamento', A: radarData.relacionamento || 0, fullMark: 5 }, { subject: 'Rendimento', A: radarData.rendimento || 0, fullMark: 5 }, { subject: 'Tarefas', A: radarData.tarefas || 0, fullMark: 5 },
+        { subject: 'Assiduidade', A: radarData.assiduidade || 0, fullMark: 5 },
+        { subject: 'Participação', A: radarData.participacao || 0, fullMark: 5 },
+        { subject: 'Relacionamento', A: radarData.relacionamento || 0, fullMark: 5 },
+        { subject: 'Rendimento', A: radarData.rendimento || 0, fullMark: 5 },
+        { subject: 'Tarefas', A: radarData.tarefas || 0, fullMark: 5 },
       ];
 
       if (!targetClass) return <div className="p-10 text-center text-slate-400">Carregando dados...</div>;
+      
       return (
           <div className="max-w-[1800px] mx-auto pb-20 w-full h-full flex flex-col overflow-hidden">
-              {/* HEADER ORGANIZADO: FILTROS À ESQUERDA, AÇÕES À DIREITA */}
-              <div className="flex flex-col md:flex-row justify-between items-end mb-8 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="space-y-2">
-                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><GraduationCap className="text-indigo-600"/> Conselho de Classe Digital</h2>
-                      <div className="flex flex-wrap gap-2 items-center">
-                          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200"><Calendar size={16} className="text-slate-400"/><input type="date" className="text-xs font-bold outline-none bg-transparent" value={dataConselho} onChange={e => setDataConselho(e.target.value)}/></div>
-                          <select className="p-2 border rounded-lg font-bold bg-slate-50 text-xs" value={targetClass} onChange={e => {setConselhoTurma(e.target.value); setConselhoFilterType('ALL');}}>{turmas.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                          <select className="p-2 border rounded-lg font-bold bg-slate-50 text-xs" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select>
-                      </div>
-                  </div>
-                  <div className="flex gap-2">
-                      <button onClick={() => setIsEvalModalOpen(true)} className="bg-orange-50 text-orange-600 border border-orange-200 px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-orange-100 text-xs transition-colors"><Activity size={16}/> Avaliar Turma</button>
-                      <button onClick={() => generateCouncilAta(targetClass)} className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-slate-900 text-xs transition-colors shadow-lg shadow-slate-200"><Printer size={16}/> Gerar Ata PDF</button>
+              <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                  <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3"><GraduationCap size={28} className="text-indigo-600"/> Conselho de Classe Digital</h2>
+                  <div className="flex flex-wrap gap-2 items-center justify-center">
+                      <div className="flex items-center gap-2 bg-white p-2 rounded-xl border shadow-sm"><Calendar size={18} className="text-slate-400"/><input type="date" className="text-sm font-bold outline-none" value={dataConselho} onChange={e => setDataConselho(e.target.value)}/></div>
+                      <select className="p-3 border rounded-xl font-bold bg-white shadow-sm text-sm" value={targetClass} onChange={e => {setConselhoTurma(e.target.value); setConselhoFilterType('ALL');}}>{turmas.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                      <select className="p-3 border rounded-xl font-bold bg-white shadow-sm text-sm" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select>
+                      <button onClick={() => setIsEvalModalOpen(true)} className="bg-orange-500 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-bold hover:bg-orange-600 shadow-md text-sm"><Activity size={18}/> Avaliar Turma</button>
+                      <button onClick={() => generateCouncilAta(targetClass)} className="bg-slate-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-bold hover:bg-slate-900 shadow-md text-sm"><Printer size={18}/> Gerar Ata PDF</button>
                   </div>
               </div>
-              
+
+              {/* ÁREA SUPERIOR: CARDS + GRÁFICO DE RADAR */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                  {/* CARDS MINIMALISTAS */}
+                  {/* COLUNA DA ESQUERDA: CARDS DE MÉTRICAS */}
                   <div className="lg:col-span-2 grid grid-cols-2 gap-4">
-                      <div onClick={() => setConselhoFilterType('ALL')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'ALL' ? 'bg-indigo-600 text-white shadow-indigo-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Total Alunos</span><span className="text-3xl font-black">{students.filter(s => s.class_id === targetClass).length}</span></div><Users2 size={32} className="opacity-20"/></div>
-                      <div onClick={() => setConselhoFilterType('RISK')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'RISK' ? 'bg-red-500 text-white shadow-red-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Faltas Críticas</span><span className="text-3xl font-black">{alunosRisco}</span></div><AlertTriangle size={32} className="opacity-20"/></div>
-                      <div onClick={() => setConselhoFilterType('GRADES')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'GRADES' ? 'bg-orange-500 text-white shadow-orange-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Notas Vermelhas</span><span className="text-3xl font-black">{alunosBaixoRendimento}</span></div><BarChart3 size={32} className="opacity-20"/></div>
-                      <div onClick={() => setConselhoFilterType('LOGS')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'LOGS' ? 'bg-blue-600 text-white shadow-blue-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Com Ocorrências</span><span className="text-3xl font-black">{councilStudents.filter(s => (s.logs?.length || 0) > 0).length}</span></div><FileText size={32} className="opacity-20"/></div>
+                      <div onClick={() => setConselhoFilterType('ALL')} className={`cursor-pointer p-4 rounded-xl shadow-sm border transition-all flex items-center gap-4 ${conselhoFilterType === 'ALL' ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white border-slate-100 hover:border-indigo-300'}`}><Users2 size={24}/><div><p className="text-[10px] font-bold uppercase opacity-70">Total Turma</p><p className="text-2xl font-black">{students.filter(s => s.class_id === targetClass).length}</p></div></div>
+                      <div onClick={() => setConselhoFilterType('RISK')} className={`cursor-pointer p-4 rounded-xl shadow-sm border transition-all flex items-center gap-4 ${conselhoFilterType === 'RISK' ? 'bg-red-600 text-white border-red-700' : 'bg-white border-slate-100 hover:border-red-300'}`}><AlertTriangle size={24}/><div><p className="text-[10px] font-bold uppercase opacity-70">Em Alerta (Faltas)</p><p className="text-2xl font-black">{alunosRisco}</p></div></div>
+                      <div onClick={() => setConselhoFilterType('GRADES')} className={`cursor-pointer p-4 rounded-xl shadow-sm border transition-all flex items-center gap-4 ${conselhoFilterType === 'GRADES' ? 'bg-orange-500 text-white border-orange-600' : 'bg-white border-slate-100 hover:border-orange-300'}`}><BarChart3 size={24}/><div><p className="text-[10px] font-bold uppercase opacity-70">Baixo Rendimento</p><p className="text-2xl font-black">{alunosBaixoRendimento}</p></div></div>
+                      <div onClick={() => setConselhoFilterType('LOGS')} className={`cursor-pointer p-4 rounded-xl shadow-sm border transition-all flex items-center gap-4 ${conselhoFilterType === 'LOGS' ? 'bg-blue-600 text-white border-blue-700' : 'bg-white border-slate-100 hover:border-blue-300'}`}><FileText size={24}/><div><p className="text-[10px] font-bold uppercase opacity-70">Com Atendimentos</p><p className="text-2xl font-black">{councilStudents.filter(s => (s.logs?.length || 0) > 0).length}</p></div></div>
                   </div>
-                  {/* RADAR INTEGRADO */}
-                  <div className="bg-white rounded-2xl p-2 flex flex-col items-center justify-center relative overflow-hidden">
-                      <h4 className="text-[10px] font-bold text-slate-400 uppercase absolute top-4 left-6 tracking-widest">Radar da Turma</h4>
-                      <div className="w-full h-48 mt-4">
+
+                  {/* COLUNA DA DIREITA: GRÁFICO DE RADAR VISUAL */}
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-2 flex flex-col items-center justify-center relative overflow-hidden">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase absolute top-2 left-4">Perfil da Turma</h4>
+                      <div className="w-full h-48">
                         <ResponsiveContainer width="100%" height="100%">
                           <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarChartData}>
-                            <PolarGrid stroke="#e2e8f0" />
+                            <PolarGrid />
                             <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: '#64748b', fontWeight: 'bold' }} />
                             <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
-                            <Radar name="Turma" dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
+                            <Radar name="Turma" dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.5} />
                             <Tooltip />
                           </RadarChart>
                         </ResponsiveContainer>
@@ -219,13 +230,13 @@ export default function App() {
                   </div>
               </div>
               
-              <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-0 shadow-sm">
+              <div className="bg-white rounded-2xl shadow-sm border overflow-hidden flex-1 flex flex-col min-h-0">
                   <div className="overflow-x-auto flex-1">
                       <table className="w-full text-xs text-left min-w-[1000px]">
-                          <thead className="bg-slate-50 text-slate-500 font-bold uppercase sticky top-0 z-10 border-b">
+                          <thead className="bg-slate-800 text-white font-bold uppercase sticky top-0 z-10">
                               <tr>
-                                  <th className="px-4 py-4 sticky left-0 bg-slate-50 z-20">Estudante</th>
-                                  <th className="px-2 py-4 text-center">LP</th><th className="px-2 py-4 text-center">MAT</th><th className="px-2 py-4 text-center">CIE</th><th className="px-2 py-4 text-center">HIS</th><th className="px-2 py-4 text-center">GEO</th><th className="px-2 py-4 text-center">ING</th><th className="px-2 py-4 text-center">ART</th><th className="px-2 py-4 text-center">EDF</th><th className="px-2 py-4 text-center bg-slate-100">PD1</th><th className="px-2 py-4 text-center bg-slate-100">PD2</th><th className="px-2 py-4 text-center bg-slate-100">PD3</th><th className="px-4 py-4 text-center bg-red-50 text-red-700">FALTAS</th><th className="px-4 py-4">Atendimentos</th>
+                                  <th className="px-4 py-3 sticky left-0 bg-slate-800 z-20">Estudante</th>
+                                  <th className="px-2 py-3 text-center">LP</th><th className="px-2 py-3 text-center">MAT</th><th className="px-2 py-3 text-center">CIE</th><th className="px-2 py-3 text-center">HIS</th><th className="px-2 py-3 text-center">GEO</th><th className="px-2 py-3 text-center">ING</th><th className="px-2 py-3 text-center">ART</th><th className="px-2 py-3 text-center">EDF</th><th className="px-2 py-3 text-center bg-slate-700">PD1</th><th className="px-2 py-3 text-center bg-slate-700">PD2</th><th className="px-2 py-3 text-center bg-slate-700">PD3</th><th className="px-4 py-3 text-center bg-red-900">FALTAS</th><th className="px-4 py-3">Atendimentos</th>
                               </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -300,7 +311,7 @@ export default function App() {
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden">
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex items-center gap-3 border-b border-slate-800"><div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} /></div><div><h1 className="font-bold text-lg">SOE Digital</h1><p className="text-[10px] uppercase text-slate-400">CED 4 Guará</p></div></div>
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <button onClick={() => { setView('dashboard'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Dashboard</button>
           <button onClick={() => { setView('students'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'students' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><Users size={18} /> Alunos</button>
           <button onClick={() => { setView('conselho'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'conselho' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}><GraduationCap size={18} /> Conselho de Classe</button>
@@ -308,12 +319,12 @@ export default function App() {
           <button onClick={handleBackup} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><Database size={18} /> Backup</button>
           <button onClick={() => { setIsSettingsModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-400 hover:bg-slate-800"><Settings size={18} /> Configurações</button>
         </nav>
-        <div className="p-4 mt-auto border-t border-slate-800 text-[10px] text-slate-400">
+        <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400 mt-auto">
           <p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p><p>{SYSTEM_ROLE}</p><p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p>
           <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white transition-colors"><LogOut size={12} /> Sair do Sistema</button>
-          <div className="mt-4 pt-4 border-t border-slate-700 flex flex-col gap-1 text-slate-500">
-            <div className="flex items-center gap-2"><Code size={12}/> <span className="text-[9px] font-bold">Dev. & Design: {SYSTEM_USER_NAME}</span></div>
-            <span className="text-[8px] opacity-50">v1.0.5 Enterprise Edition</span>
+          <div className="mt-4 pt-4 border-t border-slate-700 flex flex-col gap-1 text-slate-400">
+            <div className="flex items-center gap-2"><Code size={12}/> <span className="text-[9px] font-bold">Dev. & Design: Daniel Alves</span></div>
+            <span className="text-[8px] opacity-50">v1.0.6 Enterprise Edition</span>
           </div>
         </div>
       </aside>
