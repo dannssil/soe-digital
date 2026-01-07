@@ -1,6 +1,6 @@
 {
   "short_name": "SOE Digital",
-  "name": "SOE Digital - CED 4 Guará",
+  "name": "SOE Digital",
   "icons": [
     {
       "src": "/icone-192.png",
@@ -15,7 +15,7 @@
       "purpose": "any maskable"
     }
   ],
-  "start_url": "/?v=5",
+  "start_url": "/?v=6",
   "display": "standalone",
   "theme_color": "#4f46e5",
   "background_color": "#f0f0f0"
