@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
   FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff, BrainCircuit, ClipboardList
+  UserCircle, FileDown, CalendarDays, Zap, Menu, Search, Users2, MoreHorizontal, Folder, BarChart3, FileSpreadsheet, MapPin, Clock, ShieldCheck, ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, Eye, EyeOff
 } from 'lucide-react';
 
 // ==============================================================================
@@ -30,7 +30,7 @@ const SYSTEM_ORG = "SEEDF";
 const ACCESS_PASSWORD = "Ced@1rf1";
 const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
-// --- LISTAS PADRÃO (Backups) ---
+// --- LISTAS PADRÃO ---
 const DEFAULT_COMPORTAMENTO = ["Conversa excessiva", "Desacato", "Agressividade verbal", "Agressividade física", "Uso de celular", "Saída s/ autorização", "Bullying", "Desobediência", "Uniforme", "Outros"];
 const DEFAULT_PEDAGOGICO = ["Sem tarefa", "Dificuldade aprend.", "Sem material", "Desatenção", "Baixo desempenho", "Faltas excessivas", "Sono em sala", "Outros"];
 const DEFAULT_SOCIAL = ["Ansiedade", "Problemas familiares", "Isolamento", "Conflito colegas", "Saúde/Laudo", "Vulnerabilidade", "Outros"];
@@ -79,7 +79,6 @@ export default function App() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // ESTADO 'VIEW'
   const [view, setView] = useState<'dashboard' | 'students' | 'conselho'>('dashboard');
   
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
@@ -97,9 +96,9 @@ export default function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
 
-  // --- MODO PROJEÇÃO E SIGILO ---
+  // --- MODO PROJEÇÃO ---
   const [projectedStudent, setProjectedStudent] = useState<any | null>(null);
-  const [isSensitiveVisible, setIsSensitiveVisible] = useState(false); // Default: Oculto
+  const [isSensitiveVisible, setIsSensitiveVisible] = useState(false); 
 
   // Tabs & Forms
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil');
@@ -111,7 +110,7 @@ export default function App() {
   // Estado Específico do Conselho
   const [conselhoTurma, setConselhoTurma] = useState<string>('');
 
-  // LISTAS DINÂMICAS (Customizáveis)
+  // LISTAS
   const [listComportamento, setListComportamento] = useState<string[]>(DEFAULT_COMPORTAMENTO);
   const [listPedagogico, setListPedagogico] = useState<string[]>(DEFAULT_PEDAGOGICO);
   const [listSocial, setListSocial] = useState<string[]>(DEFAULT_SOCIAL);
@@ -142,7 +141,6 @@ export default function App() {
     const savedAuth = localStorage.getItem('soe_auth');
     const savedPhoto = localStorage.getItem('adminPhoto');
 
-    // Carregar Listas Customizadas
     const savedComp = localStorage.getItem('list_comp'); if (savedComp) setListComportamento(JSON.parse(savedComp));
     const savedPed = localStorage.getItem('list_ped'); if (savedPed) setListPedagogico(JSON.parse(savedPed));
     const savedSoc = localStorage.getItem('list_soc'); if (savedSoc) setListSocial(JSON.parse(savedSoc));
@@ -160,7 +158,6 @@ export default function App() {
     }
   }, [students]);
 
-  // Limpa o formulário ao trocar de aluno
   useEffect(() => {
     setObsLivre("");
     setMotivosSelecionados([]);
@@ -168,7 +165,7 @@ export default function App() {
     setSolicitante('Professor');
     setEncaminhamento('');
     setExitReason(''); 
-    setIsSensitiveVisible(false); // Reseta sigilo ao fechar/abrir
+    setIsSensitiveVisible(false);
   }, [selectedStudent, projectedStudent]);
 
   // FUNÇÕES DE CONFIGURAÇÃO
@@ -261,14 +258,12 @@ export default function App() {
   const handleRegisterExit = async () => {
     if (!selectedStudent) return;
 
-    // 1. Prepara o registro para o histórico
     const logDesc = JSON.stringify({
       solicitante: 'Secretaria/SOE',
       motivos: [exitType], 
       obs: `SAÍDA REGISTRADA. Motivo detalhado: ${exitReason}`
     });
 
-    // 2. Salva o log no histórico
     const { error: logError } = await supabase.from('logs').insert([
       {
         student_id: selectedStudent.id,
@@ -284,7 +279,6 @@ export default function App() {
       return;
     }
 
-    // 3. Atualiza o status do aluno
     const { error } = await supabase.from('students').update({
       status: exitType,
       exit_reason: exitReason,
@@ -363,7 +357,6 @@ export default function App() {
           headStyles: { fillColor: [79, 70, 229] }
       });
 
-      // Espaço para assinaturas
       let finalY = (doc as any).lastAutoTable.finalY + 20;
       doc.text("Assinaturas dos Professores Presentes:", 14, finalY);
       finalY += 10;
@@ -460,28 +453,29 @@ export default function App() {
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
   const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); if (!window.confirm(`Deseja gerar um arquivo com TODAS as ${classStudents.length} fichas da turma ${classId}?`)) return; const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`); };
 
-  // --- MÓDULO NOVO: RENDERIZA O CONSELHO DE CLASSE ---
   const renderConselho = () => {
       const turmas = [...new Set(students.map(s => s.class_id))].sort();
       const targetClass = conselhoTurma || turmas[0];
       const councilStudents = students.filter(s => s.class_id === targetClass);
 
-      // --- DIAGNÓSTICO DA TURMA (NOVO) ---
-      const statsTurma = useMemo(() => {
-          let totalFaltas = 0;
-          let alunosRisco = 0;
-          let totalOcorrencias = 0;
-          councilStudents.forEach(s => {
-              const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
-              if(d) {
-                  totalFaltas += (d.faltas_bimestre || 0);
-                  if(d.faltas_bimestre > 20) alunosRisco++;
-              }
-              totalOcorrencias += (s.logs?.length || 0);
-          });
-          const mediaFaltas = councilStudents.length > 0 ? Math.round(totalFaltas / councilStudents.length) : 0;
-          return { totalFaltas, mediaFaltas, alunosRisco, totalOcorrencias };
-      }, [councilStudents, selectedBimestre]);
+      // CÁLCULO SEGURO E DIRETO DOS DADOS DA TURMA
+      let totalFaltas = 0;
+      let alunosRisco = 0;
+      let totalOcorrencias = 0;
+      
+      councilStudents.forEach(s => {
+          const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
+          if(d) {
+              totalFaltas += (d.faltas_bimestre || 0);
+              if(d.faltas_bimestre > 20) alunosRisco++;
+          }
+          totalOcorrencias += (s.logs?.length || 0);
+      });
+      const mediaFaltas = councilStudents.length > 0 ? Math.round(totalFaltas / councilStudents.length) : 0;
+      const statsTurma = { totalFaltas, mediaFaltas, alunosRisco, totalOcorrencias };
+
+      // Se não houver turmas, mostra carregando
+      if (!targetClass) return <div className="p-10 text-center text-slate-400">Carregando dados...</div>;
 
       return (
           <div className="max-w-[1800px] mx-auto pb-20 w-full h-full flex flex-col">
@@ -494,11 +488,10 @@ export default function App() {
                       <select className="p-3 border rounded-xl font-bold bg-white shadow-sm" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}>
                           <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
                       </select>
-                      <button onClick={() => generateCouncilAta(targetClass)} className="bg-slate-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-bold hover:bg-slate-900 shadow-md"><ClipboardList size={20}/> Gerar Ata PDF</button>
+                      <button onClick={() => generateCouncilAta(targetClass)} className="bg-slate-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-bold hover:bg-slate-900 shadow-md"><FileText size={20}/> Gerar Ata PDF</button>
                   </div>
               </div>
 
-              {/* PAINEL DE DIAGNÓSTICO (NOVO) */}
               <div className="grid grid-cols-4 gap-4 mb-6">
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
                       <div className="bg-indigo-100 p-3 rounded-full text-indigo-600"><Users2 size={24}/></div>
@@ -830,7 +823,7 @@ export default function App() {
 
                         {/* CAMPOS DE DELIBERAÇÃO */}
                         <div className="bg-orange-50 p-6 rounded-2xl border border-orange-100">
-                            <h3 className="font-bold text-orange-800 text-lg uppercase mb-4 flex items-center gap-2"><BrainCircuit size={20}/> Deliberação do Conselho</h3>
+                            <h3 className="font-bold text-orange-800 text-lg uppercase mb-4 flex items-center gap-2"><GraduationCap size={20}/> Deliberação do Conselho</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs font-bold text-orange-400 uppercase mb-1 block">Anotações / Observações</label>
