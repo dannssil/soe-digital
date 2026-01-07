@@ -92,7 +92,11 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [projectedStudent, setProjectedStudent] = useState<any | null>(null);
   const [isSensitiveVisible, setIsSensitiveVisible] = useState(false); 
-  const [isEvalModalOpen, setIsEvalModalOpen] = useState(false); // NOVO MODAL AVALIAÇÃO
+  const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
+  
+  // ESTADO DO RADAR
+  const [radarData, setRadarData] = useState({ assiduidade: 3, participacao: 3, relacionamento: 3, rendimento: 3, tarefas: 3 });
+
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil');
   const [isEditing, setIsEditing] = useState(false);
   const [selectedClassFilter, setSelectedClassFilter] = useState<string | null>(null);
@@ -133,36 +137,28 @@ export default function App() {
     setAttendanceDate(new Date().toISOString().split('T')[0]);
   }, []);
 
-  useEffect(() => {
-    if (selectedStudent) { const updated = students.find(s => s.id === selectedStudent.id); if (updated) setSelectedStudent(updated); }
-  }, [students]);
+  useEffect(() => { if (selectedStudent) { const updated = students.find(s => s.id === selectedStudent.id); if (updated) setSelectedStudent(updated); } }, [students]);
+  useEffect(() => { setObsLivre(""); setMotivosSelecionados([]); setResolvido(false); setSolicitante('Professor'); setEncaminhamento(''); setExitReason(''); setIsSensitiveVisible(false); }, [selectedStudent]);
+  useEffect(() => { if (projectedStudent) { const dadosBimestre = projectedStudent.desempenho?.find((d: any) => d.bimestre === selectedBimestre); setCouncilObs(dadosBimestre?.obs_conselho || ''); setCouncilEnc(dadosBimestre?.encaminhamento_conselho || ''); } else { setCouncilObs(''); setCouncilEnc(''); } }, [projectedStudent, selectedBimestre]);
 
+  // CARREGAR DADOS DO RADAR
   useEffect(() => {
-    setObsLivre(""); setMotivosSelecionados([]); setResolvido(false); setSolicitante('Professor'); setEncaminhamento(''); setExitReason(''); setIsSensitiveVisible(false);
-  }, [selectedStudent]);
-
-  useEffect(() => {
-      if (projectedStudent) {
-          const dadosBimestre = projectedStudent.desempenho?.find((d: any) => d.bimestre === selectedBimestre);
-          setCouncilObs(dadosBimestre?.obs_conselho || '');
-          setCouncilEnc(dadosBimestre?.encaminhamento_conselho || '');
-      } else { setCouncilObs(''); setCouncilEnc(''); }
-  }, [projectedStudent, selectedBimestre]);
+    async function fetchRadar() {
+      const targetClass = conselhoTurma || students[0]?.class_id;
+      if (!targetClass) return;
+      const { data } = await supabase.from('class_radar').select('*').eq('turma', targetClass).eq('bimestre', selectedBimestre).single();
+      if (data) { setRadarData({ assiduidade: data.assiduidade, participacao: data.participacao, relacionamento: data.relacionamento, rendimento: data.rendimento, tarefas: data.tarefas }); } 
+      else { setRadarData({ assiduidade: 3, participacao: 3, relacionamento: 3, rendimento: 3, tarefas: 3 }); }
+    }
+    fetchRadar();
+  }, [conselhoTurma, selectedBimestre, students]);
 
   const addListItem = (listName: string) => { if (!newItem) return; if (listName === 'comp') { const n = [...listComportamento, newItem]; setListComportamento(n); localStorage.setItem('list_comp', JSON.stringify(n)); } if (listName === 'ped') { const n = [...listPedagogico, newItem]; setListPedagogico(n); localStorage.setItem('list_ped', JSON.stringify(n)); } if (listName === 'soc') { const n = [...listSocial, newItem]; setListSocial(n); localStorage.setItem('list_soc', JSON.stringify(n)); } if (listName === 'enc') { const n = [...listEncaminhamentos, newItem]; setListEncaminhamentos(n); localStorage.setItem('list_enc', JSON.stringify(n)); } setNewItem(''); };
   const removeListItem = (listName: string, item: string) => { if (listName === 'comp') { const n = listComportamento.filter(i => i !== item); setListComportamento(n); localStorage.setItem('list_comp', JSON.stringify(n)); } if (listName === 'ped') { const n = listPedagogico.filter(i => i !== item); setListPedagogico(n); localStorage.setItem('list_ped', JSON.stringify(n)); } if (listName === 'soc') { const n = listSocial.filter(i => i !== item); setListSocial(n); localStorage.setItem('list_soc', JSON.stringify(n)); } if (listName === 'enc') { const n = listEncaminhamentos.filter(i => i !== item); setListEncaminhamentos(n); localStorage.setItem('list_enc', JSON.stringify(n)); } };
 
-  async function fetchStudents() {
-    setLoading(true);
-    const { data, error } = await supabase.from('students').select(`*, logs(id, student_id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`) .order('name');
-    if (!error && data) { const sortedData = data.map((student: any) => ({ ...student, logs: student.logs?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) })); setStudents(sortedData); }
-    setLoading(false);
-  }
-
+  async function fetchStudents() { setLoading(true); const { data, error } = await supabase.from('students').select(`*, logs(id, student_id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`) .order('name'); if (!error && data) { const sortedData = data.map((student: any) => ({ ...student, logs: student.logs?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) })); setStudents(sortedData); } setLoading(false); }
   const toggleItem = (list: string[], setList: any, item: string) => { if (list.includes(item)) setList(list.filter((i: string) => i !== item)); else setList([...list, item]); };
-  
   const checkRisk = (student: any) => { const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; let notasVermelhas = 0; if (ultDesempenho) { const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; } return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas }; };
-  
   const stats = useMemo(() => { const allLogs = students.flatMap(s => s.logs || []); const last7Days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); const count = allLogs.filter(l => new Date(l.created_at).toDateString() === d.toDateString()).length; return { name: dateStr, total: count }; }).reverse(); const motivoCount: any = {}; allLogs.forEach(l => { try { const desc = JSON.parse(l.description); if (desc.motivos) desc.motivos.forEach((m: string) => { motivoCount[m] = (motivoCount[m] || 0) + 1; }); } catch (e) { } }); const pieData = Object.keys(motivoCount).map(key => ({ name: key, value: motivoCount[key] })).sort((a, b) => b.value - a.value).slice(0, 5); return { last7Days, pieData, allLogs }; }, [students]);
 
   const handleLogin = (e: React.FormEvent) => { e.preventDefault(); if (passwordInput === ACCESS_PASSWORD) { setIsAuthenticated(true); localStorage.setItem('soe_auth', 'true'); fetchStudents(); } };
@@ -173,39 +169,22 @@ export default function App() {
   const handleAddStudent = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, status: 'ATIVO' }]); if (!error) { alert('Criado!'); setIsNewStudentModalOpen(false); fetchStudents(); } else alert(error.message); };
   const handleRegisterExit = async () => { if (!selectedStudent) return; const logDesc = JSON.stringify({ solicitante: 'Secretaria/SOE', motivos: [exitType], obs: `SAÍDA REGISTRADA. Motivo detalhado: ${exitReason}` }); const { error: logError } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: 'Situação Escolar', description: logDesc, resolved: true, created_at: new Date().toISOString() }]); if (logError) return alert('Erro ao salvar histórico: ' + logError.message); const { error } = await supabase.from('students').update({ status: exitType, exit_reason: exitReason, exit_date: new Date().toISOString() }).eq('id', selectedStudent.id); if (!error) { alert('Saída registrada!'); setExitReason(''); setIsExitModalOpen(false); setIsModalOpen(false); fetchStudents(); } else alert(error.message); };
 
-  // --- NOVA FUNÇÃO DE NAVEGAÇÃO ENTRE ALUNOS ---
-  const changeStudent = (direction: 'prev' | 'next') => {
-      const turmas = [...new Set(students.map(s => s.class_id))].sort();
-      const currentClass = conselhoTurma || turmas[0];
-      const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name));
-      if (!projectedStudent || currentList.length === 0) return;
-      const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id);
-      if (direction === 'next') {
-          if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]);
-          else setProjectedStudent(currentList[0]); // Loop para o início
-      } else {
-          if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]);
-          else setProjectedStudent(currentList[currentList.length - 1]); // Loop para o final
-      }
+  const changeStudent = (direction: 'prev' | 'next') => { const turmas = [...new Set(students.map(s => s.class_id))].sort(); const currentClass = conselhoTurma || turmas[0]; const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name)); if (!projectedStudent || currentList.length === 0) return; const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id); if (direction === 'next') { if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]); else setProjectedStudent(currentList[0]); } else { if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]); else setProjectedStudent(currentList[currentList.length - 1]); } };
+  // SALVAR RADAR NO BANCO
+  const handleSaveRadar = async () => {
+    const targetClass = conselhoTurma || students[0]?.class_id;
+    if (!targetClass) return;
+    const { error } = await supabase.from('class_radar').upsert({ turma: targetClass, bimestre: selectedBimestre, ...radarData }, { onConflict: 'turma, bimestre' });
+    if (!error) { alert('Avaliação da Turma Salva!'); setIsEvalModalOpen(false); } else { alert('Erro: ' + error.message); }
   };
+
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
-  const handleSaveCouncilChanges = async () => { 
-      if(!projectedStudent) return; 
-      const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre); 
-      if(!desempenhoAtual) return; 
-      const { error } = await supabase.from('desempenho_bimestral').update({ 
-          lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie, his: desempenhoAtual.his, 
-          geo: desempenhoAtual.geo, ing: desempenhoAtual.ing, art: desempenhoAtual.art, edf: desempenhoAtual.edf, 
-          pd1: desempenhoAtual.pd1, pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3, 
-          faltas_bimestre: desempenhoAtual.faltas_bimestre,
-          obs_conselho: councilObs, encaminhamento_conselho: councilEnc 
-      }).eq('id', desempenhoAtual.id); 
-      if(!error) { alert('Dados Salvos!'); fetchStudents(); } else alert('Erro: ' + error.message); 
-  };
+  const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre); if(!desempenhoAtual) return; const { error } = await supabase.from('desempenho_bimestral').update({ lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie, his: desempenhoAtual.his, geo: desempenhoAtual.geo, ing: desempenhoAtual.ing, art: desempenhoAtual.art, edf: desempenhoAtual.edf, pd1: desempenhoAtual.pd1, pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3, faltas_bimestre: desempenhoAtual.faltas_bimestre, obs_conselho: councilObs, encaminhamento_conselho: councilEnc }).eq('id', desempenhoAtual.id); if(!error) { alert('Dados Salvos!'); fetchStudents(); } else alert('Erro: ' + error.message); };
 
   const printStudentData = (doc: jsPDF, student: any) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" }); doc.setFontSize(12); doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25); doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${student.name}`, 35, 35); doc.setFont("helvetica", "normal"); doc.text(`Turma: ${student.class_id}`, 160, 35); doc.text(`Responsável:`, 14, 43); doc.text(`${student.guardian_name || 'Não informado'}`, 40, 43); doc.text(`Telefone:`, 14, 50); doc.text(`${student.guardian_phone || '-'}`, 40, 50); doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60); const acadData = student.desempenho?.map((d: any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || []; autoTable(doc, { startY: 65, head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], body: acadData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 8, halign: 'center' }, styles: { fontSize: 8, halign: 'center' } }); const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85; doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY); const logsData = student.logs?.filter((l: any) => l.student_id === student.id).map((l: any) => { let desc = { motivos: [], obs: '', solicitante: '' }; try { desc = JSON.parse(l.description); } catch (e) { } return [new Date(l.created_at).toLocaleDateString('pt-BR'), l.category, `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`, l.resolved ? 'Resolvido' : 'Pendente']; }) || []; autoTable(doc, { startY: finalY + 5, head: [['Data', 'Tipo', 'Detalhes do Atendimento', 'Status']], body: logsData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 2: { cellWidth: 100 } } }); const pageHeight = doc.internal.pageSize.height; doc.line(60, pageHeight - 35, 150, pageHeight - 35); doc.setFont("helvetica", "bold"); doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 105, pageHeight - 30, { align: "center" }); doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 25, { align: "center" }); doc.setFontSize(8); doc.setTextColor(100); const timeNow = new Date().toLocaleString('pt-BR'); doc.text(`Emitido em: ${timeNow}`, 105, pageHeight - 15, { align: "center" }); };
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
   const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); if (!window.confirm(`Deseja gerar fichas da turma ${classId}?`)) return; const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`); };
+  
   const generateCouncilAta = (targetClass: string) => { const councilStudents = students.filter(s => s.class_id === targetClass); if(councilStudents.length === 0) return alert('Turma vazia'); const doc = new jsPDF({ orientation: 'landscape' }); doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(`ATA DO CONSELHO DE CLASSE - TURMA ${targetClass}`, 148, 20, {align: "center"}); doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`Referente ao: ${selectedBimestre} | Data da Reunião: ${new Date(dataConselho).toLocaleDateString('pt-BR')}`, 148, 26, {align: "center"}); const rows = councilStudents.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {}; return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.geo||'-', d.ing||'-', d.art||'-', d.edf||'-', d.pd1||'-', d.pd2||'-', d.pd3||'-', d.faltas_bimestre||0, s.logs?.length||0]; }); autoTable(doc, { startY: 35, head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas', 'Atend.']], body: rows, styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [30, 41, 59] } }); let finalY = (doc as any).lastAutoTable.finalY + 25; doc.setFont("helvetica", "bold"); doc.line(100, finalY, 200, finalY); doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 150, finalY + 5, {align: "center"}); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(`${SYSTEM_ROLE} - Matrícula: ${SYSTEM_MATRICULA}`, 150, finalY + 10, {align: "center"}); doc.save(`ATA_CONSELHO_${targetClass}.pdf`); };
   const handleExportReport = () => { const wb = XLSX.utils.book_new(); const summaryData = [["Métrica", "Valor"], ["Total Alunos", students.length], ["Total Atendimentos", stats.allLogs.length], ["Atendimentos Resolvidos", stats.allLogs.filter(l => l.resolved).length], ["Alunos em Risco", students.filter(s => checkRisk(s).reprovadoFalta || checkRisk(s).criticoNotas).length]]; const wsSummary = XLSX.utils.aoa_to_sheet(summaryData); XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo"); const motivesData = [["Motivo", "Ocorrências"]]; stats.pieData.forEach(d => motivesData.push([d.name, d.value])); const wsMotives = XLSX.utils.aoa_to_sheet(motivesData); XLSX.utils.book_append_sheet(wb, wsMotives, "Motivos"); const studentsData = [["Nome", "Turma", "Total Atendimentos", "Situação"]]; students.map(s => ({ ...s, count: s.logs?.length || 0 })).filter(s => s.count > 0).sort((a, b) => b.count - a.count).forEach(s => { studentsData.push([s.name, s.class_id, s.count, checkRisk(s).reprovadoFalta ? "Risco Faltas" : "Normal"]); }); const wsStudents = XLSX.utils.aoa_to_sheet(studentsData); XLSX.utils.book_append_sheet(wb, wsStudents, "Alunos Recorrentes"); XLSX.writeFile(wb, `Relatorio_Gerencial_SOE.xlsx`); };
   const handleBackup = () => { const wb = XLSX.utils.book_new(); const studentsBackup = students.map(s => ({ ID: s.id, Nome: s.name, Turma: s.class_id, Status: s.status, Responsavel: s.guardian_name, Telefone: s.guardian_phone })); const wsStudents = XLSX.utils.json_to_sheet(studentsBackup); XLSX.utils.book_append_sheet(wb, wsStudents, "Alunos"); const logsBackup = students.flatMap(s => s.logs?.map((l: any) => ({ Aluno: s.name, Turma: s.class_id, Data: new Date(l.created_at).toLocaleDateString(), Tipo: l.category, Descricao: l.description, Resolvido: l.resolved ? "SIM" : "NAO" })) || []); const wsLogs = XLSX.utils.json_to_sheet(logsBackup); XLSX.utils.book_append_sheet(wb, wsLogs, "Historico_Atendimentos"); XLSX.writeFile(wb, `BACKUP_COMPLETO_SOE_${new Date().toISOString().split('T')[0]}.xlsx`); };
@@ -241,7 +220,6 @@ export default function App() {
                       <div className="flex items-center gap-2 bg-white p-2 rounded-xl border shadow-sm"><Calendar size={18} className="text-slate-400"/><input type="date" className="text-sm font-bold outline-none" value={dataConselho} onChange={e => setDataConselho(e.target.value)}/></div>
                       <select className="p-3 border rounded-xl font-bold bg-white shadow-sm text-sm" value={targetClass} onChange={e => {setConselhoTurma(e.target.value); setConselhoFilterType('ALL');}}>{turmas.map(t => <option key={t} value={t}>{t}</option>)}</select>
                       <select className="p-3 border rounded-xl font-bold bg-white shadow-sm text-sm" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select>
-                      {/* BOTÃO AVALIAÇÃO GLOBAL */}
                       <button onClick={() => setIsEvalModalOpen(true)} className="bg-orange-500 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-bold hover:bg-orange-600 shadow-md text-sm"><Activity size={18}/> Radar da Turma</button>
                       <button onClick={() => generateCouncilAta(targetClass)} className="bg-slate-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-bold hover:bg-slate-900 shadow-md text-sm"><Printer size={18}/> Gerar Ata PDF</button>
                   </div>
@@ -325,6 +303,7 @@ export default function App() {
     if (dashboardFilterType === 'RESOLVED') return s.logs?.some((l:any) => l.resolved);
     if (dashboardFilterType === 'RECURRENT') return (s.logs?.length || 0) >= 3;
     if (dashboardFilterType === 'WITH_LOGS') return (s.logs?.length || 0) > 0;
+    
     return !globalSearch || s.name.toLowerCase().includes(globalSearch.toLowerCase());
   });
 
@@ -384,25 +363,25 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL RADAR TURMA */}
+      {/* MODAL RADAR TURMA (SALVA NO BANCO) */}
       {isEvalModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 animate-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Activity className="text-orange-500" /> Avaliação da Turma</h3><button onClick={() => setIsEvalModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={24} /></button></div>
             <div className="space-y-6">
-              {[ {l: 'Assiduidade', i: <Clock size={18}/>}, {l: 'Participação', i: <Brain size={18}/>}, {l: 'Relacionamento', i: <Heart size={18}/>}, {l: 'Rendimento', i: <BarChart3 size={18}/>}, {l: 'Tarefas', i: <PenTool size={18}/>} ].map((item, idx) => (
+              {[ {l: 'Assiduidade', k: 'assiduidade', i: <Clock size={18}/>}, {l: 'Participação', k: 'participacao', i: <Brain size={18}/>}, {l: 'Relacionamento', k: 'relacionamento', i: <Heart size={18}/>}, {l: 'Rendimento', k: 'rendimento', i: <BarChart3 size={18}/>}, {l: 'Tarefas', k: 'tarefas', i: <PenTool size={18}/>} ].map((item: any, idx) => (
                 <div key={idx}>
                   <label className="flex items-center gap-2 text-sm font-bold text-slate-600 mb-2">{item.i} {item.l}</label>
-                  <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">Fraco</span><input type="range" min="1" max="5" defaultValue="3" className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-500" /><span className="text-xs font-bold text-slate-400">Excelente</span></div>
+                  <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">Fraco</span><input type="range" min="1" max="5" value={radarData[item.k as keyof typeof radarData] || 3} onChange={(e) => setRadarData({...radarData, [item.k]: parseInt(e.target.value)})} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-500" /><span className="text-xs font-bold text-slate-400">Excelente</span></div>
                 </div>
               ))}
-              <div className="pt-4 border-t"><button onClick={() => { alert('Avaliação registrada (Simulação)!'); setIsEvalModalOpen(false); }} className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold hover:bg-orange-600">Salvar Avaliação</button></div>
+              <div className="pt-4 border-t"><button onClick={handleSaveRadar} className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold hover:bg-orange-600">Salvar Avaliação</button></div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL PROJEÇÃO */}
+      {/* MODAL PROJEÇÃO (SALVA OBS NO BANCO) */}
       {projectedStudent && (
         <div className="fixed inset-0 bg-slate-950/90 z-[100] flex items-center justify-center p-4 lg:p-8 backdrop-blur-md">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-300">
