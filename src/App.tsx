@@ -68,6 +68,7 @@ const StudentList = ({ students, onSelectStudent }: any) => {
     </div>
   );
 };
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -138,7 +139,6 @@ export default function App() {
     setLoading(true); 
     const { data, error } = await supabase.from('students').select(`*, logs(id, student_id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`) .order('name'); 
     if (!error && data) { 
-      // Garante que o array de logs esteja ordenado e desempenho exista
       const sortedData = data.map((student: any) => ({ ...student, logs: student.logs?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || [], desempenho: student.desempenho || [] })); 
       setStudents(sortedData); 
     } 
@@ -171,6 +171,8 @@ export default function App() {
 
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
   const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre); if(!desempenhoAtual) return; const { error } = await supabase.from('desempenho_bimestral').update({ lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie, his: desempenhoAtual.his, geo: desempenhoAtual.geo, ing: desempenhoAtual.ing, art: desempenhoAtual.art, edf: desempenhoAtual.edf, pd1: desempenhoAtual.pd1, pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3, faltas_bimestre: desempenhoAtual.faltas_bimestre, obs_conselho: councilObs, encaminhamento_conselho: councilEnc }).eq('id', desempenhoAtual.id); if(!error) { alert('Dados Salvos!'); fetchStudents(); } else alert('Erro: ' + error.message); };
+  
+  // FUNÇÕES PDF (Recolocadas no lugar certo)
   const printStudentData = (doc: jsPDF, student: any) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" }); doc.setFontSize(12); doc.text("CENTRO EDUCACIONAL 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25); doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`Aluno(a):`, 14, 35); doc.setFont("helvetica", "bold"); doc.text(`${student.name}`, 35, 35); doc.setFont("helvetica", "normal"); doc.text(`Turma: ${student.class_id}`, 160, 35); doc.text(`Responsável:`, 14, 43); doc.text(`${student.guardian_name || 'Não informado'}`, 40, 43); doc.text(`Telefone:`, 14, 50); doc.text(`${student.guardian_phone || '-'}`, 40, 50); doc.setFont("helvetica", "bold"); doc.text("DESEMPENHO ACADÊMICO", 14, 60); const acadData = student.desempenho?.map((d: any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.faltas_bimestre]) || []; autoTable(doc, { startY: 65, head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'Faltas']], body: acadData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 8, halign: 'center' }, styles: { fontSize: 8, halign: 'center' } }); const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : 85; doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("HISTÓRICO DE ATENDIMENTOS", 14, finalY); const logsData = student.logs?.filter((l: any) => l.student_id === student.id).map((l: any) => { let desc = { motivos: [], obs: '', solicitante: '' }; try { desc = JSON.parse(l.description); } catch (e) { } return [new Date(l.created_at).toLocaleDateString('pt-BR'), l.category, `SOLICITANTE: ${desc.solicitante || 'SOE'}\nMOTIVOS: ${desc.motivos?.join(', ') || '-'}\nRELATO: ${desc.obs}\nENCAMINHAMENTO: ${l.referral || '-'}`, l.resolved ? 'Resolvido' : 'Pendente']; }) || []; autoTable(doc, { startY: finalY + 5, head: [['Data', 'Tipo', 'Detalhes do Atendimento', 'Status']], body: logsData, theme: 'grid', headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 2: { cellWidth: 100 } } }); const pageHeight = doc.internal.pageSize.height; doc.line(60, pageHeight - 35, 150, pageHeight - 35); doc.setFont("helvetica", "bold"); doc.text(`${SYSTEM_USER_NAME.toUpperCase()}`, 105, pageHeight - 30, { align: "center" }); doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(`${SYSTEM_ROLE} | ${SYSTEM_ORG} | Matrícula: ${SYSTEM_MATRICULA}`, 105, pageHeight - 25, { align: "center" }); doc.setFontSize(8); doc.setTextColor(100); const timeNow = new Date().toLocaleString('pt-BR'); doc.text(`Emitido em: ${timeNow}`, 105, pageHeight - 15, { align: "center" }); };
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
   const generateBatchPDF = (classId: string, e?: React.MouseEvent) => { if (e) e.stopPropagation(); const classStudents = students.filter(s => s.class_id === classId); if (classStudents.length === 0) return alert("Turma vazia."); if (!window.confirm(`Deseja gerar fichas da turma ${classId}?`)) return; const doc = new jsPDF(); classStudents.forEach((student, index) => { if (index > 0) doc.addPage(); printStudentData(doc, student); }); doc.save(`PASTA_TURMA_${classId}_COMPLETA.pdf`); };
@@ -181,12 +183,12 @@ export default function App() {
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) { if (!e.target.files || e.target.files.length === 0) return; setImporting(true); const file = e.target.files[0]; const reader = new FileReader(); reader.onload = async (evt) => { try { const bstr = evt.target?.result; const workbook = XLSX.read(bstr, { type: 'binary' }); const ws = workbook.Sheets[workbook.SheetNames[0]]; const data = XLSX.utils.sheet_to_json(ws); for (const row of (data as any[])) { const nomeExcel = row['ESTUDANTE']?.toString().toUpperCase().trim(); if (!nomeExcel) continue; const aluno = students.find(s => s.name.toUpperCase().trim() === nomeExcel); if (aluno) { const parseNota = (val: any) => val ? parseFloat(val.toString().replace(',', '.')) : null; await supabase.from('desempenho_bimestral').insert([{ aluno_id: aluno.id, bimestre: selectedBimestre, art: parseNota(row['ART']), cie: parseNota(row['CIE']), edf: parseNota(row['EDF']), geo: parseNota(row['GEO']), his: parseNota(row['HIS']), ing: parseNota(row['ING']), lp: parseNota(row['LP']), mat: parseNota(row['MAT']), pd1: parseNota(row['PD1']), pd2: parseNota(row['PD2']), pd3: parseNota(row['PD3']), faltas_bimestre: row['FALTAS'] ? parseInt(row['FALTAS']) : 0 }]); } } alert(`Sucesso!`); setIsImportModalOpen(false); setImporting(false); fetchStudents(); } catch (err) { alert('Erro: ' + err); setImporting(false); } }; reader.readAsBinaryString(file); }
 
   const changeStudent = (direction: 'prev' | 'next') => { const turmas = [...new Set(students.map(s => s.class_id))].sort(); const currentClass = conselhoTurma || turmas[0]; const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name)); if (!projectedStudent || currentList.length === 0) return; const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id); if (direction === 'next') { if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]); else setProjectedStudent(currentList[0]); } else { if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]); else setProjectedStudent(currentList[currentList.length - 1]); } };
+
   const renderConselho = () => {
       const turmas = [...new Set(students.map(s => s.class_id))].sort(); 
       const targetClass = conselhoTurma || turmas[0]; 
       let councilStudents = students.filter(s => s.class_id === targetClass);
       
-      // Cálculo de Estatísticas (Sempre acontece ANTES do filtro visual)
       let totalFaltas = 0; let alunosRisco = 0; let totalOcorrencias = 0; let alunosBaixoRendimento = 0;
       councilStudents.forEach(s => { 
           const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
@@ -199,8 +201,8 @@ export default function App() {
           } 
           totalOcorrencias += (s.logs?.length || 0); 
       });
+      const mediaFaltas = councilStudents.length > 0 ? Math.round(totalFaltas / councilStudents.length) : 0;
       
-      // Filtros Visuais (Apenas alteram quem aparece na lista)
       if (conselhoFilterType === 'RISK') councilStudents = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && d.faltas_bimestre > 20; });
       if (conselhoFilterType === 'LOGS') councilStudents = councilStudents.filter(s => (s.logs?.length || 0) > 0);
       if (conselhoFilterType === 'GRADES') councilStudents = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); if (!d) return false; const disciplinasBase = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf]; return disciplinasBase.filter(n => n !== null && n < 5).length > 3; });
@@ -209,11 +211,15 @@ export default function App() {
         { subject: 'Assiduidade', A: radarData.assiduidade || 0, fullMark: 5 }, { subject: 'Participação', A: radarData.participacao || 0, fullMark: 5 }, { subject: 'Relacionamento', A: radarData.relacionamento || 0, fullMark: 5 }, { subject: 'Rendimento', A: radarData.rendimento || 0, fullMark: 5 }, { subject: 'Tarefas', A: radarData.tarefas || 0, fullMark: 5 },
       ];
 
+      const renderNota = (val: any) => {
+        if (val === undefined || val === null) return <span className="text-slate-300">-</span>;
+        return <span className={`font-bold ${val < 5 ? 'text-red-600 bg-red-50 px-1 rounded' : 'text-slate-700'}`}>{val}</span>;
+      };
+
       if (!targetClass) return <div className="p-10 text-center text-slate-400">Carregando dados...</div>;
       
       return (
           <div className="max-w-[1800px] mx-auto pb-20 w-full h-full flex flex-col overflow-hidden">
-              {/* Header Unificado */}
               <div className="flex flex-col md:flex-row justify-between items-end mb-8 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                   <div className="space-y-2">
                       <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><GraduationCap className="text-indigo-600"/> Conselho de Classe Digital</h2>
@@ -230,14 +236,12 @@ export default function App() {
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                  {/* Cards Interativos */}
                   <div className="lg:col-span-2 grid grid-cols-2 gap-4">
                       <div onClick={() => setConselhoFilterType('ALL')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'ALL' ? 'bg-indigo-600 text-white shadow-indigo-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Total Alunos</span><span className="text-3xl font-black">{students.filter(s => s.class_id === targetClass).length}</span></div><Users2 size={32} className="opacity-20"/></div>
-                      <div onClick={() => setConselhoFilterType('RISK')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'RISK' ? 'bg-red-500 text-white shadow-red-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Faltas Críticas</span><span className="text-3xl font-black">{alunosRisco}</span></div><AlertTriangle size={32} className="opacity-20"/></div>
-                      <div onClick={() => setConselhoFilterType('GRADES')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'GRADES' ? 'bg-orange-500 text-white shadow-orange-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Notas Vermelhas</span><span className="text-3xl font-black">{alunosBaixoRendimento}</span></div><BarChart3 size={32} className="opacity-20"/></div>
+                      <div onClick={() => setConselhoFilterType('RISK')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'RISK' ? 'bg-red-500 text-white shadow-red-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Em Alerta (Faltas)</span><span className="text-3xl font-black">{alunosRisco}</span></div><AlertTriangle size={32} className="opacity-20"/></div>
+                      <div onClick={() => setConselhoFilterType('GRADES')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'GRADES' ? 'bg-orange-500 text-white shadow-orange-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Baixo Rendimento</span><span className="text-3xl font-black">{alunosBaixoRendimento}</span></div><BarChart3 size={32} className="opacity-20"/></div>
                       <div onClick={() => setConselhoFilterType('LOGS')} className={`cursor-pointer p-6 rounded-2xl transition-all flex items-center justify-between ${conselhoFilterType === 'LOGS' ? 'bg-blue-600 text-white shadow-blue-200 shadow-xl' : 'bg-white text-slate-600 hover:bg-slate-50'}`}><div className="flex flex-col"><span className="text-[10px] uppercase font-bold opacity-70">Com Ocorrências</span><span className="text-3xl font-black">{councilStudents.filter(s => (s.logs?.length || 0) > 0).length}</span></div><FileText size={32} className="opacity-20"/></div>
                   </div>
-                  {/* Radar Visual */}
                   <div className="bg-white rounded-2xl p-2 flex flex-col items-center justify-center relative overflow-hidden shadow-sm border border-slate-100">
                       <h4 className="text-[10px] font-bold text-slate-400 uppercase absolute top-4 left-6 tracking-widest">Radar da Turma</h4>
                       <div className="w-full h-48 mt-4">
@@ -266,7 +270,6 @@ export default function App() {
                           <tbody className="divide-y divide-slate-100">
                               {councilStudents.map(s => {
                                   const notas = s.desempenho?.find((d: any) => d.bimestre === selectedBimestre) || {};
-                                  const renderNota = (val: number) => { if (val === undefined || val === null) return <span className="text-slate-300">-</span>; return <span className={`font-bold ${val < 5 ? 'text-red-600 bg-red-50 px-1 rounded' : 'text-slate-700'}`}>{val}</span>; };
                                   return (
                                       <tr key={s.id} onClick={() => setProjectedStudent(s)} className="hover:bg-indigo-50 transition-colors cursor-pointer group">
                                           <td className="px-4 py-3 font-bold text-slate-700 flex items-center gap-2 border-r sticky left-0 bg-white group-hover:bg-indigo-50 z-10 min-w-[200px]"><Avatar name={s.name} src={s.photo_url} size="sm"/> <span className="truncate">{s.name}</span></td>
@@ -348,8 +351,8 @@ export default function App() {
           <p className="font-bold text-white text-xs">{SYSTEM_USER_NAME}</p><p>{SYSTEM_ROLE}</p><p>{SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA}</p>
           <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 mt-4 hover:text-white transition-colors"><LogOut size={12} /> Sair do Sistema</button>
           <div className="mt-4 pt-4 border-t border-slate-700 flex flex-col gap-1 text-slate-400">
-            <div className="flex items-center gap-2"><Code size={12}/> <span className="text-[9px] font-bold">Dev. & Design: Daniel Alves da Silva</span></div>
-            <span className="text-[8px] opacity-50">v1.0.7 Enterprise Edition</span>
+            <div className="flex items-center gap-2"><Code size={12}/> <span className="text-[9px] font-bold">Desenvolvedor: {SYSTEM_USER_NAME}</span></div>
+            <span className="text-[8px] opacity-50">v1.0.8 Enterprise Edition</span>
           </div>
         </div>
       </aside>
