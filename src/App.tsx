@@ -3,11 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+// --- IMPORTS GRÁFICOS ---
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, BarChart, Bar,
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
+// --- IMPORTS ÍCONES ---
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
@@ -40,7 +42,6 @@ const DEFAULT_COMPORTAMENTO = ["Conversa excessiva", "Desacato", "Agressividade 
 const DEFAULT_PEDAGOGICO = ["Sem tarefa", "Dificuldade aprend.", "Sem material", "Desatenção", "Baixo desempenho", "Faltas excessivas", "Sono em sala", "Outros"];
 const DEFAULT_SOCIAL = ["Ansiedade", "Problemas familiares", "Isolamento", "Conflito colegas", "Saúde/Laudo", "Vulnerabilidade", "Outros"];
 const DEFAULT_ENCAMINHAMENTOS = ["Coordenação", "Psicologia", "Família", "Direção", "Conselho Tutelar", "Sala Recursos", "Apoio Aprendizagem", "Disciplinar", "Saúde"];
-const FLASH_REASONS = ["Uniforme Inadequado", "Atraso / Chegada Tardia", "Uso de Celular", "Sem Material", "Saída de Sala", "Conversa / Bagunça", "Conflito entre Colegas", "Sono em Sala", "Falta de Atividade", "Elogio / Destaque", "Encaminhamento Saúde", "Outros"];
 
 // --- COMPONENTES AUXILIARES ---
 function Avatar({ name, src, size = "md" }: { name: string, src?: string | null, size?: "sm" | "md" | "lg" | "xl" | "2xl" }) {
@@ -141,6 +142,7 @@ export default function App() {
   const [quickReason, setQuickReason] = useState('');
   const [exitReason, setExitReason] = useState('');
   const [exitType, setExitType] = useState<'TRANSFERIDO' | 'ABANDONO'>('TRANSFERIDO');
+  const FLASH_REASONS = ["Uniforme Inadequado", "Atraso / Chegada Tardia", "Uso de Celular", "Sem Material", "Saída de Sala", "Conversa / Bagunça", "Conflito entre Colegas", "Sono em Sala", "Falta de Atividade", "Elogio / Destaque", "Encaminhamento Saúde", "Outros"];
 
   useEffect(() => { const savedAuth = localStorage.getItem('soe_auth'); const savedPhoto = localStorage.getItem('adminPhoto'); if (savedAuth === 'true') { setIsAuthenticated(true); fetchStudents(); } if (savedPhoto) setAdminPhoto(savedPhoto); setAttendanceDate(new Date().toISOString().split('T')[0]); }, []);
   useEffect(() => { if (selectedStudent) { const updated = students.find(s => s.id === selectedStudent.id); if (updated) setSelectedStudent(updated); } }, [students]);
@@ -178,7 +180,7 @@ export default function App() {
   const handleSaveRadar = async () => { const targetClass = conselhoTurma || students[0]?.class_id; if (!targetClass) return; const { error } = await supabase.from('class_radar').upsert({ turma: targetClass, bimestre: selectedBimestre, ...radarData }, { onConflict: 'turma, bimestre' }); if (!error) { alert('Avaliação da Turma Salva!'); setIsEvalModalOpen(false); } else { alert('Erro: ' + error.message); } };
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) { if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return; const file = event.target.files[0]; const fileName = `${selectedStudent.id}-${Math.random()}.${file.name.split('.').pop()}`; const { error } = await supabase.storage.from('photos').upload(fileName, file); if (error) { alert('Erro upload: ' + error.message); return; } const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName); await supabase.from('students').update({ photo_url: publicUrl }).eq('id', selectedStudent.id); setSelectedStudent({ ...selectedStudent, photo_url: publicUrl }); fetchStudents(); }
   
-  // --- IMPORTAÇÃO INTELIGENTE REFORÇADA ---
+  // --- IMPORTAÇÃO INTELIGENTE V7 (O TRATOR) ---
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) { 
     if (!e.target.files || e.target.files.length === 0) return; 
     setImporting(true); 
@@ -190,34 +192,26 @@ export default function App() {
         const workbook = XLSX.read(bstr, { type: 'binary' }); 
         const ws = workbook.Sheets[workbook.SheetNames[0]]; 
         
-        // 1. Converte para Matriz (Array de Arrays) para achar o cabeçalho real
+        // 1. Acha o cabeçalho real
         const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
         let headerRowIndex = 0;
-        
-        // Procura a linha que tem "Estudante" ou "Nome" ou "Alunos"
         for (let i = 0; i < rawData.length; i++) {
             const rowStr = rawData[i].join(' ').toUpperCase();
-            if (rowStr.includes('ESTUDANTE') || rowStr.includes('NOME DO ALUNO') || rowStr.includes('CODIGO')) {
+            if (rowStr.includes('ESTUDANTE') || rowStr.includes('NOME DO ESTUDANTE')) {
                 headerRowIndex = i;
                 break;
             }
         }
 
-        // 2. Lê de novo usando a linha certa como cabeçalho
         const data = XLSX.utils.sheet_to_json(ws, { range: headerRowIndex });
-        
-        // Normaliza as chaves (remove acentos e espaços) para facilitar o match
         const normalizeKey = (key: string) => key.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
         let updatedCount = 0;
-
         for (const row of (data as any[])) {
-          // Cria um mapa normalizado da linha atual
           const rowMap: any = {};
           Object.keys(row).forEach(k => rowMap[normalizeKey(k)] = row[k]);
 
-          // Tenta achar o nome
-          const nomeExcel = (rowMap['ESTUDANTE'] || rowMap['NOME'] || rowMap['ALUNO'] || rowMap['NOME DO ESTUDANTE'])?.toString().toUpperCase().trim(); 
+          const nomeExcel = (rowMap['ESTUDANTE'] || rowMap['NOME'] || rowMap['NOME DO ESTUDANTE'])?.toString().toUpperCase().trim(); 
           if (!nomeExcel) continue; 
           
           const aluno = students.find(s => s.name.toUpperCase().trim() === nomeExcel); 
@@ -225,91 +219,89 @@ export default function App() {
           if (aluno) { 
             const updates: any = {};
 
-            // A. DATA DE NASCIMENTO
+            // DATA DE NASCIMENTO (Lógica Robusta)
             const rawDate = rowMap['DATA DE NASCIMENTO'] || rowMap['NASCIMENTO'] || rowMap['DN'];
             if (rawDate) {
                if (typeof rawDate === 'number') { 
-                   // Excel Serial Date
+                   // Serial Excel
                    const jsDate = new Date(Math.round((rawDate - 25569)*86400*1000)); 
+                   // Ajuste de fuso horário simples
+                   jsDate.setMinutes(jsDate.getMinutes() + jsDate.getTimezoneOffset());
                    updates.birth_date = jsDate.toISOString(); 
                } else if (typeof rawDate === 'string') {
-                   // String PT-BR
-                   const parts = rawDate.split('/'); 
+                   // String 25/03/2010
+                   const parts = rawDate.trim().split('/'); 
                    if(parts.length === 3) updates.birth_date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).toISOString();
                }
             }
 
-            // B. NEE
-            if (rowMap['NEE'] || rowMap['DEFICIENCIA'] || rowMap['NECESSIDADES']) { 
-                updates.nee_description = rowMap['NEE'] || rowMap['DEFICIENCIA'] || rowMap['NECESSIDADES']; 
-            }
-
-            // C. CONSELHO TUTELAR
-            if (rowMap['CONSELHO TUTELAR'] || rowMap['CT']) { 
-                updates.ct_referral = rowMap['MOTIVO DO ENCAMINHAMENTO'] || rowMap['MOTIVO'] || "Encaminhado"; 
-            }
+            // NEE e CT
+            if (rowMap['NEE'] || rowMap['DEFICIENCIA']) updates.nee_description = rowMap['NEE'] || rowMap['DEFICIENCIA'];
+            if (rowMap['CONSELHO TUTELAR'] || rowMap['CT']) updates.ct_referral = rowMap['MOTIVO DO ENCAMINHAMENTO'] || rowMap['MOTIVO'] || "Sim";
 
             if (Object.keys(updates).length > 0) { 
                 await supabase.from('students').update(updates).eq('id', aluno.id);
                 updatedCount++;
             }
-
-            // D. NOTAS (Opcional, se tiver)
-            if (rowMap['LP'] || rowMap['MAT']) {
+            
+            // Notas (Opcional)
+            if(rowMap['LP'] || rowMap['MAT']) {
                 const parseNota = (val: any) => val ? parseFloat(val.toString().replace(',', '.')) : null; 
                 await supabase.from('desempenho_bimestral').insert([{ 
-                    aluno_id: aluno.id, 
-                    bimestre: selectedBimestre, 
-                    art: parseNota(rowMap['ART']), 
-                    cie: parseNota(rowMap['CIE']), 
-                    edf: parseNota(rowMap['EDF']), 
-                    geo: parseNota(rowMap['GEO']), 
-                    his: parseNota(rowMap['HIS']), 
-                    ing: parseNota(rowMap['ING']), 
-                    lp: parseNota(rowMap['LP'] || rowMap['L. PORTUGUESA']), 
-                    mat: parseNota(rowMap['MAT'] || rowMap['MATEMATICA']), 
-                    pd1: parseNota(rowMap['PD1']), 
-                    pd2: parseNota(rowMap['PD2']), 
-                    pd3: parseNota(rowMap['PD3']), 
-                    faltas_bimestre: rowMap['FALTAS'] ? parseInt(rowMap['FALTAS']) : 0 
-                }]);
+                    aluno_id: aluno.id, bimestre: selectedBimestre, 
+                    art: parseNota(rowMap['ART']), cie: parseNota(rowMap['CIE']), edf: parseNota(rowMap['EDF']), geo: parseNota(rowMap['GEO']), his: parseNota(rowMap['HIS']), ing: parseNota(rowMap['ING']), lp: parseNota(rowMap['LP']), mat: parseNota(rowMap['MAT']), pd1: parseNota(rowMap['PD1']), pd2: parseNota(rowMap['PD2']), pd3: parseNota(rowMap['PD3']), faltas_bimestre: rowMap['FALTAS'] ? parseInt(rowMap['FALTAS']) : 0 
+                }]); 
             }
           } 
         } 
-        alert(`Processo concluído! ${updatedCount} alunos atualizados.`); 
-        setIsImportModalOpen(false); 
-        setImporting(false); 
-        fetchStudents(); 
-      } catch (err) { 
-        alert('Erro na importação: ' + err); 
-        setImporting(false); 
-      } 
+        alert(`Sucesso! ${updatedCount} alunos atualizados.`); setIsImportModalOpen(false); setImporting(false); fetchStudents(); 
+      } catch (err) { alert('Erro: ' + err); setImporting(false); } 
     }; 
     reader.readAsBinaryString(file); 
   }
 
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
   const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const desempenhoAtual = projectedStudent.desempenho.find((d:any) => d.bimestre === selectedBimestre); if(!desempenhoAtual) return; const { error } = await supabase.from('desempenho_bimestral').update({ lp: desempenhoAtual.lp, mat: desempenhoAtual.mat, cie: desempenhoAtual.cie, his: desempenhoAtual.his, geo: desempenhoAtual.geo, ing: desempenhoAtual.ing, art: desempenhoAtual.art, edf: desempenhoAtual.edf, pd1: desempenhoAtual.pd1, pd2: desempenhoAtual.pd2, pd3: desempenhoAtual.pd3, faltas_bimestre: desempenhoAtual.faltas_bimestre, obs_conselho: councilObs, encaminhamento_conselho: councilEnc }).eq('id', desempenhoAtual.id); if(!error) { alert('Dados Salvos!'); fetchStudents(); } else alert('Erro: ' + error.message); };
-  
   const generateSuperAta = (targetClass: string) => {
     const councilStudents = students.filter(s => s.class_id === targetClass);
     if(councilStudents.length === 0) return alert('Turma vazia');
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(`ATA DE CONSELHO DE CLASSE - ${targetClass}`, 148, 20, {align: "center"});
     doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`${selectedBimestre} | Data: ${new Date(dataConselho).toLocaleDateString('pt-BR')} | ${SYSTEM_ORG}`, 148, 26, {align: "center"});
+    
+    // RADAR
     autoTable(doc, { startY: 32, head: [['Indicador', 'Assiduidade', 'Participação', 'Relacionamento', 'Rendimento', 'Tarefas']], body: [[ 'Avaliação da Turma (0-5)', radarData.assiduidade, radarData.participacao, radarData.relacionamento, radarData.rendimento, radarData.tarefas ]], theme: 'grid', styles: { fontSize: 8, halign: 'center' }, headStyles: { fillColor: [55, 65, 81] } });
+    
+    // QUADRO GERAL
     const rows = councilStudents.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {}; return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.geo||'-', d.ing||'-', d.art||'-', d.edf||'-', d.pd1||'-', d.pd2||'-', d.pd3||'-', d.faltas_bimestre||0, s.logs?.length||0]; });
     autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 10, head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas', 'Ocorr.']], body: rows, styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [30, 41, 59] } });
-    doc.addPage(); doc.setFontSize(14); doc.text("PLANO DE AÇÃO E ENCAMINHAMENTOS", 14, 20);
-    let currentY = 30;
-    const destaques = councilStudents.filter(s => s.is_highlight);
-    if(destaques.length > 0) { doc.setFillColor(255, 247, 237); doc.rect(14, currentY, 269, 7, 'F'); doc.setFontSize(10); doc.setTextColor(234, 88, 12); doc.text("⭐ DESTAQUES ACADÊMICOS", 16, currentY + 5); autoTable(doc, { startY: currentY + 8, head: [['Nome']], body: destaques.map(s => [s.name]), theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [234, 88, 12] } }); currentY = (doc as any).lastAutoTable.finalY + 10; }
-    const elogios = councilStudents.filter(s => s.is_praised);
-    if(elogios.length > 0) { doc.setFillColor(240, 253, 244); doc.rect(14, currentY, 269, 7, 'F'); doc.setTextColor(21, 128, 61); doc.text("👏 ELOGIOS / SUPERAÇÃO", 16, currentY + 5); autoTable(doc, { startY: currentY + 8, head: [['Nome']], body: elogios.map(s => [s.name]), theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [22, 163, 74] } }); currentY = (doc as any).lastAutoTable.finalY + 10; }
-    const faltosos = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && d.faltas_bimestre > 20; });
-    if(faltosos.length > 0) { doc.setFillColor(254, 242, 242); doc.rect(14, currentY, 269, 7, 'F'); doc.setTextColor(220, 38, 38); doc.text("🚨 BUSCA ATIVA (Faltas > 20)", 16, currentY + 5); autoTable(doc, { startY: currentY + 8, head: [['Nome', 'Total Faltas']], body: faltosos.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return [s.name, d?.faltas_bimestre]; }), theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [220, 38, 38] } }); currentY = (doc as any).lastAutoTable.finalY + 10; }
-    const deliberacoes = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && (d.obs_conselho || d.encaminhamento_conselho); });
-    if(deliberacoes.length > 0) { doc.addPage(); doc.setFontSize(14); doc.setTextColor(0); doc.text("DELIBERAÇÕES INDIVIDUAIS (REGISTROS)", 14, 20); const rowsDelib = deliberacoes.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return [s.name, d.obs_conselho || '-', d.encaminhamento_conselho || '-']; }); autoTable(doc, { startY: 25, head: [['Estudante', 'Anotações Específicas', 'Encaminhamento Definido']], body: rowsDelib, theme: 'grid', styles: { fontSize: 8, cellWidth: 'wrap' }, columnStyles: { 1: { cellWidth: 110 }, 2: { cellWidth: 80 } } }); }
+
+    // ESTUDANTES COM +3 NOTAS BAIXAS (NOVO PEDIDO)
+    const riscoNotas = councilStudents.filter(s => {
+       const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
+       if (!d) return false;
+       const disciplinas = [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf];
+       return disciplinas.filter(n => n !== null && n < 5).length > 3;
+    });
+    
+    let currentY = (doc as any).lastAutoTable.finalY + 15;
+    
+    // Se não couber na página, cria nova
+    if (currentY > 150) { doc.addPage(); currentY = 20; }
+
+    if (riscoNotas.length > 0) {
+        doc.setFillColor(220, 38, 38); doc.rect(14, currentY, 269, 7, 'F');
+        doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont("helvetica", "bold");
+        doc.text(`ALUNOS COM MAIS DE 3 NOTAS ABAIXO DA MÉDIA (${riscoNotas.length})`, 16, currentY + 5);
+        
+        const rowsRisco = riscoNotas.map(s => {
+            const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre);
+            return [s.name, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf];
+        });
+        autoTable(doc, { startY: currentY + 8, head: [['Nome', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF']], body: rowsRisco, theme: 'grid', styles: { fontSize: 8, textColor: [0, 0, 0] } });
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
     doc.save(`ATA_COMPLETA_${targetClass}.pdf`);
   };
 
@@ -319,6 +311,7 @@ export default function App() {
   const handleExportReport = () => { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(students); XLSX.utils.book_append_sheet(wb, ws, "Dados"); XLSX.writeFile(wb, `Relatorio_Geral.xlsx`); };
   const handleBackup = () => { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(students); XLSX.utils.book_append_sheet(wb, ws, "Backup"); XLSX.writeFile(wb, `BACKUP_SOE.xlsx`); };
   const changeStudent = (direction: 'prev' | 'next') => { const turmas = [...new Set(students.map(s => s.class_id))].sort(); const currentClass = conselhoTurma || turmas[0]; const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name)); if (!projectedStudent || currentList.length === 0) return; const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id); if (direction === 'next') { if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]); else setProjectedStudent(currentList[0]); } else { if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]); else setProjectedStudent(currentList[currentList.length - 1]); } };
+
   // --- RENDER CONSELHO ---
   const renderConselho = () => {
       const turmas = [...new Set(students.map(s => s.class_id))].sort(); 
@@ -350,11 +343,10 @@ export default function App() {
       );
   };
 
-  // --- RENDER DASHBOARD (AGORA COM OS CARDS CERTOS) ---
+  // --- RENDER DASHBOARD (CORRIGIDO) ---
   const renderDashboard = () => {
     let studentsInRisk = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoFalta || r.criticoNotas; });
     const ativos = students.filter(s => s.status === 'ATIVO').length;
-    // NOVAS CONTAGENS
     const nees = students.filter(s => s.nee_description).length;
     const cts = students.filter(s => s.ct_referral).length;
 
@@ -408,7 +400,7 @@ export default function App() {
         <div className="p-4 bg-[#151521] border-t border-white/5">
           <div className="flex items-center gap-3 mb-3"><Avatar name={SYSTEM_USER_NAME} src={adminPhoto} size="sm"/><div className="overflow-hidden"><p className="font-bold text-white text-xs truncate">{SYSTEM_USER_NAME}</p><p className="text-[10px] text-slate-400 truncate">{SYSTEM_MATRICULA}</p></div></div>
           <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 text-[10px] text-red-400 hover:text-red-300 transition-colors w-full"><LogOut size={12} /> Sair do Sistema</button>
-          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves da Silva</span></div><span className="text-[8px]">v6.5 Pro</span></div>
+          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves da Silva</span></div><span className="text-[8px]">v7.0 Final</span></div>
         </div>
       </aside>
 
