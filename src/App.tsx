@@ -25,7 +25,7 @@ const SYSTEM_ORG = "CED 4 Guará";
 const ACCESS_PASSWORD = "Ced@1rf1";
 const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
-// --- TEMPLATES E LISTAS ---
+// --- TEMPLATES ---
 const TEXTO_CONVOCACAO = "O Centro Educacional 4 do Guará convoca-a para comparecer com urgência à escola no dia [DATA] às [HORA] para tratar de assuntos relacionados ao seu filho(a) [NOME_ALUNO], da turma [TURMA]. Será uma oportunidade valiosa para discutirmos questões de extrema importância para o desenvolvimento do estudante.\n\nDe acordo com a Lei da Educação Nacional (Lei nº 9.394/96), é obrigação dos pais participarem ativamente da vida escolar de seus filhos. Como parte desse compromisso, reforçamos esta convocação.\n\nSua presença é vital para garantir o sucesso e o bem-estar do estudante na escola.\nNão deixem de comparecer!";
 const TEXTO_DECLARACAO = "Declaramos para os devidos fins que o(a) Senhor(a) [NOME_RESPONSAVEL], responsável pelo(a) estudante [NOME_ALUNO], da turma [TURMA], esteve nesta Unidade de Ensino no dia [DATA_HOJE], no período de ______ às ______, para tratar de assuntos relacionados ao desempenho e acompanhamento escolar do(a) referido(a) aluno(a).";
 
@@ -72,15 +72,13 @@ export default function App() {
   const [passwordInput, setPasswordInput] = useState('');
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'students' | 'conselho'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'students' | 'conselho' | 'documentos'>('dashboard'); // NOVO VIEW
   const [dashboardFilterType, setDashboardFilterType] = useState<'ALL' | 'RISK' | 'NEE' | 'CT'>('ALL');
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
-  const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia' | 'documentos'>('perfil'); // ABA DOCUMENTOS
+  const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil'); // SÓ 4 ABAS
   
-  // Modais
+  // Modais e Estados V10.1
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
-  const [isTermoModalOpen, setIsTermoModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [isQuickModalOpen, setIsQuickModalOpen] = useState(false);
@@ -93,7 +91,16 @@ export default function App() {
   const [isSensitiveVisible, setIsSensitiveVisible] = useState(false);
   const [radarData, setRadarData] = useState({ assiduidade: 3, participacao: 3, relacionamento: 3, rendimento: 3, tarefas: 3 });
   
-  // Edição e Dados
+  // Modais de Documentos (Menu a parte)
+  const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
+  const [isTermoModalOpen, setIsTermoModalOpen] = useState(false);
+  const [docStudent, setDocStudent] = useState<any | null>(null); // Aluno selecionado PARA DOCS
+  const [docSearch, setDocSearch] = useState('');
+  const [docType, setDocType] = useState(''); 
+  const [docContent, setDocContent] = useState('');
+  const [termoChecks, setTermoChecks] = useState<string[]>([]);
+
+  // Edição
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(''); const [editClass, setEditClass] = useState(''); const [editGuardian, setEditGuardian] = useState(''); const [editPhone, setEditPhone] = useState(''); const [editAddress, setEditAddress] = useState('');
   const [editNee, setEditNee] = useState(''); const [editCtReason, setEditCtReason] = useState(''); const [editCtCouncil, setEditCtCouncil] = useState(''); const [editCtDate, setEditCtDate] = useState('');
@@ -102,11 +109,6 @@ export default function App() {
   const [dataConselho, setDataConselho] = useState(new Date().toISOString().split('T')[0]);
   const [councilObs, setCouncilObs] = useState(''); const [councilEnc, setCouncilEnc] = useState('');
   
-  // Documentos
-  const [docType, setDocType] = useState(''); 
-  const [docContent, setDocContent] = useState('');
-  const [termoChecks, setTermoChecks] = useState<string[]>([]);
-
   // Outros
   const [listComportamento, setListComportamento] = useState<string[]>(DEFAULT_COMPORTAMENTO);
   const [listPedagogico, setListPedagogico] = useState<string[]>(DEFAULT_PEDAGOGICO);
@@ -157,18 +159,16 @@ export default function App() {
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
   const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const d = projectedStudent.desempenho.find((x:any) => x.bimestre === selectedBimestre); if(!d) return; await supabase.from('desempenho_bimestral').update({ lp: d.lp, mat: d.mat, cie: d.cie, his: d.his, geo: d.geo, ing: d.ing, art: d.art, edf: d.edf, pd1: d.pd1, pd2: d.pd2, pd3: d.pd3, faltas_bimestre: d.faltas_bimestre, obs_conselho: councilObs, encaminhamento_conselho: councilEnc }).eq('id', d.id); alert('Salvo!'); fetchStudents(); };
 
-  // --- MOTOR DE PDF COM TABELA ALINHADA ---
+  // --- MÓDULO DE DOCUMENTOS (ISOLADO) ---
   const generateOfficialDoc = (type: string, content: string = "") => {
-      if(!selectedStudent) return;
+      if(!docStudent) return; // Usa o docStudent
       const doc = new jsPDF();
       
-      doc.setFont("times", "bold");
-      doc.setFontSize(12);
+      doc.setFont("times", "bold"); doc.setFontSize(12);
       doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 20, {align: "center"});
       doc.text("SECRETARIA DE ESTADO DE EDUCAÇÃO", 105, 26, {align: "center"});
       doc.text("CENTRO EDUCACIONAL 4 DO GUARÁ", 105, 32, {align: "center"});
-      doc.setFontSize(10);
-      doc.setFont("times", "normal");
+      doc.setFontSize(10); doc.setFont("times", "normal");
       doc.text("Fone: 3318-2289 / 3318-2288", 105, 38, {align: "center"});
       doc.setLineWidth(0.5); doc.line(20, 42, 190, 42);
 
@@ -180,18 +180,10 @@ export default function App() {
       if (type === 'SAUDE') title = "RELATÓRIO ESCOLAR (SAÚDE)";
       if (type === 'TERMO') title = "TERMO DE COMPROMISSO";
 
-      doc.setFontSize(14); doc.setFont("times", "bold");
-      doc.text(title, 105, 55, {align: "center"});
+      doc.setFontSize(14); doc.setFont("times", "bold"); doc.text(title, 105, 55, {align: "center"});
 
-      // TABELA DE DADOS DO ALUNO (CORRIGIDA)
-      autoTable(doc, {
-          startY: 65,
-          head: [['Estudante', 'Turma', 'Responsável']],
-          body: [[selectedStudent.name, selectedStudent.class_id, selectedStudent.guardian_name || '']],
-          theme: 'grid',
-          styles: { font: 'times', fontSize: 10, cellPadding: 2, lineColor: [0,0,0], lineWidth: 0.1 },
-          headStyles: { fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold' }
-      });
+      // TABELA DE DADOS (USANDO docStudent)
+      autoTable(doc, { startY: 65, head: [['Estudante', 'Turma', 'Responsável']], body: [[docStudent.name, docStudent.class_id, docStudent.guardian_name || '']], theme: 'grid', styles: { font: 'times', fontSize: 10, cellPadding: 2, lineColor: [0,0,0], lineWidth: 0.1 }, headStyles: { fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold' } });
 
       let finalY = (doc as any).lastAutoTable.finalY + 15;
       doc.setFontSize(12); doc.setFont("times", "normal");
@@ -203,27 +195,22 @@ export default function App() {
       doc.line(20, pageHeight - 30, 90, pageHeight - 30); doc.text("Responsável / Estudante", 55, pageHeight - 25, {align: "center"});
       doc.line(110, pageHeight - 30, 180, pageHeight - 30); doc.text("Orientador(a) Educacional", 145, pageHeight - 25, {align: "center"});
 
-      doc.save(`${title}_${selectedStudent.name}.pdf`);
+      doc.save(`${title}_${docStudent.name}.pdf`);
       setIsEditorModalOpen(false); setIsTermoModalOpen(false);
   };
 
-  const prepareConvocacao = () => {
-      let t = TEXTO_CONVOCACAO;
-      t = t.replace('[DATA]', '_____/_____/_____'); t = t.replace('[HORA]', '____:____');
-      t = t.replace('[NOME_ALUNO]', selectedStudent.name); t = t.replace('[TURMA]', selectedStudent.class_id);
-      setDocContent(t); setDocType('CONVOCACAO'); setIsEditorModalOpen(true);
+  const prepareDoc = (type: string) => {
+      if(!docStudent) return;
+      let t = "";
+      if (type === 'CONVOCACAO') { t = TEXTO_CONVOCACAO.replace('[DATA]', '_____/_____/_____').replace('[HORA]', '____:____').replace('[NOME_ALUNO]', docStudent.name).replace('[TURMA]', docStudent.class_id); }
+      if (type === 'DECLARACAO') { t = TEXTO_DECLARACAO.replace('[NOME_RESPONSAVEL]', docStudent.guardian_name || "__________________________").replace('[NOME_ALUNO]', docStudent.name).replace('[TURMA]', docStudent.class_id).replace('[DATA_HOJE]', new Date().toLocaleDateString()); }
+      if (type === 'ATA') t = "Descreva aqui o teor da reunião...";
+      setDocContent(t); setDocType(type); setIsEditorModalOpen(true);
   };
-  const prepareDeclaracao = () => {
-      let t = TEXTO_DECLARACAO;
-      t = t.replace('[NOME_RESPONSAVEL]', selectedStudent.guardian_name || "__________________________");
-      t = t.replace('[NOME_ALUNO]', selectedStudent.name); t = t.replace('[TURMA]', selectedStudent.class_id); t = t.replace('[DATA_HOJE]', new Date().toLocaleDateString());
-      setDocContent(t); setDocType('DECLARACAO'); setIsEditorModalOpen(true);
-  };
-  const prepareAta = () => { setDocContent("Descreva aqui o teor da reunião, participantes, relatos e encaminhamentos acordados..."); setDocType('ATA'); setIsEditorModalOpen(true); };
   const prepareTermo = () => { setTermoChecks([]); setIsTermoModalOpen(true); };
   const generateTermoPDF = () => {
       const listaProblemas = [ "Desatenção", "Desrespeita professores", "Desrespeita colegas", "Brincadeiras Inoportunas", "Bullying", "Agressão física", "Não realiza atividades", "Não traz material", "Chega atrasado", "Uso de celular", "Danifica patrimônio" ];
-      let content = "Eu, " + selectedStudent.name + ", da turma " + selectedStudent.class_id + ", estou ciente que apresento os seguintes comportamentos:\n\n";
+      let content = "Eu, " + docStudent.name + ", da turma " + docStudent.class_id + ", estou ciente que apresento os seguintes comportamentos:\n\n";
       listaProblemas.forEach(prob => { const marked = termoChecks.includes(prob) ? "[ X ]" : "[   ]"; content += `${marked} ${prob}\n`; });
       content += "\nDeclaro que fui orientado(a) e comprometo-me a melhorar os comportamentos acima mencionados. Caso contrário receberei as medidas disciplinares necessárias.";
       generateOfficialDoc('TERMO', content);
@@ -283,6 +270,53 @@ export default function App() {
     );
   };
 
+  const renderDocs = () => {
+      const filteredForDocs = students.filter(s => docSearch && s.name.toLowerCase().includes(docSearch.toLowerCase())).slice(0, 5);
+      return (
+          <div className="max-w-4xl mx-auto pb-20 p-6 space-y-8 animate-in fade-in">
+              <div className="text-center space-y-2">
+                  <h2 className="text-3xl font-black text-slate-800 flex items-center justify-center gap-3"><Printer className="text-indigo-600"/> Central de Documentos</h2>
+                  <p className="text-slate-500">Emissão de documentos oficiais com formatação automática.</p>
+              </div>
+              <div className="bg-white p-8 rounded-2xl shadow-lg border border-indigo-100">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">1. Selecione o Estudante</label>
+                  <div className="relative">
+                      <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
+                      <input className="w-full pl-12 pr-4 py-4 border rounded-xl bg-slate-50 text-lg font-bold outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Digite o nome..." value={docSearch} onChange={e => { setDocSearch(e.target.value); setDocStudent(null); }} />
+                  </div>
+                  {docSearch && !docStudent && (
+                      <div className="mt-2 space-y-1 border rounded-xl overflow-hidden shadow-sm">
+                          {filteredForDocs.map(s => (
+                              <div key={s.id} onClick={() => { setDocStudent(s); setDocSearch(s.name); }} className="p-3 bg-white hover:bg-indigo-50 cursor-pointer flex justify-between items-center border-b last:border-0">
+                                  <span className="font-bold text-slate-700">{s.name}</span>
+                                  <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">{s.class_id}</span>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+              
+              {docStudent && (
+                  <div className="bg-white p-8 rounded-2xl shadow-lg border border-slate-200 animate-in slide-in-from-bottom-4">
+                      <div className="flex items-center gap-4 mb-6 border-b pb-4">
+                          <Avatar name={docStudent.name} src={docStudent.photo_url} size="lg"/>
+                          <div><h3 className="text-xl font-bold">{docStudent.name}</h3><p className="text-slate-500">Turma {docStudent.class_id}</p></div>
+                      </div>
+                      <label className="block text-sm font-bold text-slate-700 mb-4">2. Escolha o Documento</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <button onClick={() => prepareDoc('CONVOCACAO')} className="p-4 border rounded-xl hover:bg-indigo-50 font-bold text-sm text-left flex items-center gap-3"><Bell className="text-red-500"/> Convocação</button>
+                          <button onClick={() => prepareDoc('DECLARACAO')} className="p-4 border rounded-xl hover:bg-indigo-50 font-bold text-sm text-left flex items-center gap-3"><FileText className="text-blue-500"/> Declaração</button>
+                          <button onClick={() => prepareDoc('ATA')} className="p-4 border rounded-xl hover:bg-indigo-50 font-bold text-sm text-left flex items-center gap-3"><Book className="text-green-500"/> Ata de Reunião</button>
+                          <button onClick={prepareTermo} className="p-4 border rounded-xl hover:bg-indigo-50 font-bold text-sm text-left flex items-center gap-3"><CheckSquare className="text-amber-500"/> Termo Compromisso</button>
+                          <button onClick={() => { setDocType('CT'); setDocContent(""); setIsEditorModalOpen(true); }} className="p-4 border rounded-xl hover:bg-indigo-50 font-bold text-sm text-left flex items-center gap-3"><Scale className="text-orange-500"/> Relatório CT</button>
+                          <button onClick={() => { setDocType('SAUDE'); setDocContent(""); setIsEditorModalOpen(true); }} className="p-4 border rounded-xl hover:bg-indigo-50 font-bold text-sm text-left flex items-center gap-3"><Heart className="text-pink-500"/> Relatório Saúde</button>
+                      </div>
+                  </div>
+              )}
+          </div>
+      );
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden">
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-[#1E1E2D] text-white flex flex-col shadow-2xl transition-transform md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -291,15 +325,24 @@ export default function App() {
           <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${view === 'dashboard' ? 'bg-indigo-600' : ''}`}><LayoutDashboard size={18} /> Dashboard</button>
           <button onClick={() => setView('students')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${view === 'students' ? 'bg-indigo-600' : ''}`}><Users size={18} /> Alunos</button>
           <button onClick={() => setView('conselho')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${view === 'conselho' ? 'bg-indigo-600' : ''}`}><GraduationCap size={18} /> Conselho</button>
+          {/* MENU A PARTE - DOCUMENTOS */}
+          <div className="pt-4 mt-4 border-t border-white/10">
+              <button onClick={() => setView('documentos')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${view === 'documentos' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}><Printer size={18} /> Documentos Oficiais</button>
+          </div>
         </nav>
         <div className="p-4 border-t border-white/5 flex items-center gap-3"><Avatar name={SYSTEM_USER_NAME} size="sm"/><p className="text-[10px] font-bold">{SYSTEM_USER_NAME}</p></div>
       </aside>
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         <header className="bg-white border-b px-6 py-3 flex justify-between items-center"><button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden"><Menu/></button><div className="flex-1 max-w-md relative"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input type="text" placeholder="Buscar..." className="w-full pl-9 pr-4 py-2 bg-slate-100 rounded-lg text-sm" value={globalSearch} onChange={e => setGlobalSearch(e.target.value)}/></div><Zap onClick={() => setIsQuickModalOpen(true)} className="text-amber-500 cursor-pointer"/></header>
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">{view === 'dashboard' && renderDashboard()}{view === 'students' && (<div className="max-w-[1600px] mx-auto space-y-6"><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded font-bold">+ Novo Aluno</button><StudentList students={students.filter(s => s.name.toLowerCase().includes(globalSearch.toLowerCase()) && (dashboardFilterType === 'ALL' || (dashboardFilterType === 'NEE' && s.nee_description) || (dashboardFilterType === 'CT' && s.ct_referral)))} onSelectStudent={(s:any) => { setSelectedStudent(s); setIsModalOpen(true); }} filterType={dashboardFilterType} /></div>)}{view === 'conselho' && renderConselho()}</div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+            {view === 'dashboard' && renderDashboard()}
+            {view === 'students' && (<div className="max-w-[1600px] mx-auto space-y-6"><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded font-bold">+ Novo Aluno</button><StudentList students={students.filter(s => s.name.toLowerCase().includes(globalSearch.toLowerCase()) && (dashboardFilterType === 'ALL' || (dashboardFilterType === 'NEE' && s.nee_description) || (dashboardFilterType === 'CT' && s.ct_referral)))} onSelectStudent={(s:any) => { setSelectedStudent(s); setIsModalOpen(true); }} filterType={dashboardFilterType} /></div>)}
+            {view === 'conselho' && renderConselho()}
+            {view === 'documentos' && renderDocs()}
+        </div>
       </main>
       
-      {/* MODAL PRINCIPAL ALUNO */}
+      {/* MODAL ALUNO ORIGINAL V10.1 (SEM MODIFICAÇÕES) */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white rounded-2xl w-full max-w-[95vw] h-[95vh] flex flex-col overflow-hidden">
@@ -307,39 +350,8 @@ export default function App() {
                     <div className="flex items-center gap-6"><Avatar name={selectedStudent.name} src={selectedStudent.photo_url} size="xl" /><div><h2 className="text-3xl font-bold">{selectedStudent.name}</h2><p>Turma {selectedStudent.class_id}</p></div></div>
                     <div className="flex gap-2"><button onClick={generatePDF} className="bg-purple-100 p-3 rounded-full"><FileDown/></button><button onClick={startEditing} className="bg-indigo-100 p-3 rounded-full"><Pencil/></button><X onClick={() => setIsModalOpen(false)} className="cursor-pointer"/></div>
                 </div>
-                <div className="flex border-b px-8 bg-white overflow-x-auto gap-8 flex-shrink-0">{['perfil', 'academico', 'historico', 'familia', 'documentos'].map(t => <button key={t} onClick={() => setActiveTab(t as any)} className={`py-5 font-bold uppercase ${activeTab === t ? 'border-b-4 border-indigo-600' : ''}`}>{t}</button>)}</div>
+                <div className="flex border-b px-8 bg-white overflow-x-auto gap-8 flex-shrink-0">{['perfil', 'academico', 'historico', 'familia'].map(t => <button key={t} onClick={() => setActiveTab(t as any)} className={`py-5 font-bold uppercase ${activeTab === t ? 'border-b-4 border-indigo-600' : ''}`}>{t}</button>)}</div>
                 <div className="flex-1 overflow-y-auto p-8">
-                    
-                    {/* NOVA ABA DOCUMENTOS */}
-                    {activeTab === 'documentos' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div className="bg-white p-6 rounded-xl border shadow-sm hover:shadow-md cursor-pointer group" onClick={prepareConvocacao}>
-                                <div className="flex items-center gap-3 mb-2"><Bell className="text-red-500 group-hover:scale-110"/><h3 className="font-bold">Convocação</h3></div>
-                                <p className="text-xs text-slate-500">Carta oficial para responsáveis.</p>
-                            </div>
-                            <div className="bg-white p-6 rounded-xl border shadow-sm hover:shadow-md cursor-pointer group" onClick={prepareDeclaracao}>
-                                <div className="flex items-center gap-3 mb-2"><FileText className="text-blue-500 group-hover:scale-110"/><h3 className="font-bold">Declaração</h3></div>
-                                <p className="text-xs text-slate-500">Comprovante de comparecimento.</p>
-                            </div>
-                            <div className="bg-white p-6 rounded-xl border shadow-sm hover:shadow-md cursor-pointer group" onClick={prepareAta}>
-                                <div className="flex items-center gap-3 mb-2"><Book className="text-green-500 group-hover:scale-110"/><h3 className="font-bold">Ata de Reunião</h3></div>
-                                <p className="text-xs text-slate-500">Registro formal de atendimento.</p>
-                            </div>
-                            <div className="bg-white p-6 rounded-xl border shadow-sm hover:shadow-md cursor-pointer group" onClick={prepareTermo}>
-                                <div className="flex items-center gap-3 mb-2"><CheckSquare className="text-amber-500 group-hover:scale-110"/><h3 className="font-bold">Termo Compromisso</h3></div>
-                                <p className="text-xs text-slate-500">Ficha disciplinar para o aluno.</p>
-                            </div>
-                            <div className="bg-white p-6 rounded-xl border shadow-sm hover:shadow-md cursor-pointer group" onClick={() => { setDocType('CT'); setDocContent(""); setIsEditorModalOpen(true); }}>
-                                <div className="flex items-center gap-3 mb-2"><Scale className="text-orange-500 group-hover:scale-110"/><h3 className="font-bold">Relatório C. Tutelar</h3></div>
-                                <p className="text-xs text-slate-500">Ofício para a rede de proteção.</p>
-                            </div>
-                            <div className="bg-white p-6 rounded-xl border shadow-sm hover:shadow-md cursor-pointer group" onClick={() => { setDocType('SAUDE'); setDocContent(""); setIsEditorModalOpen(true); }}>
-                                <div className="flex items-center gap-3 mb-2"><Heart className="text-pink-500 group-hover:scale-110"/><h3 className="font-bold">Relatório Saúde</h3></div>
-                                <p className="text-xs text-slate-500">Encaminhamento para psicólogo/médico.</p>
-                            </div>
-                        </div>
-                    )}
-
                     {activeTab === 'perfil' && <div className="p-8 bg-white border rounded-xl"><h4>Responsável: {selectedStudent.guardian_name}</h4><p>Telefone: {selectedStudent.guardian_phone}</p></div>}
                     {activeTab === 'historico' && <div className="space-y-4">
                         <textarea className="w-full border p-4 rounded-xl h-48" value={obsLivre} onChange={e => setObsLivre(e.target.value)} placeholder="Novo registro de atendimento..."/>
@@ -351,13 +363,13 @@ export default function App() {
         </div>
       )}
 
-      {/* JANELINHA EDITORA */}
+      {/* JANELINHA EDITORA DE DOCUMENTOS */}
       {isEditorModalOpen && (
           <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6 flex flex-col h-[80vh]">
                   <div className="flex justify-between mb-4"><h3 className="font-bold text-lg uppercase text-slate-600">Editando: {docType}</h3><button onClick={() => setIsEditorModalOpen(false)}><X/></button></div>
-                  <div className="bg-yellow-50 p-2 text-xs text-yellow-700 mb-2 rounded border border-yellow-200">💡 Dica: Revise o texto abaixo.</div>
-                  <textarea spellCheck={true} className="flex-1 border p-4 rounded-xl text-sm font-serif leading-relaxed resize-none outline-none" value={docContent} onChange={e => setDocContent(e.target.value)} placeholder="Texto do documento..."/>
+                  <div className="bg-yellow-50 p-2 text-xs text-yellow-700 mb-2 rounded border border-yellow-200">💡 Dica: Revise o texto abaixo. O corretor ortográfico do navegador está ativo.</div>
+                  <textarea spellCheck={true} className="flex-1 border p-4 rounded-xl text-sm font-serif leading-relaxed resize-none outline-none" value={docContent} onChange={e => setDocContent(e.target.value)} placeholder="Cole ou digite o texto do documento aqui..."/>
                   <div className="flex justify-end gap-3 mt-4">
                       <button onClick={() => setIsEditorModalOpen(false)} className="px-4 py-2 font-bold text-slate-500">Cancelar</button>
                       <button onClick={() => generateOfficialDoc(docType, docContent)} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2"><Printer size={18}/> Gerar PDF</button>
