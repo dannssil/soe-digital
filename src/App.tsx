@@ -89,8 +89,6 @@ export default function App() {
   const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-  // MODAIS
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
@@ -98,11 +96,10 @@ export default function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
-  
   const [importing, setImporting] = useState(false);
   const [projectedStudent, setProjectedStudent] = useState<any | null>(null);
   const [isSensitiveVisible, setIsSensitiveVisible] = useState(false); 
+  const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
   const [radarData, setRadarData] = useState({ assiduidade: 3, participacao: 3, relacionamento: 3, rendimento: 3, tarefas: 3 });
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil');
   const [isEditing, setIsEditing] = useState(false);
@@ -134,9 +131,12 @@ export default function App() {
   const [attendanceDate, setAttendanceDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
   const [obsLivre, setObsLivre] = useState("");
+  
+  // ZAP (REGISTRO RÁPIDO) FIX
   const [quickSearchTerm, setQuickSearchTerm] = useState('');
   const [quickSelectedStudent, setQuickSelectedStudent] = useState<any | null>(null);
   const [quickReason, setQuickReason] = useState('');
+  
   const [exitReason, setExitReason] = useState('');
   const [exitType, setExitType] = useState<'TRANSFERIDO' | 'ABANDONO'>('TRANSFERIDO');
 
@@ -176,7 +176,15 @@ export default function App() {
 
   const handleLogin = (e: React.FormEvent) => { e.preventDefault(); if (passwordInput === ACCESS_PASSWORD) { setIsAuthenticated(true); localStorage.setItem('soe_auth', 'true'); fetchStudents(); } };
   const handleSaveLog = async () => { if (!selectedStudent) return; const currentCategory = activeTab === 'familia' ? 'Família' : 'Atendimento SOE'; const desc = JSON.stringify({ solicitante, motivos: motivosSelecionados, obs: obsLivre }); const { error } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: currentCategory, description: desc, referral: encaminhamento, resolved: resolvido, created_at: new Date(attendanceDate).toISOString(), return_date: returnDate || null }]); if (!error) { alert('Salvo!'); setMotivosSelecionados([]); setObsLivre(""); setResolvido(false); fetchStudents(); } else alert(error.message); };
-  const handleQuickSave = async () => { if (!quickSelectedStudent || !quickReason) return; const desc = JSON.stringify({ solicitante: 'SOE (Rápido)', motivos: [quickReason], acoes: [], obs: '[Registro Rápido via Mobile]' }); const { error } = await supabase.from('logs').insert([{ student_id: quickSelectedStudent.id, category: 'Atendimento SOE', description: desc, resolved: false, created_at: new Date().toISOString() }]); if (!error) { alert(`Salvo!`); setIsQuickModalOpen(false); fetchStudents(); } };
+  
+  // FUNÇÃO ZAP CORRIGIDA
+  const handleQuickSave = async () => { 
+      if (!quickSelectedStudent || !quickReason) return alert("Selecione um aluno e um motivo."); 
+      const desc = JSON.stringify({ solicitante: 'SOE (Rápido)', motivos: [quickReason], acoes: [], obs: `[Registro Rápido] Motivo: ${quickReason}` }); 
+      const { error } = await supabase.from('logs').insert([{ student_id: quickSelectedStudent.id, category: 'Atendimento SOE', description: desc, resolved: false, created_at: new Date().toISOString() }]); 
+      if (!error) { alert(`Registro de "${quickReason}" salvo!`); setQuickSelectedStudent(null); setQuickSearchTerm(''); setQuickReason(''); setIsQuickModalOpen(false); fetchStudents(); } 
+  };
+
   const handleAddStudent = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('students').insert([{ name: newName, class_id: newClass, status: 'ATIVO' }]); if (!error) { alert('Criado!'); setIsNewStudentModalOpen(false); fetchStudents(); } else alert(error.message); };
   const handleRegisterExit = async () => { if (!selectedStudent) return; const logDesc = JSON.stringify({ solicitante: 'Secretaria/SOE', motivos: [exitType], obs: `SAÍDA REGISTRADA. Motivo detalhado: ${exitReason}` }); const { error: logError } = await supabase.from('logs').insert([{ student_id: selectedStudent.id, category: 'Situação Escolar', description: logDesc, resolved: true, created_at: new Date().toISOString() }]); if (logError) return alert('Erro ao salvar histórico: ' + logError.message); const { error } = await supabase.from('students').update({ status: exitType, exit_reason: exitReason, exit_date: new Date().toISOString() }).eq('id', selectedStudent.id); if (!error) { alert('Saída registrada!'); setExitReason(''); setIsExitModalOpen(false); setIsModalOpen(false); fetchStudents(); } else alert(error.message); };
   const handleSaveRadar = async () => { const targetClass = conselhoTurma || students[0]?.class_id; if (!targetClass) return; const { error } = await supabase.from('class_radar').upsert({ turma: targetClass, bimestre: selectedBimestre, ...radarData }, { onConflict: 'turma, bimestre' }); if (!error) { alert('Avaliação da Turma Salva!'); setIsEvalModalOpen(false); } else { alert('Erro: ' + error.message); } };
@@ -478,7 +486,7 @@ export default function App() {
         <div className="p-4 bg-[#151521] border-t border-white/5">
           <div className="flex items-center gap-3 mb-3"><Avatar name={SYSTEM_USER_NAME} src={adminPhoto} size="sm"/><div className="overflow-hidden"><p className="font-bold text-white text-xs truncate">{SYSTEM_USER_NAME}</p><p className="text-[10px] text-slate-400 truncate">{SYSTEM_MATRICULA}</p></div></div>
           <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 text-[10px] text-red-400 hover:text-red-300 transition-colors w-full"><LogOut size={12} /> Sair do Sistema</button>
-          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves da Silva</span></div><span className="text-[8px]">v10.1 Final</span></div>
+          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves da Silva</span></div><span className="text-[8px]">v10.1.1 Fixed</span></div>
         </div>
       </aside>
 
@@ -562,8 +570,8 @@ export default function App() {
       {isImportModalOpen && (<div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"><h3 className="text-xl font-bold mb-4 text-indigo-600 flex items-center gap-2"><FileSpreadsheet size={24} /> Importar Excel</h3><div className="space-y-4"><div><label className="block text-sm font-bold text-slate-700 mb-1">Bimestre de Referência</label><select title="bim" className="w-full p-3 border rounded-xl" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select></div><div className="border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center bg-indigo-50">{importing ? <p className="animate-pulse font-bold text-indigo-600">Sincronizando...</p> : <input title="file" type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="w-full text-sm" />}</div><div className="flex justify-end"><button onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold">Fechar</button></div></div></div></div>)}
       {isNewStudentModalOpen && (<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl"><h3 className="font-bold text-xl mb-6 text-indigo-900">Cadastrar Novo Aluno</h3><form onSubmit={handleAddStudent} className="space-y-4"><div><label className="text-xs font-bold uppercase text-slate-400">Nome Completo</label><input title="nome" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div><div><label className="text-xs font-bold uppercase text-slate-400">Turma</label><input title="turma" value={newClass} onChange={e => setNewClass(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div><div className="flex gap-3 mt-6"><button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold">Cancelar</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg">Salvar</button></div></form></div></div>)}
       
-      {/* BOTÃO FLUTUANTE ZAP (CORRIGIDO V10.1) */}
-      {isQuickModalOpen && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center"><div className="bg-white p-6 rounded-xl w-80"><h3>Registro Rápido</h3><input className="w-full border p-2" value={quickSearchTerm} onChange={e => setQuickSearchTerm(e.target.value)} placeholder="Aluno..."/><div className="max-h-40 overflow-y-auto">{students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0,5).map(s => <div key={s.id} onClick={() => {setQuickSelectedStudent(s); setQuickSearchTerm(s.name);}} className="p-2 border-b cursor-pointer">{s.name}</div>)}</div><button onClick={handleQuickSave} className="bg-green-600 text-white w-full py-3 mt-4">Confirmar</button></div></div>}
+      {/* BOTÃO FLUTUANTE ZAP (CORRIGIDO) */}
+      {isQuickModalOpen && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center"><div className="bg-white p-6 rounded-xl w-96 shadow-2xl"><div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg flex items-center gap-2"><Zap className="text-amber-500"/> Registro Rápido</h3><button onClick={() => setIsQuickModalOpen(false)}><X size={20}/></button></div><input className="w-full border p-2 rounded-lg mb-4" value={quickSearchTerm} onChange={e => setQuickSearchTerm(e.target.value)} placeholder="Buscar aluno..."/><div className="max-h-32 overflow-y-auto mb-4 border rounded">{students.filter(s => quickSearchTerm && s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0,3).map(s => <div key={s.id} onClick={() => {setQuickSelectedStudent(s); setQuickSearchTerm(s.name);}} className={`p-2 border-b cursor-pointer hover:bg-indigo-50 ${quickSelectedStudent?.id === s.id ? 'bg-indigo-100 font-bold' : ''}`}>{s.name}</div>)}</div>{quickSelectedStudent && (<div className="grid grid-cols-2 gap-2 mb-4">{['Uniforme', 'Atraso', 'Celular', 'Sem Material', 'Disciplina', 'Elogio'].map(m => (<button key={m} onClick={() => setQuickReason(m)} className={`p-2 text-xs border rounded hover:bg-slate-100 font-bold ${quickReason === m ? 'bg-amber-100 border-amber-400' : ''}`}>{m}</button>))}</div>)}<button onClick={handleQuickSave} className="bg-amber-500 hover:bg-amber-600 text-white w-full py-3 rounded-xl font-bold shadow-lg">CONFIRMAR REGISTRO</button></div></div>}
       <button onClick={() => setIsQuickModalOpen(true)} className="fixed bottom-8 right-8 w-16 h-16 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 hover:scale-110 transition-all border-4 border-white"><Zap size={32} /></button>
     </div>
   );
