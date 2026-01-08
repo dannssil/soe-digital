@@ -3,15 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
-import { 
-  LayoutDashboard, Users, BookOpen, LogOut, Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock, 
-  FileText, CheckSquare, Phone, UserCircle, FileDown, CalendarDays, Zap, Menu, Search as SearchIcon, 
-  Users2, MoreHorizontal, Folder, BarChart3 as BarChartIcon, FileSpreadsheet, MapPin, Clock, ShieldCheck, 
-  ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, 
-  Maximize2, MonitorPlay, Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, ChevronLeft, 
-  Star, Activity, Heart, Brain, PenTool, Copyright, Code, PieChart as PieChartIcon, FileOutput, ThumbsUp, 
-  Puzzle, Scale, Cake, Siren, Bell, ListChecks, FileInput, Book, FileSignature 
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, BarChart, Bar,
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+} from 'recharts';
+import {
+  LayoutDashboard, Users, BookOpen, LogOut,
+  Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
+  FileText, CheckSquare, Phone,
+  UserCircle, FileDown, CalendarDays, Zap, Menu, 
+  Search as SearchIcon, Users2, MoreHorizontal, Folder, 
+  BarChart3 as BarChartIcon, FileSpreadsheet, MapPin, Clock, ShieldCheck, 
+  ChevronRight, Copy, History, GraduationCap, Printer, 
+  FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, 
+  Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, 
+  ChevronLeft, Star, Activity, Heart, Brain, PenTool, Copyright, Code,
+  PieChart as PieChartIcon, FileOutput, ThumbsUp, Puzzle, Scale, Cake, Siren, Bell, ListChecks, FileInput, Book, FileSignature 
 } from 'lucide-react';
 
 const supabaseUrl = "https://zfryhzmujfaqqzybjuhb.supabase.co";
@@ -72,18 +80,18 @@ export default function App() {
   const [passwordInput, setPasswordInput] = useState('');
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'students' | 'conselho' | 'documentos'>('dashboard'); // NOVO VIEW
+  const [view, setView] = useState<'dashboard' | 'students' | 'conselho' | 'documentos'>('dashboard');
   const [dashboardFilterType, setDashboardFilterType] = useState<'ALL' | 'RISK' | 'NEE' | 'CT'>('ALL');
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
-  const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil'); // SÓ 4 ABAS
+  const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil');
   
-  // Modais e Estados V10.1
+  // Modais V10.1 (Restaurados)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [isQuickModalOpen, setIsQuickModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false); // Menu Relatórios
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -94,7 +102,7 @@ export default function App() {
   // Modais de Documentos (Menu a parte)
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isTermoModalOpen, setIsTermoModalOpen] = useState(false);
-  const [docStudent, setDocStudent] = useState<any | null>(null); // Aluno selecionado PARA DOCS
+  const [docStudent, setDocStudent] = useState<any | null>(null);
   const [docSearch, setDocSearch] = useState('');
   const [docType, setDocType] = useState(''); 
   const [docContent, setDocContent] = useState('');
@@ -158,10 +166,12 @@ export default function App() {
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) { if (!event.target.files || event.target.files.length === 0 || !selectedStudent) return; const file = event.target.files[0]; const fileName = `${selectedStudent.id}-${Math.random()}.${file.name.split('.').pop()}`; const { error } = await supabase.storage.from('photos').upload(fileName, file); if (error) { alert('Erro upload: ' + error.message); return; } const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName); await supabase.from('students').update({ photo_url: publicUrl }).eq('id', selectedStudent.id); setSelectedStudent({ ...selectedStudent, photo_url: publicUrl }); fetchStudents(); }
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
   const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const d = projectedStudent.desempenho.find((x:any) => x.bimestre === selectedBimestre); if(!d) return; await supabase.from('desempenho_bimestral').update({ lp: d.lp, mat: d.mat, cie: d.cie, his: d.his, geo: d.geo, ing: d.ing, art: d.art, edf: d.edf, pd1: d.pd1, pd2: d.pd2, pd3: d.pd3, faltas_bimestre: d.faltas_bimestre, obs_conselho: councilObs, encaminhamento_conselho: councilEnc }).eq('id', d.id); alert('Salvo!'); fetchStudents(); };
+  const handleExportReport = () => { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(students); XLSX.utils.book_append_sheet(wb, ws, "Dados"); XLSX.writeFile(wb, `Relatorio_Geral.xlsx`); };
+  const handleBackup = () => { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(students); XLSX.utils.book_append_sheet(wb, ws, "Backup"); XLSX.writeFile(wb, `BACKUP_SOE.xlsx`); };
 
   // --- MÓDULO DE DOCUMENTOS (ISOLADO) ---
   const generateOfficialDoc = (type: string, content: string = "") => {
-      if(!docStudent) return; // Usa o docStudent
+      if(!docStudent) return;
       const doc = new jsPDF();
       
       doc.setFont("times", "bold"); doc.setFontSize(12);
@@ -182,7 +192,6 @@ export default function App() {
 
       doc.setFontSize(14); doc.setFont("times", "bold"); doc.text(title, 105, 55, {align: "center"});
 
-      // TABELA DE DADOS (USANDO docStudent)
       autoTable(doc, { startY: 65, head: [['Estudante', 'Turma', 'Responsável']], body: [[docStudent.name, docStudent.class_id, docStudent.guardian_name || '']], theme: 'grid', styles: { font: 'times', fontSize: 10, cellPadding: 2, lineColor: [0,0,0], lineWidth: 0.1 }, headStyles: { fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold' } });
 
       let finalY = (doc as any).lastAutoTable.finalY + 15;
@@ -325,9 +334,11 @@ export default function App() {
           <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${view === 'dashboard' ? 'bg-indigo-600' : ''}`}><LayoutDashboard size={18} /> Dashboard</button>
           <button onClick={() => setView('students')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${view === 'students' ? 'bg-indigo-600' : ''}`}><Users size={18} /> Alunos</button>
           <button onClick={() => setView('conselho')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${view === 'conselho' ? 'bg-indigo-600' : ''}`}><GraduationCap size={18} /> Conselho</button>
-          {/* MENU A PARTE - DOCUMENTOS */}
           <div className="pt-4 mt-4 border-t border-white/10">
               <button onClick={() => setView('documentos')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${view === 'documentos' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}><Printer size={18} /> Documentos Oficiais</button>
+              <button onClick={() => { setIsReportModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-white/5 hover:text-white"><FileBarChart2 size={18} /> <span className="font-medium text-sm">Relatórios</span></button>
+              <button onClick={handleBackup} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-white/5 hover:text-white"><Database size={18} /> <span className="font-medium text-sm">Backup</span></button>
+              <button onClick={() => { setIsSettingsModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-white/5 hover:text-white"><Settings size={18} /> <span className="font-medium text-sm">Configurações</span></button>
           </div>
         </nav>
         <div className="p-4 border-t border-white/5 flex items-center gap-3"><Avatar name={SYSTEM_USER_NAME} size="sm"/><p className="text-[10px] font-bold">{SYSTEM_USER_NAME}</p></div>
@@ -363,6 +374,9 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAIS RESTAURADOS V10.1 */}
+      {isReportModalOpen && (<div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600" /> Relatórios Gerenciais</h3><button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28} /></button></div><div className="flex-1 overflow-y-auto space-y-6 pr-2"><div className="pt-6 border-t mt-4 flex justify-end"><button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg transition-transform hover:scale-105"><FileSpreadsheet /> Baixar Relatório Completo</button></div></div></div></div>)}
+      
       {/* JANELINHA EDITORA DE DOCUMENTOS */}
       {isEditorModalOpen && (
           <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
@@ -394,7 +408,11 @@ export default function App() {
       )}
 
       {isNewStudentModalOpen && (<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl"><h3 className="font-bold text-xl mb-6 text-indigo-900">Novo Aluno</h3><form onSubmit={handleAddStudent} className="space-y-4"><input title="nome" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 border rounded-xl" placeholder="Nome"/><input title="turma" value={newClass} onChange={e => setNewClass(e.target.value)} className="w-full p-3 border rounded-xl" placeholder="Turma"/><div className="flex gap-3"><button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="flex-1 py-3">Cancelar</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-3 rounded-xl">Salvar</button></div></form></div></div>)}
+      
+      {/* BOTÃO REGISTRO RÁPIDO V10.1 (RESTAURADO) */}
       {isQuickModalOpen && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center"><div className="bg-white p-6 rounded-xl w-80"><h3>Registro Rápido</h3><input className="w-full border p-2" value={quickSearchTerm} onChange={e => setQuickSearchTerm(e.target.value)} placeholder="Aluno..."/><div className="max-h-40 overflow-y-auto">{students.filter(s => s.name.toLowerCase().includes(quickSearchTerm.toLowerCase())).slice(0,5).map(s => <div key={s.id} onClick={() => {setQuickSelectedStudent(s); setQuickSearchTerm(s.name);}} className="p-2 border-b cursor-pointer">{s.name}</div>)}</div><button onClick={() => {supabase.from('logs').insert([{student_id: quickSelectedStudent.id, category:'Atendimento SOE', description: JSON.stringify({obs:'Registro Rápido'})}]); setIsQuickModalOpen(false);}} className="bg-green-600 text-white w-full py-3 mt-4">Confirmar</button></div></div>}
+      
+      <button onClick={() => setIsQuickModalOpen(true)} className="fixed bottom-8 right-8 w-16 h-16 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 hover:scale-110 transition-all border-4 border-white"><Zap size={32} /></button>
     </div>
   );
 }
