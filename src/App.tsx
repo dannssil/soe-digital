@@ -3,29 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, BarChart, Bar,
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
-} from 'recharts';
-import {
-  LayoutDashboard, Users, BookOpen, LogOut,
-  Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock,
-  FileText, CheckSquare, Phone,
-  UserCircle, FileDown, CalendarDays, Zap, Menu, 
-  Search as SearchIcon, Users2, MoreHorizontal, Folder, 
-  BarChart3 as BarChartIcon, FileSpreadsheet, MapPin, Clock, ShieldCheck, 
-  ChevronRight, Copy, History, GraduationCap, Printer, 
-  FileBarChart2, Database, Settings, Trash2, Maximize2, MonitorPlay, 
-  Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, 
-  ChevronLeft, Star, Activity, Heart, Brain, PenTool, Copyright, Code,
-  PieChart as PieChartIcon, FileOutput, ThumbsUp, Puzzle, Scale, Cake, Siren, Bell, ListChecks, FileInput, Book, FileSignature 
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
+import { 
+  LayoutDashboard, Users, BookOpen, LogOut, Plus, Save, X, AlertTriangle, Camera, User, Pencil, Lock, 
+  FileText, CheckSquare, Phone, UserCircle, FileDown, CalendarDays, Zap, Menu, Search as SearchIcon, 
+  Users2, MoreHorizontal, Folder, BarChart3 as BarChartIcon, FileSpreadsheet, MapPin, Clock, ShieldCheck, 
+  ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, 
+  Maximize2, MonitorPlay, Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, ChevronLeft, 
+  Star, Activity, Heart, Brain, PenTool, Copyright, Code, PieChart as PieChartIcon, FileOutput, ThumbsUp, 
+  Puzzle, Scale, Cake, Siren, Bell, ListChecks, FileInput, Book, FileSignature 
 } from 'lucide-react';
 
+// --- CONEXÃO COM SUPABASE ---
 const supabaseUrl = "https://zfryhzmujfaqqzybjuhb.supabase.co";
 const supabaseKey = "sb_publishable_oJqCCMfnBlbQWGMP4Wj3rQ_YqogatOo";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// --- CONFIGURAÇÕES GERAIS ---
 const SYSTEM_USER_NAME = "Daniel Alves da Silva";
 const SYSTEM_ROLE = "Orientador Educacional";
 const SYSTEM_MATRICULA = "Mat: 212.235-9 | SEEDF";
@@ -33,15 +27,17 @@ const SYSTEM_ORG = "CED 4 Guará";
 const ACCESS_PASSWORD = "Ced@1rf1";
 const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
-// --- TEMPLATES ---
+// --- TEMPLATES DE DOCUMENTOS ---
 const TEXTO_CONVOCACAO = "O Centro Educacional 4 do Guará convoca-a para comparecer com urgência à escola no dia [DATA] às [HORA] para tratar de assuntos relacionados ao seu filho(a) [NOME_ALUNO], da turma [TURMA]. Será uma oportunidade valiosa para discutirmos questões de extrema importância para o desenvolvimento do estudante.\n\nDe acordo com a Lei da Educação Nacional (Lei nº 9.394/96), é obrigação dos pais participarem ativamente da vida escolar de seus filhos. Como parte desse compromisso, reforçamos esta convocação.\n\nSua presença é vital para garantir o sucesso e o bem-estar do estudante na escola.\nNão deixem de comparecer!";
 const TEXTO_DECLARACAO = "Declaramos para os devidos fins que o(a) Senhor(a) [NOME_RESPONSAVEL], responsável pelo(a) estudante [NOME_ALUNO], da turma [TURMA], esteve nesta Unidade de Ensino no dia [DATA_HOJE], no período de ______ às ______, para tratar de assuntos relacionados ao desempenho e acompanhamento escolar do(a) referido(a) aluno(a).";
 
+// --- LISTAS PADRÃO ---
 const DEFAULT_COMPORTAMENTO = ["Conversa excessiva", "Desacato", "Agressividade verbal", "Agressividade física", "Uso de celular", "Saída s/ autorização", "Bullying", "Desobediência", "Uniforme", "Outros"];
 const DEFAULT_PEDAGOGICO = ["Sem tarefa", "Dificuldade aprend.", "Sem material", "Desatenção", "Baixo desempenho", "Faltas excessivas", "Sono em sala", "Outros"];
 const DEFAULT_SOCIAL = ["Ansiedade", "Problemas familiares", "Isolamento", "Conflito colegas", "Saúde/Laudo", "Vulnerabilidade", "Outros"];
 const DEFAULT_ENCAMINHAMENTOS = ["Coordenação", "Psicologia", "Família", "Direção", "Conselho Tutelar", "Sala Recursos", "Apoio Aprendizagem", "Disciplinar", "Saúde"];
 
+// --- COMPONENTES AUXILIARES ---
 function Avatar({ name, src, size = "md" }: { name: string, src?: string | null, size?: "sm" | "md" | "lg" | "xl" | "2xl" }) {
   const safeName = name || "Aluno"; const initials = safeName.substring(0, 2).toUpperCase();
   const sizeClasses: any = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-16 h-16 text-xl", xl: "w-24 h-24 text-2xl", "2xl": "w-40 h-40 text-4xl" };
@@ -75,7 +71,10 @@ const StudentList = ({ students, onSelectStudent, filterType }: any) => {
     </div>
   );
 };
+
+// --- COMPONENTE PRINCIPAL ---
 export default function App() {
+  // ESTADOS GERAIS
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [students, setStudents] = useState<any[]>([]);
@@ -85,30 +84,23 @@ export default function App() {
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'historico' | 'familia'>('perfil');
   
-  // Modais V10.1 (Restaurados)
+  // MODAIS (TODOS)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [isQuickModalOpen, setIsQuickModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false); // Menu Relatórios
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
+  const [isEditorModalOpen, setIsEditorModalOpen] = useState(false); // Docs
+  const [isTermoModalOpen, setIsTermoModalOpen] = useState(false); // Docs
+  
+  // ESTADOS DIVERSOS
   const [importing, setImporting] = useState(false);
   const [projectedStudent, setProjectedStudent] = useState<any | null>(null);
   const [isSensitiveVisible, setIsSensitiveVisible] = useState(false);
   const [radarData, setRadarData] = useState({ assiduidade: 3, participacao: 3, relacionamento: 3, rendimento: 3, tarefas: 3 });
-  
-  // Modais de Documentos (Menu a parte)
-  const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
-  const [isTermoModalOpen, setIsTermoModalOpen] = useState(false);
-  const [docStudent, setDocStudent] = useState<any | null>(null);
-  const [docSearch, setDocSearch] = useState('');
-  const [docType, setDocType] = useState(''); 
-  const [docContent, setDocContent] = useState('');
-  const [termoChecks, setTermoChecks] = useState<string[]>([]);
-
-  // Edição
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(''); const [editClass, setEditClass] = useState(''); const [editGuardian, setEditGuardian] = useState(''); const [editPhone, setEditPhone] = useState(''); const [editAddress, setEditAddress] = useState('');
   const [editNee, setEditNee] = useState(''); const [editCtReason, setEditCtReason] = useState(''); const [editCtCouncil, setEditCtCouncil] = useState(''); const [editCtDate, setEditCtDate] = useState('');
@@ -117,7 +109,14 @@ export default function App() {
   const [dataConselho, setDataConselho] = useState(new Date().toISOString().split('T')[0]);
   const [councilObs, setCouncilObs] = useState(''); const [councilEnc, setCouncilEnc] = useState('');
   
-  // Outros
+  // ESTADOS DE DOCUMENTOS
+  const [docStudent, setDocStudent] = useState<any | null>(null);
+  const [docSearch, setDocSearch] = useState('');
+  const [docType, setDocType] = useState(''); 
+  const [docContent, setDocContent] = useState('');
+  const [termoChecks, setTermoChecks] = useState<string[]>([]);
+
+  // OUTROS ESTADOS
   const [listComportamento, setListComportamento] = useState<string[]>(DEFAULT_COMPORTAMENTO);
   const [listPedagogico, setListPedagogico] = useState<string[]>(DEFAULT_PEDAGOGICO);
   const [listSocial, setListSocial] = useState<string[]>(DEFAULT_SOCIAL);
@@ -141,9 +140,17 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [listClassFilter, setListClassFilter] = useState<string | null>(null);
 
+  // --- EFEITOS E BUSCA DE DADOS ---
   useEffect(() => { const savedAuth = localStorage.getItem('soe_auth'); if (savedAuth === 'true') { setIsAuthenticated(true); fetchStudents(); } }, []);
-  async function fetchStudents() { const { data, error } = await supabase.from('students').select(`*, logs(*), desempenho:desempenho_bimestral(*)`).order('name'); if (!error && data) setStudents(data); }
+  async function fetchStudents() { 
+    setLoading(true);
+    const { data, error } = await supabase.from('students').select(`*, logs(*), desempenho:desempenho_bimestral(*)`).order('name'); 
+    if (!error && data) setStudents(data); 
+    else if (error) console.error("Erro Supabase:", error);
+    setLoading(false);
+  }
 
+  // --- LÓGICA E CÁLCULOS ---
   const checkRisk = (student: any) => { const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; const ult = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; let nV = 0; if (ult) { nV = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf'].filter(disc => ult[disc] !== null && ult[disc] < 5).length; } return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: nV > 3, totalFaltas, notasVermelhas: nV }; };
   const stats = useMemo(() => { const allL = students.flatMap(s => s.logs || []); const last7 = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const c = allL.filter(l => new Date(l.created_at).toDateString() === d.toDateString()).length; return { name: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), total: c }; }).reverse(); const mC: any = {}; allL.forEach(l => { try { const d = JSON.parse(l.description); if (d.motivos) d.motivos.forEach((m: string) => { mC[m] = (mC[m] || 0) + 1; }); } catch (e) { } }); return { last7Days: last7, pieData: Object.keys(mC).map(key => ({ name: key, value: mC[key] })).sort((a, b) => b.value - a.value).slice(0, 5), allLogs: allL }; }, [students]);
   
@@ -173,7 +180,6 @@ export default function App() {
   const generateOfficialDoc = (type: string, content: string = "") => {
       if(!docStudent) return;
       const doc = new jsPDF();
-      
       doc.setFont("times", "bold"); doc.setFontSize(12);
       doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 20, {align: "center"});
       doc.text("SECRETARIA DE ESTADO DE EDUCAÇÃO", 105, 26, {align: "center"});
@@ -191,7 +197,6 @@ export default function App() {
       if (type === 'TERMO') title = "TERMO DE COMPROMISSO";
 
       doc.setFontSize(14); doc.setFont("times", "bold"); doc.text(title, 105, 55, {align: "center"});
-
       autoTable(doc, { startY: 65, head: [['Estudante', 'Turma', 'Responsável']], body: [[docStudent.name, docStudent.class_id, docStudent.guardian_name || '']], theme: 'grid', styles: { font: 'times', fontSize: 10, cellPadding: 2, lineColor: [0,0,0], lineWidth: 0.1 }, headStyles: { fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold' } });
 
       let finalY = (doc as any).lastAutoTable.finalY + 15;
@@ -228,6 +233,8 @@ export default function App() {
   const printStudentData = (doc: jsPDF, student: any) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("FICHA INDIVIDUAL", 105, 20, { align: "center" }); autoTable(doc, { startY: 30, head: [['Dado', 'Valor']], body: [['Nome', student.name], ['Turma', student.class_id], ['Resp.', student.guardian_name]] }); };
   const generatePDF = () => { if (selectedStudent) { const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); } };
   const generateSuperAta = (target: string) => { const cS = students.filter(s => s.class_id === target); if(cS.length === 0) return alert('Vazia'); const doc = new jsPDF({orientation:'landscape'}); autoTable(doc, {head:[['Nome','Faltas']], body: cS.map(s => [s.name, s.desempenho?.[0]?.faltas_bimestre||0])}); doc.save('Ata.pdf'); };
+
+  // --- RENDERIZADORES ---
   const renderDashboard = () => {
     let sR = students.filter(s => { const r = checkRisk(s); return r.reprovadoFalta || r.criticoNotas; });
     const nees = students.filter(s => s.nee_description).length;
@@ -304,7 +311,6 @@ export default function App() {
                       </div>
                   )}
               </div>
-              
               {docStudent && (
                   <div className="bg-white p-8 rounded-2xl shadow-lg border border-slate-200 animate-in slide-in-from-bottom-4">
                       <div className="flex items-center gap-4 mb-6 border-b pb-4">
@@ -374,7 +380,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAIS RESTAURADOS V10.1 */}
+      {/* MODAIS RESTAURADOS V10.1 E ADICIONAIS */}
       {isReportModalOpen && (<div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600" /> Relatórios Gerenciais</h3><button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28} /></button></div><div className="flex-1 overflow-y-auto space-y-6 pr-2"><div className="pt-6 border-t mt-4 flex justify-end"><button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg transition-transform hover:scale-105"><FileSpreadsheet /> Baixar Relatório Completo</button></div></div></div></div>)}
       
       {/* JANELINHA EDITORA DE DOCUMENTOS */}
