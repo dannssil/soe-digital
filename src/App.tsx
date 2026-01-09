@@ -1,6 +1,6 @@
+import * as XLSX from 'xlsx';
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
@@ -81,7 +81,7 @@ export default function App() {
   const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
+   
   // MODAIS
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
@@ -91,7 +91,7 @@ export default function App() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
-  
+   
   const [importing, setImporting] = useState(false);
   const [projectedStudent, setProjectedStudent] = useState<any | null>(null);
   const [isSensitiveVisible, setIsSensitiveVisible] = useState(false); 
@@ -108,7 +108,7 @@ export default function App() {
   const [aiSummary, setAiSummary] = useState('');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const toggleLogExpansion = (id: string) => { setExpandedLogId(expandedLogId === id ? null : id); };
-  
+   
   // States de Edição
   const [editNee, setEditNee] = useState('');
   const [editCtReason, setEditCtReason] = useState('');
@@ -142,11 +142,11 @@ export default function App() {
   useEffect(() => { async function fetchRadar() { const targetClass = conselhoTurma || students[0]?.class_id; if (!targetClass) return; const { data } = await supabase.from('class_radar').select('*').eq('turma', targetClass).eq('bimestre', selectedBimestre).single(); if (data) { setRadarData({ assiduidade: data.assiduidade, participacao: data.participacao, relacionamento: data.relacionamento, rendimento: data.rendimento, tarefas: data.tarefas }); } else { setRadarData({ assiduidade: 3, participacao: 3, relacionamento: 3, rendimento: 3, tarefas: 3 }); } } fetchRadar(); }, [conselhoTurma, selectedBimestre, students]);
 
   async function fetchStudents() { setLoading(true); const { data, error } = await supabase.from('students').select(`*, logs(id, student_id, category, description, created_at, referral, resolved, return_date), desempenho:desempenho_bimestral(*)`) .order('name'); if (!error && data) { const sortedData = data.map((student: any) => ({ ...student, logs: student.logs?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || [], desempenho: student.desempenho || [] })); setStudents(sortedData); } setLoading(false); }
-  
+   
   const addListItem = (listName: string) => { if (!newItem) return; if (listName === 'comp') setListComportamento([...listComportamento, newItem]); if (listName === 'ped') setListPedagogico([...listPedagogico, newItem]); if (listName === 'soc') setListSocial([...listSocial, newItem]); if (listName === 'enc') setListEncaminhamentos([...listEncaminhamentos, newItem]); setNewItem(''); };
   const removeListItem = (listName: string, item: string) => { if (listName === 'comp') setListComportamento(listComportamento.filter(i => i !== item)); if (listName === 'ped') setListPedagogico(listPedagogico.filter(i => i !== item)); if (listName === 'soc') setListSocial(listSocial.filter(i => i !== item)); if (listName === 'enc') setListEncaminhamentos(listEncaminhamentos.filter(i => i !== item)); };
   const toggleItem = (list: string[], setList: any, item: string) => { if (list.includes(item)) setList(list.filter((i: string) => i !== item)); else setList([...list, item]); };
-  
+   
   const startEditing = () => { if (selectedStudent) { setEditName(selectedStudent.name); setEditClass(selectedStudent.class_id); setEditGuardian(selectedStudent.guardian_name || ''); setEditPhone(selectedStudent.guardian_phone || ''); setEditAddress(selectedStudent.address || ''); setEditNee(selectedStudent.nee_description || ''); setEditCtReason(selectedStudent.ct_referral || ''); setEditCtCouncil(selectedStudent.ct_council_name || ''); setEditCtDate(selectedStudent.ct_date || ''); setIsEditing(true); } };
   const saveEdits = async () => { if (!selectedStudent) return; const updates = { name: editName, class_id: editClass, guardian_name: editGuardian, guardian_phone: editPhone, address: editAddress, nee_description: editNee, ct_referral: editCtReason, ct_council_name: editCtCouncil, ct_date: editCtDate || null }; const { error } = await supabase.from('students').update(updates).eq('id', selectedStudent.id); if (!error) { alert('Sucesso!'); setIsEditing(false); fetchStudents(); setIsModalOpen(false); } else alert(error.message); };
   const handleLogin = (e: React.FormEvent) => { e.preventDefault(); if (passwordInput === ACCESS_PASSWORD) { setIsAuthenticated(true); localStorage.setItem('soe_auth', 'true'); fetchStudents(); } };
@@ -160,11 +160,11 @@ export default function App() {
   const togglePraise = async (studentId: string, currentVal: boolean, e: React.MouseEvent) => { e.stopPropagation(); const updatedStudents = students.map(s => s.id === studentId ? { ...s, is_praised: !currentVal } : s); setStudents(updatedStudents); await supabase.from('students').update({ is_praised: !currentVal }).eq('id', studentId); };
   const checkRisk = (student: any) => { const totalFaltas = student.desempenho?.reduce((acc: number, d: any) => acc + (d.faltas_bimestre || 0), 0) || 0; const ultDesempenho = student.desempenho && student.desempenho.length > 0 ? student.desempenho[student.desempenho.length - 1] : null; let notasVermelhas = 0; if (ultDesempenho) { const disciplinas = ['lp', 'mat', 'cie', 'his', 'geo', 'ing', 'art', 'edf']; notasVermelhas = disciplinas.filter(disc => ultDesempenho[disc] !== null && ultDesempenho[disc] < 5).length; } return { reprovadoFalta: totalFaltas >= 280, criticoFalta: totalFaltas >= 200, criticoNotas: notasVermelhas > 3, totalFaltas, notasVermelhas }; };
   const stats = useMemo(() => { const allLogs = students.flatMap(s => s.logs || []); const last7Days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); const count = allLogs.filter(l => new Date(l.created_at).toDateString() === d.toDateString()).length; return { name: dateStr, total: count }; }).reverse(); const motivoCount: any = {}; allLogs.forEach(l => { try { const desc = JSON.parse(l.description); if (desc.motivos) desc.motivos.forEach((m: string) => { motivoCount[m] = (motivoCount[m] || 0) + 1; }); } catch (e) { } }); const pieData = Object.keys(motivoCount).map(key => ({ name: key, value: motivoCount[key] })).sort((a, b) => b.value - a.value).slice(0, 5); return { last7Days, pieData, allLogs }; }, [students]);
-  
+   
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) { if (!e.target.files || e.target.files.length === 0) return; setImporting(true); const file = e.target.files[0]; const reader = new FileReader(); reader.onload = async (evt) => { try { const bstr = evt.target?.result; const workbook = XLSX.read(bstr, { type: 'binary' }); const ws = workbook.Sheets[workbook.SheetNames[0]]; const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]; let headerRowIndex = 0; for (let i = 0; i < rawData.length; i++) { const rowStr = rawData[i].join(' ').toUpperCase(); if (rowStr.includes('ESTUDANTE') || rowStr.includes('NOME')) { headerRowIndex = i; break; } } const data = XLSX.utils.sheet_to_json(ws, { range: headerRowIndex }); const normalizeKey = (key: string) => key.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); let updatedCount = 0; for (const row of (data as any[])) { const rowMap: any = {}; Object.keys(row).forEach(k => rowMap[normalizeKey(k)] = row[k]); const nomeExcel = (rowMap['ESTUDANTE'] || rowMap['NOME'] || rowMap['NOME DO ESTUDANTE'])?.toString().toUpperCase().trim(); if (!nomeExcel) continue; const aluno = students.find(s => s.name.toUpperCase().trim() === nomeExcel); if (aluno) { const updates: any = {}; const rawDate = rowMap['DATA DE NASCIMENTO'] || rowMap['NASCIMENTO'] || rowMap['DN']; if (rawDate) { if (typeof rawDate === 'number') { const jsDate = new Date(Math.round((rawDate - 25569)*86400*1000)); jsDate.setMinutes(jsDate.getMinutes() + jsDate.getTimezoneOffset()); updates.birth_date = jsDate.toISOString(); } else if (typeof rawDate === 'string') { const parts = rawDate.trim().split('/'); if(parts.length === 3) updates.birth_date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).toISOString(); } } if (rowMap['NEE'] || rowMap['DEFICIENCIA']) updates.nee_description = rowMap['NEE'] || rowMap['DEFICIENCIA']; if (rowMap['CONSELHO TUTELAR'] || rowMap['CT']) { updates.ct_council_name = rowMap['CONSELHO TUTELAR'] || rowMap['CT']; updates.ct_referral = rowMap['MOTIVO DO ENCAMINHAMENTO'] || rowMap['MOTIVO']; } if (Object.keys(updates).length > 0) { await supabase.from('students').update(updates).eq('id', aluno.id); updatedCount++; } if(rowMap['LP'] || rowMap['MAT']) { const parseNota = (val: any) => val ? parseFloat(val.toString().replace(',', '.')) : null; await supabase.from('desempenho_bimestral').insert([{ aluno_id: aluno.id, bimestre: selectedBimestre, art: parseNota(rowMap['ART']), cie: parseNota(rowMap['CIE']), edf: parseNota(rowMap['EDF']), geo: parseNota(rowMap['GEO']), his: parseNota(rowMap['HIS']), ing: parseNota(rowMap['ING']), lp: parseNota(rowMap['LP'] || rowMap['L. PORTUGUESA']), mat: parseNota(rowMap['MAT'] || rowMap['MATEMATICA']), pd1: parseNota(rowMap['PD1']), pd2: parseNota(rowMap['PD2']), pd3: parseNota(rowMap['PD3']), faltas_bimestre: rowMap['FALTAS'] ? parseInt(rowMap['FALTAS']) : 0 }]); } } } alert(`Sucesso! ${updatedCount} alunos atualizados.`); setIsImportModalOpen(false); setImporting(false); fetchStudents(); } catch (err) { alert('Erro: ' + err); setImporting(false); } }; reader.readAsBinaryString(file); }
   const handleUpdateGrade = (field: string, value: string) => { if(!projectedStudent) return; const newStudent = { ...projectedStudent }; const bimIndex = newStudent.desempenho.findIndex((d:any) => d.bimestre === selectedBimestre); if (bimIndex >= 0) { const numValue = value === '' ? null : parseFloat(value.replace(',', '.')); newStudent.desempenho[bimIndex][field] = numValue; setProjectedStudent(newStudent); } };
   const handleSaveCouncilChanges = async () => { if(!projectedStudent) return; const d = projectedStudent.desempenho.find((x:any) => x.bimestre === selectedBimestre); if(!d) return; await supabase.from('desempenho_bimestral').update({ lp: d.lp, mat: d.mat, cie: d.cie, his: d.his, geo: d.geo, ing: d.ing, art: d.art, edf: d.edf, pd1: d.pd1, pd2: d.pd2, pd3: d.pd3, faltas_bimestre: d.faltas_bimestre, obs_conselho: councilObs, encaminhamento_conselho: councilEnc }).eq('id', d.id); alert('Salvo!'); fetchStudents(); };
-  
+   
   // FUNCIONALIDADE 1: RESUMO IA
   const generateAiSummary = () => {
       if(!selectedStudent) return;
@@ -173,7 +173,7 @@ export default function App() {
       selectedStudent.logs?.forEach((l: any) => { try { const d = JSON.parse(l.description); d.motivos?.forEach((m: string) => motivos[m] = (motivos[m] || 0) + 1); } catch {} });
       const topMotivo = Object.keys(motivos).sort((a,b) => motivos[b] - motivos[a])[0] || 'diversos';
       const notasVermelhas = selectedStudent.desempenho?.reduce((acc: number, d: any) => acc + [d.lp, d.mat, d.cie, d.his, d.geo].filter(n => n && n < 5).length, 0) || 0;
-      
+       
       const texto = `O estudante ${selectedStudent.name} apresenta um total de ${totalLogs} registros no sistema. O motivo mais recorrente é "${topMotivo}". No aspecto acadêmico, constam ${notasVermelhas} notas abaixo da média no ano. ${totalLogs > 5 ? 'Requer monitoramento constante devido à frequência de ocorrências.' : 'Apresenta um histórico dentro da regularidade.'}`;
       setAiSummary(texto);
   };
@@ -200,7 +200,39 @@ export default function App() {
   const printCTList = () => { const ctStudents = students.filter(s => s.ct_referral); if(ctStudents.length === 0) return alert('Nenhum estudante no Conselho Tutelar.'); const doc = new jsPDF(); doc.setFontSize(14); doc.text("ENCAMINHAMENTOS AO CONSELHO TUTELAR", 105, 20, {align: "center"}); const rows = ctStudents.map(s => [s.name, s.class_id, s.ct_council_name || '-', s.ct_date ? new Date(s.ct_date).toLocaleDateString() : '-', s.ct_referral]); autoTable(doc, { startY: 30, head: [['Nome', 'Turma', 'Conselho', 'Data', 'Motivo']], body: rows }); doc.save("LISTA_CONSELHO_TUTELAR.pdf"); };
   const printStudentData = (doc: jsPDF, student: any) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" }); doc.text("CED 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25); doc.setFontSize(11); doc.text(`FICHA INDIVIDUAL DO ESTUDANTE`, 14, 35); autoTable(doc, { startY: 40, head: [['Informação', 'Detalhe']], body: [['Nome Completo', student.name], ['Turma', student.class_id], ['Data de Nascimento', student.birth_date ? new Date(student.birth_date).toLocaleDateString() : '-'], ['Responsável', student.guardian_name || 'Não informado'], ['Telefone', student.guardian_phone || '-'], ['Endereço', student.address || '-']], theme: 'grid', headStyles: { fillColor: [55, 65, 81] }, columnStyles: { 0: { cellWidth: 50, fontStyle: 'bold' } } }); let currentY = (doc as any).lastAutoTable.finalY + 10; doc.setFontSize(11); doc.setTextColor(0); doc.text("DESEMPENHO ACADÊMICO", 14, currentY); const acadData = student.desempenho?.map((d: any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.pd2, d.pd3, d.faltas_bimestre]) || []; autoTable(doc, { startY: currentY + 5, head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas']], body: acadData, theme: 'grid', headStyles: { fillColor: [55, 65, 81] } }); currentY = (doc as any).lastAutoTable.finalY + 10; doc.text("HISTÓRICO DE ATENDIMENTOS", 14, currentY); const logsData = student.logs?.filter((l: any) => l.student_id === student.id).map((l: any) => { let desc = { obs: '' }; try { desc = JSON.parse(l.description); } catch(e) {} return [new Date(l.created_at).toLocaleDateString(), l.category, desc.obs]; }) || []; autoTable(doc, { startY: currentY + 5, head: [['Data', 'Tipo', 'Detalhes']], body: logsData, theme: 'grid', headStyles: { fillColor: [55, 65, 81] } }); };
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
-  const handleExportReport = () => { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(students); XLSX.utils.book_append_sheet(wb, ws, "Dados"); XLSX.writeFile(wb, `Relatorio_Geral.xlsx`); };
+  
+  // --- FUNÇÃO EXCEL 3 ABAS (ATUALIZADA) ---
+  const handleExportReport = () => {
+    const wb = XLSX.utils.book_new();
+
+    // 1. Aba Resumo
+    const resumo = [
+        { Info: "Total Alunos", Valor: students.length },
+        { Info: "Data", Valor: new Date().toLocaleDateString() },
+        { Info: "Versão", Valor: "v11.1 + Excel Advanced" },
+        { Info: "Usuário", Valor: SYSTEM_USER_NAME }
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumo), "Resumo");
+
+    // 2. Aba Geral
+    const geral = students.map(s => ({
+        ID: s.id,
+        Nome: s.name,
+        Turma: s.class_id,
+        Status: s.status,
+        Responsavel: s.guardian_name || '-',
+        Telefone: s.guardian_phone || '-',
+        NEE: s.nee_description || 'Não'
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(geral), "Base Geral");
+
+    // 3. Aba Risco (Filtro)
+    const risco = geral.filter(s => s.Status === 'CRITICO' || s.Status === 'ATENÇÃO' || (s.NEE !== 'Não'));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(risco), "Alunos em Risco");
+
+    XLSX.writeFile(wb, "Relatorio_Gestao_3Abas.xlsx");
+  };
+
   const handleBackup = () => { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(students); XLSX.utils.book_append_sheet(wb, ws, "Backup"); XLSX.writeFile(wb, `BACKUP_SOE.xlsx`); };
 
   const renderConselho = () => {
@@ -285,12 +317,16 @@ export default function App() {
           <button onClick={() => { setView('dashboard'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><LayoutDashboard size={18} /> <span className="font-medium text-sm">Dashboard</span></button>
           <button onClick={() => { setView('students'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'students' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><Users size={18} /> <span className="font-medium text-sm">Alunos</span></button>
           <button onClick={() => { setView('conselho'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'conselho' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><GraduationCap size={18} /> <span className="font-medium text-sm">Conselho de Classe</span></button>
-          <div className="pt-4 mt-4 border-t border-white/10"><button onClick={() => { setIsReportModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-white/5 hover:text-white"><FileBarChart2 size={18} /> <span className="font-medium text-sm">Relatórios</span></button><button onClick={handleBackup} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-white/5 hover:text-white"><Database size={18} /> <span className="font-medium text-sm">Backup</span></button><button onClick={() => { setIsSettingsModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-white/5 hover:text-white"><Settings size={18} /> <span className="font-medium text-sm">Configurações</span></button></div>
+          <div className="pt-4 mt-4 border-t border-white/10">
+            <button onClick={() => { setIsReportModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-white/5 hover:text-white"><FileBarChart2 size={18} /> <span className="font-medium text-sm">Relatórios</span></button>
+            <button onClick={handleBackup} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-white/5 hover:text-white"><Database size={18} /> <span className="font-medium text-sm">Backup</span></button>
+            <button onClick={() => { setIsSettingsModalOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-white/5 hover:text-white"><Settings size={18} /> <span className="font-medium text-sm">Configurações</span></button>
+          </div>
         </nav>
         <div className="p-4 bg-[#151521] border-t border-white/5">
           <div className="flex items-center gap-3 mb-3"><Avatar name={SYSTEM_USER_NAME} src={adminPhoto} size="sm"/><div className="overflow-hidden"><p className="font-bold text-white text-xs truncate">{SYSTEM_USER_NAME}</p><p className="text-[10px] text-slate-400 truncate">{SYSTEM_MATRICULA}</p></div></div>
           <button onClick={() => { localStorage.removeItem('soe_auth'); window.location.reload(); }} className="flex items-center gap-2 text-[10px] text-red-400 hover:text-red-300 transition-colors w-full"><LogOut size={12} /> Sair do Sistema</button>
-          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves da Silva</span></div><span className="text-[8px]">v11.1 Intelligence</span></div>
+          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-slate-500"><div className="flex items-center gap-1"><Code size={10}/> <span className="text-[8px] font-bold uppercase">Dev: Daniel Alves da Silva</span></div><span className="text-[8px]">v11.1 Excel+</span></div>
         </div>
       </aside>
 
@@ -336,47 +372,133 @@ export default function App() {
         {isEditing && <button onClick={saveEdits} className="w-full bg-green-600 text-white p-4 rounded-xl font-bold mt-6 shadow-lg">Salvar Alterações</button>}</div>)}
         {activeTab === 'academico' && (<div className="bg-white rounded-2xl border shadow-sm overflow-x-auto w-full"><table className="w-full text-sm text-left"><thead className="bg-slate-100 text-[10px] font-bold uppercase text-slate-500 border-b"><tr><th className="px-4 py-4">Bimestre</th><th className="px-2">Português</th><th className="px-2">Matemática</th><th className="px-2">Ciências</th><th className="px-2">História</th><th className="px-2">Geografia</th><th className="px-2">Inglês</th><th className="px-2">Arte</th><th className="px-2">Ed. Física</th><th className="px-2 bg-slate-200">PD1</th><th className="px-2 bg-slate-200">PD2</th><th className="px-2 bg-slate-200">PD3</th><th className="px-4 text-red-600 bg-red-50 text-center">FALTAS</th></tr></thead><tbody className="divide-y divide-slate-100">{selectedStudent.desempenho?.map((d: any, i: number) => (<tr key={i} className="hover:bg-slate-50"><td className="px-4 py-5 font-bold text-slate-700">{d.bimestre}</td><td className={`px-2 font-bold ${d.lp < 5 ? 'text-red-500' : 'text-indigo-900'}`}>{d.lp}</td><td className={`px-2 font-bold ${d.mat < 5 ? 'text-red-500' : 'text-indigo-900'}`}>{d.mat}</td><td className={`px-2 font-bold ${d.cie < 5 ? 'text-red-500' : 'text-indigo-900'}`}>{d.cie}</td><td className={`px-2 font-bold ${d.his < 5 ? 'text-red-500' : 'text-indigo-900'}`}>{d.his}</td><td className={`px-2 font-bold ${d.geo < 5 ? 'text-red-500' : 'text-indigo-900'}`}>{d.geo}</td><td className={`px-2 font-bold ${d.ing < 5 ? 'text-red-500' : 'text-indigo-900'}`}>{d.ing}</td><td className={`px-2 font-bold ${d.art < 5 ? 'text-red-500' : 'text-indigo-900'}`}>{d.art}</td><td className={`px-2 font-bold ${d.edf < 5 ? 'text-red-500' : 'text-indigo-900'}`}>{d.edf}</td><td className="px-2 bg-slate-50 font-bold text-slate-700">{d.pd1}</td><td className="px-2 bg-slate-50 font-bold text-slate-700">{d.pd2}</td><td className="px-2 bg-slate-50 font-bold text-slate-700">{d.pd3}</td><td className="px-4 font-bold text-red-600 bg-red-50 text-center">{d.faltas_bimestre}</td></tr>))}</tbody></table></div>)}
         {(activeTab === 'historico' || activeTab === 'familia') && (<div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full h-full"><div className={`lg:col-span-8 p-8 rounded-2xl border shadow-sm h-full flex flex-col ${activeTab === 'familia' ? 'bg-orange-50 border-orange-200' : 'bg-white border-indigo-100'}`}><h3 className="font-bold mb-6 uppercase text-sm flex items-center gap-2 pb-4 border-b border-black/5">{activeTab === 'familia' ? <><Users2 /> Novo Atendimento Família</> : <><FileText /> Novo Atendimento Estudante</>}</h3><div className="space-y-6 flex-1 flex flex-col"><div className="grid grid-cols-2 gap-4"><div><label className="text-xs font-bold text-slate-400 uppercase">Solicitante</label><select title="sol" className="w-full mt-1 p-3 border rounded-lg bg-white" value={solicitante} onChange={e => setSolicitante(e.target.value)}><option>Professor</option><option>Coordenação</option><option>Responsável</option><option>Disciplinar</option></select></div><div><label className="text-xs font-bold text-slate-400 uppercase">Encaminhar</label><select title="enc" className="w-full mt-1 p-3 border rounded-lg bg-white" value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)}><option value="">-- Selecione --</option>{listEncaminhamentos.map(e => <option key={e}>{e}</option>)}</select></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Data</label><input type="date" title="date" className="w-full mt-1 p-3 border rounded-lg bg-white" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} /></div><div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Retorno</label><input type="date" title="ret" className="w-full mt-1 p-3 border rounded-lg bg-white" value={returnDate} onChange={e => setReturnDate(e.target.value)} /></div></div><div className="border p-4 rounded-xl bg-white/50 space-y-4"><div className="grid grid-cols-3 gap-4"><div><p className="text-[10px] font-bold text-orange-600 uppercase mb-2">Comportamental</p><div className="flex flex-col gap-1">{listComportamento.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)} /> {m}</label>))}</div></div><div><p className="text-[10px] font-bold text-blue-600 uppercase mb-2">Pedagógico</p><div className="flex flex-col gap-1">{listPedagogico.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)} /> {m}</label>))}</div></div><div><p className="text-[10px] font-bold text-purple-600 uppercase mb-2">Social/Outros</p><div className="flex flex-col gap-1">{listSocial.map(m => (<label key={m} className="text-xs flex gap-2 cursor-pointer hover:bg-white p-1 rounded"><input type="checkbox" checked={motivosSelecionados.includes(m)} onChange={() => toggleItem(motivosSelecionados, setMotivosSelecionados, m)} /> {m}</label>))}</div></div></div></div><div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex-1 flex flex-col"><label className="text-center block text-sm font-bold text-slate-600 uppercase mb-2 tracking-widest bg-slate-200 py-1 rounded">RELATÓRIO DE ATENDIMENTO</label><textarea title="rel" className="w-full p-4 border rounded-xl flex-1 text-sm bg-white" rows={12} value={obsLivre} onChange={e => setObsLivre(e.target.value)} /></div><div className="flex justify-between items-center pt-4 border-t border-slate-200"><div className="text-xs text-slate-400 font-mono"><p>Registrado por: <span className="font-bold text-slate-600">{SYSTEM_USER_NAME}</span></p><p>{SYSTEM_ROLE} | {SYSTEM_ORG} | Mat. {SYSTEM_MATRICULA} | {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p></div><div className="flex items-center gap-4"><label className="text-sm font-bold text-green-700 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="w-5 h-5 rounded" checked={resolvido} onChange={e => setResolvido(e.target.checked)} /> <ShieldCheck size={18} /> Resolvido</label><button onClick={handleSaveLog} className={`text-white px-8 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 ${activeTab === 'familia' ? 'bg-orange-600' : 'bg-indigo-600'}`}><Save size={18} /> SALVAR REGISTRO</button></div></div></div></div>
-        {/* NOVA TIMELINE VISUAL E RESUMO IA */}
-        <div className="lg:col-span-4 space-y-4 max-h-[800px] overflow-y-auto pr-2 bg-white border-l border-slate-100 pl-6 py-6 h-full relative">
-            <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-6"><History size={14} /> Linha do Tempo</h3>
-            
-            {/* CARD DE RESUMO IA */}
-            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
-                <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-xs font-bold text-indigo-700 flex items-center gap-2"><Sparkles size={14}/> Resumo Inteligente</h4>
-                    <button onClick={generateAiSummary} className="text-[10px] bg-white border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-100 text-indigo-600 font-bold">Gerar</button>
+            {/* NOVA TIMELINE VISUAL E RESUMO IA */}
+            <div className="lg:col-span-4 space-y-4 max-h-[800px] overflow-y-auto pr-2 bg-white border-l border-slate-100 pl-6 py-6 h-full relative">
+                <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-6"><History size={14} /> Linha do Tempo</h3>
+                 
+                {/* CARD DE RESUMO IA */}
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
+                    <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-xs font-bold text-indigo-700 flex items-center gap-2"><Sparkles size={14}/> Resumo Inteligente</h4>
+                        <button onClick={generateAiSummary} className="text-[10px] bg-white border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-100 text-indigo-600 font-bold">Gerar</button>
+                    </div>
+                    {aiSummary ? <p className="text-xs text-indigo-800 leading-relaxed italic">{aiSummary}</p> : <p className="text-[10px] text-indigo-400 text-center py-2">Clique em Gerar para análise automática.</p>}
                 </div>
-                {aiSummary ? <p className="text-xs text-indigo-800 leading-relaxed italic">{aiSummary}</p> : <p className="text-[10px] text-indigo-400 text-center py-2">Clique em Gerar para análise automática.</p>}
-            </div>
 
-            {/* TIMELINE */}
-            <div className="border-l-2 border-slate-100 ml-3 space-y-8 pb-10">
-                {selectedStudent.logs?.filter((l: any) => l.student_id === selectedStudent.id).map((log: any) => { 
-                    let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch (e) { } 
-                    const isFamily = log.category === 'Família';
-                    const icon = isFamily ? <Users2 size={12} className="text-white"/> : <FileText size={12} className="text-white"/>;
-                    const color = isFamily ? 'bg-orange-500' : 'bg-indigo-500';
+                {/* TIMELINE */}
+                <div className="border-l-2 border-slate-100 ml-3 space-y-8 pb-10">
+                    {selectedStudent.logs?.filter((l: any) => l.student_id === selectedStudent.id).map((log: any) => { 
+                        let p = { obs: log.description, motivos: [], solicitante: '' }; try { p = JSON.parse(log.description); } catch (e) { } 
+                        const isFamily = log.category === 'Família';
+                        const icon = isFamily ? <Users2 size={12} className="text-white"/> : <FileText size={12} className="text-white"/>;
+                        const color = isFamily ? 'bg-orange-500' : 'bg-indigo-500';
 
-                    return (
-                        <div key={log.id} className="relative pl-8">
-                            <div className={`absolute -left-[9px] top-0 w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center ${color} z-10`}>{icon}</div>
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 hover:shadow-md transition-shadow group">
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="text-[10px] font-bold text-slate-400">{new Date(log.created_at).toLocaleDateString()}</span>
-                                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${isFamily ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>{log.category}</span>
+                        return (
+                            <div key={log.id} className="relative pl-8">
+                                <div className={`absolute -left-[9px] top-0 w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center ${color} z-10`}>{icon}</div>
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 hover:shadow-md transition-shadow group">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <span className="text-[10px] font-bold text-slate-400">{new Date(log.created_at).toLocaleDateString()}</span>
+                                        <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${isFamily ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>{log.category}</span>
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-700 mb-1">{p.motivos?.join(', ') || 'Atendimento Geral'}</p>
+                                    <p className="text-xs text-slate-500 line-clamp-3 group-hover:line-clamp-none transition-all duration-300">"{p.obs}"</p>
                                 </div>
-                                <p className="text-xs font-bold text-slate-700 mb-1">{p.motivos?.join(', ') || 'Atendimento Geral'}</p>
-                                <p className="text-xs text-slate-500 line-clamp-3 group-hover:line-clamp-none transition-all duration-300">"{p.obs}"</p>
                             </div>
-                        </div>
-                    ) 
-                })}
+                        ) 
+                    })}
+                </div>
             </div>
-        </div>
-        </div>)}</div></div></div>)}
+            </div>)}</div></div></div>)}
 
       {/* OUTROS MODAIS */}
-      {isReportModalOpen && (<div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]"><div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3"><FileBarChart2 className="text-indigo-600" /> Relatórios Gerenciais</h3><button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={28} /></button></div><div className="flex-1 overflow-y-auto space-y-6 pr-2"><div className="pt-6 border-t mt-4 flex justify-end"><button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg transition-transform hover:scale-105"><FileSpreadsheet /> Baixar Relatório Completo</button></div></div></div></div>)}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 flex flex-col h-[80vh]">
+            <div className="flex justify-between items-center mb-6 flex-shrink-0">
+              <h3 className="text-2xl font-bold text-indigo-800 flex items-center gap-3">
+                <FileBarChart2 className="text-indigo-600" /> Relatórios Gerenciais
+              </h3>
+              <button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-red-500">
+                <X size={28} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto pr-2">
+              {(() => {
+                  const allLogs = students.flatMap(s => s.logs || []);
+                  const totalCalls = allLogs.length;
+                  const resolvedCalls = allLogs.filter(l => l.resolved).length;
+                  const recurrentStudents = students.filter(s => (s.logs?.length || 0) >= 3);
+                  
+                  const motivoCount: any = {};
+                  allLogs.forEach(l => {
+                      try {
+                          const desc = JSON.parse(l.description);
+                          if (desc.motivos) desc.motivos.forEach((m: string) => { motivoCount[m] = (motivoCount[m] || 0) + 1; });
+                      } catch (e) { }
+                  });
+                  const sortedMotivos = Object.keys(motivoCount).map(key => ({ name: key, count: motivoCount[key] })).sort((a, b) => b.count - a.count).slice(0, 5);
+                  
+                  return (
+                      <div className="space-y-6">
+                        {/* 1. CARDS DE ESTATÍSTICA (INTERATIVOS) */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                           <div onClick={() => { setDashboardFilterType('WITH_LOGS'); setView('students'); setIsReportModalOpen(false); }} className="cursor-pointer hover:scale-105 transition-transform hover:shadow-md bg-indigo-50 border border-indigo-100 p-6 rounded-xl text-center group">
+                              <h4 className="text-xs font-bold text-indigo-400 uppercase mb-2 group-hover:text-indigo-600">Total Atendimentos</h4>
+                              <p className="text-4xl font-black text-indigo-700">{totalCalls}</p>
+                           </div>
+                           <div onClick={() => { setDashboardFilterType('RESOLVED'); setView('students'); setIsReportModalOpen(false); }} className="cursor-pointer hover:scale-105 transition-transform hover:shadow-md bg-emerald-50 border border-emerald-100 p-6 rounded-xl text-center group">
+                              <h4 className="text-xs font-bold text-emerald-400 uppercase mb-2 group-hover:text-emerald-600">Casos Resolvidos</h4>
+                              <p className="text-4xl font-black text-emerald-600">{resolvedCalls}</p>
+                           </div>
+                           <div onClick={() => { setDashboardFilterType('RECURRENT'); setView('students'); setIsReportModalOpen(false); }} className="cursor-pointer hover:scale-105 transition-transform hover:shadow-md bg-amber-50 border border-amber-100 p-6 rounded-xl text-center group">
+                              <h4 className="text-xs font-bold text-amber-400 uppercase mb-2 group-hover:text-amber-600">Alunos Recorrentes</h4>
+                              <p className="text-4xl font-black text-amber-600">{recurrentStudents.length}</p>
+                           </div>
+                        </div>
+
+                        {/* 2. LISTAS (RESTAURADAS) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                              <h4 className="font-bold text-slate-600 text-sm uppercase mb-4 border-b pb-2">Top 5 Motivos</h4>
+                              <div className="space-y-2">
+                                  {sortedMotivos.map((m, idx) => (
+                                      <div key={idx} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded">
+                                          <span className="text-sm font-medium text-slate-700">{m.name}</span>
+                                          <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">{m.count}</span>
+                                      </div>
+                                  ))}
+                              </div>
+                           </div>
+                           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                              <h4 className="font-bold text-slate-600 text-sm uppercase mb-4 border-b pb-2">Alunos com +3 Atendimentos</h4>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                  {recurrentStudents.slice(0, 5).map((s, idx) => (
+                                      <div key={idx} onClick={() => { setSelectedStudent(s); setIsModalOpen(true); }} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded cursor-pointer group">
+                                          <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-700 uppercase group-hover:text-indigo-600">{s.name}</span>
+                                            <span className="text-[10px] text-slate-400">{s.class_id}</span>
+                                          </div>
+                                          <span className="bg-red-100 text-red-600 px-2 py-1 rounded text-xs font-bold group-hover:bg-red-200">{s.logs.length}</span>
+                                      </div>
+                                  ))}
+                              </div>
+                           </div>
+                        </div>
+                      </div>
+                  );
+              })()}
+            </div>
+            
+            {/* BOTÃO VERDE (COM EXCEL 3 ABAS) */}
+            <div className="pt-6 border-t mt-4 flex justify-end">
+                <button onClick={handleExportReport} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg transition-transform hover:scale-105">
+                    <FileSpreadsheet size={20}/> Baixar Relatório Completo
+                </button>
+            </div>
+          </div>
+        </div>
+      )}
       {isExitModalOpen && (<div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"><h3 className="text-xl font-bold mb-4 text-red-600">Registrar Saída de Aluno</h3><div className="space-y-4"><div className="flex gap-4 bg-slate-100 p-2 rounded-lg"><label className="flex items-center gap-2 font-bold text-sm cursor-pointer"><input type="radio" name="exitType" checked={exitType === 'TRANSFERIDO'} onChange={() => setExitType('TRANSFERIDO')} /> TRANSFERÊNCIA</label><label className="flex items-center gap-2 font-bold text-sm text-red-600 cursor-pointer"><input type="radio" name="exitType" checked={exitType === 'ABANDONO'} onChange={() => setExitType('ABANDONO')} /> ABANDONO</label></div><textarea className="w-full p-3 border rounded-xl h-24" placeholder="Motivo detalhado da saída..." value={exitReason} onChange={e => setExitReason(e.target.value)} /><div className="flex justify-end gap-2"><button onClick={() => setIsExitModalOpen(false)} className="px-4 py-2 font-bold text-slate-500">CANCELAR</button><button onClick={handleRegisterExit} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700 shadow-lg">CONFIRMAR SAÍDA</button></div></div></div></div>)}
       {isImportModalOpen && (<div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"><h3 className="text-xl font-bold mb-4 text-indigo-600 flex items-center gap-2"><FileSpreadsheet size={24} /> Importar Excel</h3><div className="space-y-4"><div><label className="block text-sm font-bold text-slate-700 mb-1">Bimestre de Referência</label><select title="bim" className="w-full p-3 border rounded-xl" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select></div><div className="border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center bg-indigo-50">{importing ? <p className="animate-pulse font-bold text-indigo-600">Sincronizando...</p> : <input title="file" type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="w-full text-sm" />}</div><div className="flex justify-end"><button onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold">Fechar</button></div></div></div></div>)}
       {isNewStudentModalOpen && (<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl"><h3 className="font-bold text-xl mb-6 text-indigo-900">Cadastrar Novo Aluno</h3><form onSubmit={handleAddStudent} className="space-y-4"><div><label className="text-xs font-bold uppercase text-slate-400">Nome Completo</label><input title="nome" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div><div><label className="text-xs font-bold uppercase text-slate-400">Turma</label><input title="turma" value={newClass} onChange={e => setNewClass(e.target.value)} className="w-full p-3 border rounded-xl mt-1" required /></div><div className="flex gap-3 mt-6"><button type="button" onClick={() => setIsNewStudentModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold">Cancelar</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg">Salvar</button></div></form></div></div>)}
