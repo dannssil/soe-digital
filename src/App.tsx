@@ -100,6 +100,7 @@ export default function App() {
   const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [selectedMotive, setSelectedMotive] = useState<string | null>(null);
    
   // MODAIS
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -255,13 +256,10 @@ export default function App() {
         if (i > 0) doc.addPage(); // Nova página para cada turma
 
         const councilStudents = students.filter(s => s.class_id === turma);
-        
-        // Tenta buscar dados do radar específicos da turma (se existirem)
         let localRadar = { assiduidade: 3, participacao: 3, relacionamento: 3, rendimento: 3, tarefas: 3 };
         const { data } = await supabase.from('class_radar').select('*').eq('turma', turma).eq('bimestre', selectedBimestre).single();
         if (data) localRadar = data;
 
-        // --- INÍCIO DO CONTEÚDO DA PÁGINA (Igual Super Ata) ---
         const headerEndY = addDocHeader(doc, 'l');
         doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(`ATA DE CONSELHO DE CLASSE - ${turma}`, doc.internal.pageSize.getWidth()/2, headerEndY + 10, {align: "center"}); 
         doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`${selectedBimestre} | Data: ${new Date(dataConselho).toLocaleDateString('pt-BR')} | ${SYSTEM_ORG}`, doc.internal.pageSize.getWidth()/2, headerEndY + 16, {align: "center"});
@@ -279,7 +277,6 @@ export default function App() {
         const baixoRendimento = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); if (!d) return false; return [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf].filter(n => n !== null && n < 5).length > 3; }); createSection("📉 BAIXO RENDIMENTO", baixoRendimento.map(s => [s.name, 'Convocação']), [180, 83, 9], [['Nome', 'Ação']]);
         const faltosos = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && d.faltas_bimestre > 20; }); createSection("🚨 BUSCA ATIVA (Faltas > 20)", faltosos.map(s => [s.name, s.desempenho?.find((x:any) => x.bimestre === selectedBimestre)?.faltas_bimestre]), [185, 28, 28], [['Nome', 'Faltas']]);
         const deliberacoes = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && (d.obs_conselho || d.encaminhamento_conselho); }); createSection("📝 OBSERVAÇÕES FINAIS", deliberacoes.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return [s.name, d.obs_conselho || '', d.encaminhamento_conselho || '']; }), [75, 85, 99], [['Estudante', 'Obs', 'Encaminhamento']]);
-        
         addDocSignature(doc);
     }
     doc.save("ATA_GERAL_TODAS_TURMAS.pdf");
@@ -445,6 +442,18 @@ export default function App() {
     if (dashboardFilterType === 'RESOLVED') return s.logs?.some((l:any) => l.resolved); 
     if (dashboardFilterType === 'RECURRENT') return (s.logs?.length || 0) >= 3; 
     if (dashboardFilterType === 'WITH_LOGS') return (s.logs?.length || 0) > 0; 
+    
+    // FILTRO INTERATIVO POR MOTIVO
+    if (selectedMotive) {
+        const hasTheMotive = s.logs?.some((l:any) => {
+            try {
+                const d = JSON.parse(l.description);
+                return d.motivos?.includes(selectedMotive);
+            } catch(e) { return false; }
+        });
+        if (!hasTheMotive) return false;
+    }
+
     return !globalSearch || s.name.toLowerCase().includes(globalSearch.toLowerCase()); 
   });
 
@@ -453,7 +462,7 @@ export default function App() {
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-[#1E1E2D] text-white flex flex-col shadow-2xl transition-transform duration-300 md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex items-center gap-3 border-b border-white/10"><div className="bg-indigo-600 p-2 rounded-lg"><BookOpen size={20} /></div><div><h1 className="font-bold text-lg tracking-tight">SOE Digital</h1><p className="text-[10px] uppercase text-slate-400 font-bold">{SYSTEM_ORG}</p></div></div>
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <button onClick={() => { setView('dashboard'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><LayoutDashboard size={18} /> <span className="font-medium text-sm">Dashboard</span></button>
+          <button onClick={() => { setView('dashboard'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); setSelectedMotive(null); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><LayoutDashboard size={18} /> <span className="font-medium text-sm">Dashboard</span></button>
           <button onClick={() => { setView('students'); setDashboardFilterType('ALL'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'students' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><Users size={18} /> <span className="font-medium text-sm">Alunos</span></button>
           <button onClick={() => { setView('conselho'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${view === 'conselho' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><GraduationCap size={18} /> <span className="font-medium text-sm">Conselho de Classe</span></button>
           <div className="pt-4 mt-4 border-t border-white/10">
@@ -477,7 +486,16 @@ export default function App() {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {view === 'dashboard' && renderDashboard()}
-          {view === 'students' && (<div className="max-w-[1600px] mx-auto pb-20 w-full h-full flex flex-col"><div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4"><div><h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Users className="text-indigo-600"/> Gestão de Estudantes</h2><p className="text-xs text-slate-500 mt-1">Gerencie matrículas, ocorrências e dados acadêmicos.</p></div><div className="flex gap-2"><button onClick={() => setIsImportModalOpen(true)} className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg font-bold shadow-sm flex items-center gap-2 hover:bg-slate-50 text-sm transition-all"><FileSpreadsheet size={16} /> Importar</button><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-indigo-200 flex items-center gap-2 hover:bg-indigo-700 text-sm transition-all"><Plus size={16} /> Novo Aluno</button></div></div>{dashboardFilterType !== 'ALL' && (<div className="bg-indigo-50 border-indigo-100 border p-3 rounded-xl mb-4 flex items-center justify-between"><span className="font-bold text-indigo-700 flex items-center gap-2 text-sm"><Filter size={16}/> Filtrando por: {dashboardFilterType} ({filteredStudents.length})</span><button onClick={() => setDashboardFilterType('ALL')} className="text-xs font-bold text-slate-500 hover:text-indigo-600 underline">Limpar Filtros</button></div>)}<div className="mb-4 flex gap-2 overflow-x-auto pb-2 scrollbar-thin"><button onClick={() => setListClassFilter(null)} className={`px-4 py-1.5 rounded-full font-bold text-xs whitespace-nowrap border transition-all ${!listClassFilter ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>Todos</button>{turmasList.map(t => (<button key={t} onClick={() => setListClassFilter(t)} className={`px-4 py-1.5 rounded-full font-bold text-xs whitespace-nowrap border flex items-center gap-2 transition-all ${listClassFilter === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>{t}</button>))}</div><div className="flex-1 min-h-0"><StudentList students={filteredStudents} onSelectStudent={(s: any) => { setSelectedStudent(s); setIsModalOpen(true); }} filterType={dashboardFilterType} /></div></div>)}
+          {view === 'students' && (<div className="max-w-[1600px] mx-auto pb-20 w-full h-full flex flex-col"><div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4"><div><h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Users className="text-indigo-600"/> Gestão de Estudantes</h2><p className="text-xs text-slate-500 mt-1">Gerencie matrículas, ocorrências e dados acadêmicos.</p></div><div className="flex gap-2"><button onClick={() => setIsImportModalOpen(true)} className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg font-bold shadow-sm flex items-center gap-2 hover:bg-slate-50 text-sm transition-all"><FileSpreadsheet size={16} /> Importar</button><button onClick={() => setIsNewStudentModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-indigo-200 flex items-center gap-2 hover:bg-indigo-700 text-sm transition-all"><Plus size={16} /> Novo Aluno</button></div></div>
+          
+          {selectedMotive && (
+              <div className="bg-indigo-600 text-white p-3 rounded-xl mb-4 flex items-center justify-between shadow-md">
+                  <span className="font-bold flex items-center gap-2 text-sm"><Filter size={16}/> Filtrando por Motivo: "{selectedMotive}" ({filteredStudents.length})</span>
+                  <button onClick={() => setSelectedMotive(null)} className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition-colors flex items-center gap-2"><X size={14}/> Limpar Filtro</button>
+              </div>
+          )}
+
+          {dashboardFilterType !== 'ALL' && (<div className="bg-indigo-50 border-indigo-100 border p-3 rounded-xl mb-4 flex items-center justify-between"><span className="font-bold text-indigo-700 flex items-center gap-2 text-sm"><Filter size={16}/> Filtrando por: {dashboardFilterType} ({filteredStudents.length})</span><button onClick={() => setDashboardFilterType('ALL')} className="text-xs font-bold text-slate-500 hover:text-indigo-600 underline">Limpar Filtros</button></div>)}<div className="mb-4 flex gap-2 overflow-x-auto pb-2 scrollbar-thin"><button onClick={() => setListClassFilter(null)} className={`px-4 py-1.5 rounded-full font-bold text-xs whitespace-nowrap border transition-all ${!listClassFilter ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>Todos</button>{turmasList.map(t => (<button key={t} onClick={() => setListClassFilter(t)} className={`px-4 py-1.5 rounded-full font-bold text-xs whitespace-nowrap border flex items-center gap-2 transition-all ${listClassFilter === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>{t}</button>))}</div><div className="flex-1 min-h-0"><StudentList students={filteredStudents} onSelectStudent={(s: any) => { setSelectedStudent(s); setIsModalOpen(true); }} filterType={dashboardFilterType} /></div></div>)}
           {view === 'conselho' && renderConselho()}
         </div>
       </main>
@@ -612,11 +630,13 @@ export default function App() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                              <h4 className="font-bold text-slate-600 text-sm uppercase mb-4 border-b pb-2">Top 5 Motivos</h4>
+                              <h4 className="font-bold text-slate-600 text-sm uppercase mb-4 border-b pb-2">Top 5 Motivos (Clique para Filtrar)</h4>
                               <div className="space-y-2">
                                   {sortedMotivos.map((m, idx) => (
-                                      <div key={idx} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded">
-                                          <span className="text-sm font-medium text-slate-700">{m.name}</span>
+                                      <div key={idx} 
+                                           onClick={() => { setSelectedMotive(m.name); setDashboardFilterType('ALL'); setView('students'); setIsReportModalOpen(false); }}
+                                           className="flex justify-between items-center p-2 hover:bg-slate-50 rounded cursor-pointer group transition-colors border border-transparent hover:border-slate-200">
+                                          <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-600">{m.name}</span>
                                           <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">{m.count}</span>
                                       </div>
                                   ))}
@@ -626,7 +646,7 @@ export default function App() {
                               <h4 className="font-bold text-slate-600 text-sm uppercase mb-4 border-b pb-2">Alunos com +3 Atendimentos</h4>
                               <div className="space-y-2 max-h-48 overflow-y-auto">
                                   {recurrentStudents.slice(0, 5).map((s, idx) => (
-                                      <div key={idx} onClick={() => { setSelectedStudent(s); setIsModalOpen(true); }} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded cursor-pointer group">
+                                      <div key={idx} onClick={() => { setIsReportModalOpen(false); setSelectedStudent(s); setIsModalOpen(true); }} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded cursor-pointer group border border-transparent hover:border-slate-200">
                                           <div className="flex flex-col">
                                             <span className="text-sm font-bold text-slate-700 uppercase group-hover:text-indigo-600">{s.name}</span>
                                             <span className="text-[10px] text-slate-400">{s.class_id}</span>
