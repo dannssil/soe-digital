@@ -11,7 +11,7 @@ import {
   ChevronRight, Copy, History, GraduationCap, Printer, FileBarChart2, Database, Settings, Trash2, 
   Maximize2, MonitorPlay, Eye, EyeOff, Filter, Calendar, ClipboardList, ArrowLeft, Home, ChevronLeft, 
   Star, Activity, Heart, Brain, PenTool, Copyright, Code, PieChart as PieChartIcon, FileOutput, ThumbsUp, 
-  Puzzle, Scale, Cake, Siren, Bell, ListChecks, FileInput, Book, FileSignature, Sparkles 
+  Puzzle, Scale, Cake, Siren, Bell, ListChecks, FileInput, Book, FileSignature, Sparkles, Layers 
 } from 'lucide-react';
 
 // --- CONEXÃO ---
@@ -224,40 +224,15 @@ export default function App() {
       doc.text(DOC_SIGNATURE[2], centerX, y + 10, { align: "center" });
   };
 
-  // --- SUPER ATA (CORES SUAVES + INSTITUCIONAL) ---
+  // --- SUPER ATA (INDIVIDUAL) ---
   const generateSuperAta = (targetClass: string) => {
     const councilStudents = students.filter(s => s.class_id === targetClass); if(councilStudents.length === 0) return alert('Turma vazia'); const doc = new jsPDF({ orientation: 'landscape' });
-    
-    // CABEÇALHO
     const headerEndY = addDocHeader(doc, 'l');
-    
     doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(`ATA DE CONSELHO DE CLASSE - ${targetClass}`, doc.internal.pageSize.getWidth()/2, headerEndY + 10, {align: "center"}); 
     doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`${selectedBimestre} | Data: ${new Date(dataConselho).toLocaleDateString('pt-BR')} | ${SYSTEM_ORG}`, doc.internal.pageSize.getWidth()/2, headerEndY + 16, {align: "center"});
-    
     autoTable(doc, { startY: headerEndY + 22, head: [['Indicador', 'Assiduidade', 'Participação', 'Relacionamento', 'Rendimento', 'Tarefas']], body: [[ 'Avaliação da Turma (0-5)', radarData.assiduidade, radarData.participacao, radarData.relacionamento, radarData.rendimento, radarData.tarefas ]], theme: 'grid', styles: { fontSize: 8, halign: 'center' }, headStyles: { fillColor: [55, 65, 81] } });
-    
-    const rows = councilStudents.map(s => { 
-        const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {}; 
-        return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.geo||'-', d.ing||'-', d.art||'-', d.edf||'-', d.pd1||'-', d.pd2||'-', d.pd3||'-', d.faltas_bimestre||0, s.logs?.length||0]; 
-    });
-
-    autoTable(doc, { 
-        startY: (doc as any).lastAutoTable.finalY + 10, 
-        head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas', 'Ocorr.']], 
-        body: rows, 
-        styles: { fontSize: 7, cellPadding: 2 }, 
-        headStyles: { fillColor: [30, 41, 59] },
-        didParseCell: (data) => {
-            if (data.section === 'body' && data.column.index >= 1 && data.column.index <= 10) {
-                const val = parseFloat(data.cell.text[0]);
-                if (!isNaN(val)) {
-                    if (val < 5) data.cell.styles.textColor = [185, 28, 28]; // Vermelho
-                    else data.cell.styles.textColor = [37, 99, 235]; // Azul
-                }
-            }
-        }
-    });
-
+    const rows = councilStudents.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {}; return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.geo||'-', d.ing||'-', d.art||'-', d.edf||'-', d.pd1||'-', d.pd2||'-', d.pd3||'-', d.faltas_bimestre||0, s.logs?.length||0]; });
+    autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 10, head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas', 'Ocorr.']], body: rows, styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [30, 41, 59] }, didParseCell: (data) => { if (data.section === 'body' && data.column.index >= 1 && data.column.index <= 10) { const val = parseFloat(data.cell.text[0]); if (!isNaN(val)) { if (val < 5) data.cell.styles.textColor = [185, 28, 28]; else data.cell.styles.textColor = [37, 99, 235]; } } } });
     doc.addPage(); doc.setFontSize(14); doc.setTextColor(0); doc.text("REGISTROS ESPECÍFICOS E ENCAMINHAMENTOS", 14, 20); let currentY = 30;
     const createSection = (title: string, data: any[], headerColor: [number, number, number], headers: string[][]) => { if (data.length > 0) { doc.setFillColor(headerColor[0] + 180 > 255 ? 245 : headerColor[0] + 180, headerColor[1] + 180, headerColor[2] + 180); doc.rect(14, currentY, 269, 8, 'F'); doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...headerColor); doc.text(title, 16, currentY + 5.5); autoTable(doc, { startY: currentY + 10, head: headers, body: data, theme: 'grid', styles: { fontSize: 8, textColor: [50, 50, 50] }, headStyles: { fillColor: headerColor, textColor: [255, 255, 255], fontStyle: 'bold' } }); currentY = (doc as any).lastAutoTable.finalY + 15; if (currentY > 180) { doc.addPage(); currentY = 20; } } };
     const destaques = councilStudents.filter(s => s.is_highlight); createSection("⭐ DESTAQUES ACADÊMICOS", destaques.map(s => [s.name, 'Honra ao Mérito']), [202, 138, 4], [['Nome', 'Ação']]);
@@ -265,11 +240,49 @@ export default function App() {
     const baixoRendimento = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); if (!d) return false; return [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf].filter(n => n !== null && n < 5).length > 3; }); createSection("📉 BAIXO RENDIMENTO", baixoRendimento.map(s => [s.name, 'Convocação']), [180, 83, 9], [['Nome', 'Ação']]);
     const faltosos = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && d.faltas_bimestre > 20; }); createSection("🚨 BUSCA ATIVA (Faltas > 20)", faltosos.map(s => [s.name, s.desempenho?.find((x:any) => x.bimestre === selectedBimestre)?.faltas_bimestre]), [185, 28, 28], [['Nome', 'Faltas']]);
     const deliberacoes = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && (d.obs_conselho || d.encaminhamento_conselho); }); createSection("📝 OBSERVAÇÕES FINAIS", deliberacoes.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return [s.name, d.obs_conselho || '', d.encaminhamento_conselho || '']; }), [75, 85, 99], [['Estudante', 'Obs', 'Encaminhamento']]);
-    
-    // ASSINATURA
     addDocSignature(doc);
-    
     doc.save(`ATA_COMPLETA_${targetClass}.pdf`);
+  };
+
+  // --- ATA GERAL (TODAS AS TURMAS) ---
+  const generateGeneralAta = async () => {
+    const allTurmas = [...new Set(students.map(s => s.class_id))].sort();
+    if (allTurmas.length === 0) return alert('Nenhuma turma encontrada.');
+    const doc = new jsPDF({ orientation: 'landscape' });
+
+    for (let i = 0; i < allTurmas.length; i++) {
+        const turma = allTurmas[i];
+        if (i > 0) doc.addPage(); // Nova página para cada turma
+
+        const councilStudents = students.filter(s => s.class_id === turma);
+        
+        // Tenta buscar dados do radar específicos da turma (se existirem)
+        let localRadar = { assiduidade: 3, participacao: 3, relacionamento: 3, rendimento: 3, tarefas: 3 };
+        const { data } = await supabase.from('class_radar').select('*').eq('turma', turma).eq('bimestre', selectedBimestre).single();
+        if (data) localRadar = data;
+
+        // --- INÍCIO DO CONTEÚDO DA PÁGINA (Igual Super Ata) ---
+        const headerEndY = addDocHeader(doc, 'l');
+        doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(`ATA DE CONSELHO DE CLASSE - ${turma}`, doc.internal.pageSize.getWidth()/2, headerEndY + 10, {align: "center"}); 
+        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`${selectedBimestre} | Data: ${new Date(dataConselho).toLocaleDateString('pt-BR')} | ${SYSTEM_ORG}`, doc.internal.pageSize.getWidth()/2, headerEndY + 16, {align: "center"});
+        
+        autoTable(doc, { startY: headerEndY + 22, head: [['Indicador', 'Assiduidade', 'Participação', 'Relacionamento', 'Rendimento', 'Tarefas']], body: [[ 'Avaliação da Turma (0-5)', localRadar.assiduidade, localRadar.participacao, localRadar.relacionamento, localRadar.rendimento, localRadar.tarefas ]], theme: 'grid', styles: { fontSize: 8, halign: 'center' }, headStyles: { fillColor: [55, 65, 81] } });
+        
+        const rows = councilStudents.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {}; return [s.name, d.lp||'-', d.mat||'-', d.cie||'-', d.his||'-', d.geo||'-', d.ing||'-', d.art||'-', d.edf||'-', d.pd1||'-', d.pd2||'-', d.pd3||'-', d.faltas_bimestre||0, s.logs?.length||0]; });
+        autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 10, head: [['Estudante', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas', 'Ocorr.']], body: rows, styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [30, 41, 59] }, didParseCell: (data) => { if (data.section === 'body' && data.column.index >= 1 && data.column.index <= 10) { const val = parseFloat(data.cell.text[0]); if (!isNaN(val)) { if (val < 5) data.cell.styles.textColor = [185, 28, 28]; else data.cell.styles.textColor = [37, 99, 235]; } } } });
+        
+        doc.addPage(); doc.setFontSize(14); doc.setTextColor(0); doc.text("REGISTROS ESPECÍFICOS E ENCAMINHAMENTOS", 14, 20); let currentY = 30;
+        const createSection = (title: string, data: any[], headerColor: [number, number, number], headers: string[][]) => { if (data.length > 0) { doc.setFillColor(headerColor[0] + 180 > 255 ? 245 : headerColor[0] + 180, headerColor[1] + 180, headerColor[2] + 180); doc.rect(14, currentY, 269, 8, 'F'); doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...headerColor); doc.text(title, 16, currentY + 5.5); autoTable(doc, { startY: currentY + 10, head: headers, body: data, theme: 'grid', styles: { fontSize: 8, textColor: [50, 50, 50] }, headStyles: { fillColor: headerColor, textColor: [255, 255, 255], fontStyle: 'bold' } }); currentY = (doc as any).lastAutoTable.finalY + 15; if (currentY > 180) { doc.addPage(); currentY = 20; } } };
+        
+        const destaques = councilStudents.filter(s => s.is_highlight); createSection("⭐ DESTAQUES ACADÊMICOS", destaques.map(s => [s.name, 'Honra ao Mérito']), [202, 138, 4], [['Nome', 'Ação']]);
+        const elogios = councilStudents.filter(s => s.is_praised); createSection("👏 ELOGIOS E INCENTIVOS", elogios.map(s => [s.name, 'Elogio Verbal']), [21, 128, 61], [['Nome', 'Ação']]);
+        const baixoRendimento = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); if (!d) return false; return [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf].filter(n => n !== null && n < 5).length > 3; }); createSection("📉 BAIXO RENDIMENTO", baixoRendimento.map(s => [s.name, 'Convocação']), [180, 83, 9], [['Nome', 'Ação']]);
+        const faltosos = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && d.faltas_bimestre > 20; }); createSection("🚨 BUSCA ATIVA (Faltas > 20)", faltosos.map(s => [s.name, s.desempenho?.find((x:any) => x.bimestre === selectedBimestre)?.faltas_bimestre]), [185, 28, 28], [['Nome', 'Faltas']]);
+        const deliberacoes = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && (d.obs_conselho || d.encaminhamento_conselho); }); createSection("📝 OBSERVAÇÕES FINAIS", deliberacoes.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return [s.name, d.obs_conselho || '', d.encaminhamento_conselho || '']; }), [75, 85, 99], [['Estudante', 'Obs', 'Encaminhamento']]);
+        
+        addDocSignature(doc);
+    }
+    doc.save("ATA_GERAL_TODAS_TURMAS.pdf");
   };
 
   const printCTList = () => { const ctStudents = students.filter(s => s.ct_referral); if(ctStudents.length === 0) return alert('Nenhum estudante no Conselho Tutelar.'); const doc = new jsPDF(); 
@@ -362,7 +375,11 @@ export default function App() {
           <div className="max-w-[1800px] mx-auto pb-4 w-full h-full flex flex-col overflow-hidden bg-slate-50/50">
               <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm flex-shrink-0">
                   <div className="flex items-center gap-4"><div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><GraduationCap size={24}/></div><div><h2 className="text-xl font-bold text-slate-800">Conselho Digital</h2><div className="flex gap-2 mt-1"><div className="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-md border border-slate-200"><Calendar size={14} className="text-slate-400"/><input type="date" className="text-xs font-bold outline-none bg-transparent text-slate-600" value={dataConselho} onChange={e => setDataConselho(e.target.value)}/></div><select className="px-3 py-1 border rounded-md font-bold bg-slate-100 text-xs text-slate-600" value={targetClass} onChange={e => {setConselhoTurma(e.target.value); setConselhoFilterType('ALL');}}>{turmas.map(t => <option key={t} value={t}>{t}</option>)}</select><select className="px-3 py-1 border rounded-md font-bold bg-slate-100 text-xs text-slate-600" value={selectedBimestre} onChange={e => setSelectedBimestre(e.target.value)}><option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option></select></div></div></div>
-                  <div className="flex gap-3"><button onClick={() => setIsEvalModalOpen(true)} className="bg-orange-50 text-orange-600 border border-orange-200 px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-orange-100 text-sm transition-colors"><Activity size={16}/> Avaliar</button><button onClick={() => generateSuperAta(targetClass)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-indigo-700 text-sm transition-colors shadow-lg shadow-indigo-200"><Printer size={16}/> Gerar Ata Unificada</button></div>
+                  <div className="flex gap-3">
+                    <button onClick={() => setIsEvalModalOpen(true)} className="bg-orange-50 text-orange-600 border border-orange-200 px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-orange-100 text-sm transition-colors"><Activity size={16}/> Avaliar</button>
+                    <button onClick={() => generateSuperAta(targetClass)} className="bg-indigo-50 text-indigo-600 border border-indigo-200 px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-indigo-100 text-sm transition-colors"><Printer size={16}/> Ata Turma</button>
+                    <button onClick={generateGeneralAta} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-indigo-700 text-sm transition-colors shadow-lg shadow-indigo-200"><Layers size={16}/> Ata Geral (Todas)</button>
+                  </div>
               </div>
               <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-4 gap-4 flex-shrink-0">
                   <div onClick={() => setConselhoFilterType('ALL')} className={`cursor-pointer bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between ${conselhoFilterType === 'ALL' ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''}`}><div><p className="text-[10px] font-bold text-slate-400 uppercase">Total Alunos</p><p className="text-2xl font-black text-slate-800">{students.filter(s => s.class_id === targetClass).length}</p></div><div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><Users2 size={20}/></div></div>
