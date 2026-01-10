@@ -27,6 +27,19 @@ const SYSTEM_ORG = "CED 4 Guará";
 const ACCESS_PASSWORD = "Ced@1rf1";
 const COLORS = ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
+// --- DADOS INSTITUCIONAIS (PDF) ---
+const DOC_HEADER = [
+  "GOVERNO DO DISTRITO FEDERAL",
+  "SECRETARIA DE ESTADO DE EDUCAÇÃO DO DF",
+  "CENTRO EDUCACIONAL 4 DO GUARÁ",
+  "SERVIÇO DE ORIENTAÇÃO EDUCACIONAL"
+];
+const DOC_SIGNATURE = [
+  "______________________________________________________________________",
+  "DANIEL ALVES DA SILVA",
+  "Orientador Educacional - SEEDF mat. 212235-9"
+];
+
 // --- LISTAS PADRÃO ---
 const DEFAULT_COMPORTAMENTO = ["Conversa excessiva", "Desacato", "Agressividade verbal", "Agressividade física", "Uso de celular", "Saída s/ autorização", "Bullying", "Desobediência", "Uniforme", "Outros"];
 const DEFAULT_PEDAGOGICO = ["Sem tarefa", "Dificuldade aprend.", "Sem material", "Desatenção", "Baixo desempenho", "Faltas excessivas", "Sono em sala", "Outros"];
@@ -186,11 +199,42 @@ export default function App() {
   // FUNÇÃO MUDAR ALUNO
   const changeStudent = (direction: 'prev' | 'next') => { const turmas = [...new Set(students.map(s => s.class_id))].sort(); const currentClass = conselhoTurma || turmas[0]; const currentList = students.filter(s => s.class_id === currentClass).sort((a,b) => a.name.localeCompare(b.name)); if (!projectedStudent || currentList.length === 0) return; const currentIndex = currentList.findIndex(s => s.id === projectedStudent.id); if (direction === 'next') { if (currentIndex < currentList.length - 1) setProjectedStudent(currentList[currentIndex + 1]); else setProjectedStudent(currentList[0]); } else { if (currentIndex > 0) setProjectedStudent(currentList[currentIndex - 1]); else setProjectedStudent(currentList[currentList.length - 1]); } };
 
-  // --- SUPER ATA (CORES SUAVES) ---
+  // --- FUNÇÕES DE LAYOUT PDF ---
+  const addDocHeader = (doc: jsPDF, orientation: 'p' | 'l' = 'p') => {
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const centerX = pageWidth / 2;
+      doc.setFontSize(10); doc.setFont("helvetica", "bold");
+      let y = 15;
+      DOC_HEADER.forEach(line => { doc.text(line, centerX, y, { align: "center" }); y += 5; });
+      return y; // Retorna onde o cabeçalho termina
+  };
+
+  const addDocSignature = (doc: jsPDF) => {
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const centerX = pageWidth / 2;
+      let y = (doc as any).lastAutoTable?.finalY + 30 || pageHeight - 50;
+      if (y > pageHeight - 40) { doc.addPage(); y = 40; } // Nova página se não couber
+      
+      doc.setFontSize(10); doc.setFont("helvetica", "normal");
+      doc.text(DOC_SIGNATURE[0], centerX, y, { align: "center" });
+      doc.setFont("helvetica", "bold");
+      doc.text(DOC_SIGNATURE[1], centerX, y + 5, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.text(DOC_SIGNATURE[2], centerX, y + 10, { align: "center" });
+  };
+
+  // --- SUPER ATA (CORES SUAVES + INSTITUCIONAL) ---
   const generateSuperAta = (targetClass: string) => {
     const councilStudents = students.filter(s => s.class_id === targetClass); if(councilStudents.length === 0) return alert('Turma vazia'); const doc = new jsPDF({ orientation: 'landscape' });
-    doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(`ATA DE CONSELHO DE CLASSE - ${targetClass}`, 148, 20, {align: "center"}); doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`${selectedBimestre} | Data: ${new Date(dataConselho).toLocaleDateString('pt-BR')} | ${SYSTEM_ORG}`, 148, 26, {align: "center"});
-    autoTable(doc, { startY: 32, head: [['Indicador', 'Assiduidade', 'Participação', 'Relacionamento', 'Rendimento', 'Tarefas']], body: [[ 'Avaliação da Turma (0-5)', radarData.assiduidade, radarData.participacao, radarData.relacionamento, radarData.rendimento, radarData.tarefas ]], theme: 'grid', styles: { fontSize: 8, halign: 'center' }, headStyles: { fillColor: [55, 65, 81] } });
+    
+    // CABEÇALHO
+    const headerEndY = addDocHeader(doc, 'l');
+    
+    doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(`ATA DE CONSELHO DE CLASSE - ${targetClass}`, doc.internal.pageSize.getWidth()/2, headerEndY + 10, {align: "center"}); 
+    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`${selectedBimestre} | Data: ${new Date(dataConselho).toLocaleDateString('pt-BR')}`, doc.internal.pageSize.getWidth()/2, headerEndY + 16, {align: "center"});
+    
+    autoTable(doc, { startY: headerEndY + 22, head: [['Indicador', 'Assiduidade', 'Participação', 'Relacionamento', 'Rendimento', 'Tarefas']], body: [[ 'Avaliação da Turma (0-5)', radarData.assiduidade, radarData.participacao, radarData.relacionamento, radarData.rendimento, radarData.tarefas ]], theme: 'grid', styles: { fontSize: 8, halign: 'center' }, headStyles: { fillColor: [55, 65, 81] } });
     
     const rows = councilStudents.map(s => { 
         const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre) || {}; 
@@ -203,7 +247,6 @@ export default function App() {
         body: rows, 
         styles: { fontSize: 7, cellPadding: 2 }, 
         headStyles: { fillColor: [30, 41, 59] },
-        // --- CORES NAS NOTAS DO PDF ---
         didParseCell: (data) => {
             if (data.section === 'body' && data.column.index >= 1 && data.column.index <= 10) {
                 const val = parseFloat(data.cell.text[0]);
@@ -222,29 +265,55 @@ export default function App() {
     const baixoRendimento = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); if (!d) return false; return [d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf].filter(n => n !== null && n < 5).length > 3; }); createSection("📉 BAIXO RENDIMENTO", baixoRendimento.map(s => [s.name, 'Convocação']), [180, 83, 9], [['Nome', 'Ação']]);
     const faltosos = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && d.faltas_bimestre > 20; }); createSection("🚨 BUSCA ATIVA (Faltas > 20)", faltosos.map(s => [s.name, s.desempenho?.find((x:any) => x.bimestre === selectedBimestre)?.faltas_bimestre]), [185, 28, 28], [['Nome', 'Faltas']]);
     const deliberacoes = councilStudents.filter(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return d && (d.obs_conselho || d.encaminhamento_conselho); }); createSection("📝 OBSERVAÇÕES FINAIS", deliberacoes.map(s => { const d = s.desempenho?.find((x:any) => x.bimestre === selectedBimestre); return [s.name, d.obs_conselho || '', d.encaminhamento_conselho || '']; }), [75, 85, 99], [['Estudante', 'Obs', 'Encaminhamento']]);
+    
+    // ASSINATURA
+    addDocSignature(doc);
+    
     doc.save(`ATA_COMPLETA_${targetClass}.pdf`);
   };
-  const printCTList = () => { const ctStudents = students.filter(s => s.ct_referral); if(ctStudents.length === 0) return alert('Nenhum estudante no Conselho Tutelar.'); const doc = new jsPDF(); doc.setFontSize(14); doc.text("ENCAMINHAMENTOS AO CONSELHO TUTELAR", 105, 20, {align: "center"}); const rows = ctStudents.map(s => [s.name, s.class_id, s.ct_council_name || '-', s.ct_date ? new Date(s.ct_date).toLocaleDateString() : '-', s.ct_referral]); autoTable(doc, { startY: 30, head: [['Nome', 'Turma', 'Conselho', 'Data', 'Motivo']], body: rows }); doc.save("LISTA_CONSELHO_TUTELAR.pdf"); };
-  const printStudentData = (doc: jsPDF, student: any) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GOVERNO DO DISTRITO FEDERAL", 105, 15, { align: "center" }); doc.text("CED 04 DO GUARÁ - SOE", 105, 22, { align: "center" }); doc.setLineWidth(0.5); doc.line(14, 25, 196, 25); doc.setFontSize(11); doc.text(`FICHA INDIVIDUAL DO ESTUDANTE`, 14, 35); 
-  autoTable(doc, { startY: 40, head: [['Informação', 'Detalhe']], body: [['Nome Completo', student.name], ['Turma', student.class_id], ['Data de Nascimento', student.birth_date ? new Date(student.birth_date).toLocaleDateString() : '-'], ['Responsável', student.guardian_name || 'Não informado'], ['Telefone', student.guardian_phone || '-'], ['Endereço', student.address || '-']], theme: 'grid', headStyles: { fillColor: [55, 65, 81] }, columnStyles: { 0: { cellWidth: 50, fontStyle: 'bold' } } }); let currentY = (doc as any).lastAutoTable.finalY + 10; doc.setFontSize(11); doc.setTextColor(0); doc.text("DESEMPENHO ACADÊMICO", 14, currentY); 
-  const acadData = student.desempenho?.map((d: any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.pd2, d.pd3, d.faltas_bimestre]) || []; 
-  autoTable(doc, { 
-      startY: currentY + 5, 
-      head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas']], 
-      body: acadData, 
-      theme: 'grid', 
-      headStyles: { fillColor: [55, 65, 81] },
-      didParseCell: (data) => {
-          if (data.section === 'body' && data.column.index >= 1 && data.column.index <= 8) {
-              const val = parseFloat(data.cell.text[0]);
-              if (!isNaN(val)) {
-                  if (val < 5) data.cell.styles.textColor = [185, 28, 28]; // Vermelho
-                  else data.cell.styles.textColor = [37, 99, 235]; // Azul
-              }
-          }
-      }
-  }); 
-  currentY = (doc as any).lastAutoTable.finalY + 10; doc.text("HISTÓRICO DE ATENDIMENTOS", 14, currentY); const logsData = student.logs?.filter((l: any) => l.student_id === student.id).map((l: any) => { let desc = { obs: '' }; try { desc = JSON.parse(l.description); } catch(e) {} return [new Date(l.created_at).toLocaleDateString(), l.category, desc.obs]; }) || []; autoTable(doc, { startY: currentY + 5, head: [['Data', 'Tipo', 'Detalhes']], body: logsData, theme: 'grid', headStyles: { fillColor: [55, 65, 81] } }); };
+
+  const printCTList = () => { const ctStudents = students.filter(s => s.ct_referral); if(ctStudents.length === 0) return alert('Nenhum estudante no Conselho Tutelar.'); const doc = new jsPDF(); 
+    const headerEndY = addDocHeader(doc);
+    doc.setFontSize(14); doc.text("ENCAMINHAMENTOS AO CONSELHO TUTELAR", 105, headerEndY + 10, {align: "center"}); 
+    const rows = ctStudents.map(s => [s.name, s.class_id, s.ct_council_name || '-', s.ct_date ? new Date(s.ct_date).toLocaleDateString() : '-', s.ct_referral]); 
+    autoTable(doc, { startY: headerEndY + 20, head: [['Nome', 'Turma', 'Conselho', 'Data', 'Motivo']], body: rows }); 
+    addDocSignature(doc);
+    doc.save("LISTA_CONSELHO_TUTELAR.pdf"); 
+  };
+
+  const printStudentData = (doc: jsPDF, student: any) => { 
+    const headerEndY = addDocHeader(doc);
+    
+    doc.setLineWidth(0.5); doc.line(14, headerEndY + 5, 196, headerEndY + 5); 
+    doc.setFontSize(11); doc.text(`FICHA INDIVIDUAL DO ESTUDANTE`, 14, headerEndY + 15); 
+    
+    autoTable(doc, { startY: headerEndY + 20, head: [['Informação', 'Detalhe']], body: [['Nome Completo', student.name], ['Turma', student.class_id], ['Data de Nascimento', student.birth_date ? new Date(student.birth_date).toLocaleDateString() : '-'], ['Responsável', student.guardian_name || 'Não informado'], ['Telefone', student.guardian_phone || '-'], ['Endereço', student.address || '-']], theme: 'grid', headStyles: { fillColor: [55, 65, 81] }, columnStyles: { 0: { cellWidth: 50, fontStyle: 'bold' } } }); 
+    let currentY = (doc as any).lastAutoTable.finalY + 10; doc.setFontSize(11); doc.setTextColor(0); doc.text("DESEMPENHO ACADÊMICO", 14, currentY); 
+    
+    const acadData = student.desempenho?.map((d: any) => [d.bimestre, d.lp, d.mat, d.cie, d.his, d.geo, d.ing, d.art, d.edf, d.pd1, d.pd2, d.pd3, d.faltas_bimestre]) || []; 
+    autoTable(doc, { 
+        startY: currentY + 5, 
+        head: [['Bimestre', 'LP', 'MAT', 'CIE', 'HIS', 'GEO', 'ING', 'ART', 'EDF', 'PD1', 'PD2', 'PD3', 'Faltas']], 
+        body: acadData, 
+        theme: 'grid', 
+        headStyles: { fillColor: [55, 65, 81] },
+        didParseCell: (data) => {
+            if (data.section === 'body' && data.column.index >= 1 && data.column.index <= 8) {
+                const val = parseFloat(data.cell.text[0]);
+                if (!isNaN(val)) {
+                    if (val < 5) data.cell.styles.textColor = [185, 28, 28]; // Vermelho
+                    else data.cell.styles.textColor = [37, 99, 235]; // Azul
+                }
+            }
+        }
+    }); 
+    
+    currentY = (doc as any).lastAutoTable.finalY + 10; doc.text("HISTÓRICO DE ATENDIMENTOS", 14, currentY); 
+    const logsData = student.logs?.filter((l: any) => l.student_id === student.id).map((l: any) => { let desc = { obs: '' }; try { desc = JSON.parse(l.description); } catch(e) {} return [new Date(l.created_at).toLocaleDateString(), l.category, desc.obs]; }) || []; 
+    autoTable(doc, { startY: currentY + 5, head: [['Data', 'Tipo', 'Detalhes']], body: logsData, theme: 'grid', headStyles: { fillColor: [55, 65, 81] } });
+    
+    addDocSignature(doc);
+  };
   const generatePDF = () => { if (!selectedStudent) return; const doc = new jsPDF(); printStudentData(doc, selectedStudent); doc.save(`Ficha_${selectedStudent.name}.pdf`); };
   
   // --- FUNÇÃO EXCEL 3 ABAS ---
